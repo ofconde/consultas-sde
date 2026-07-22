@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel · Consultas SDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/panel.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">Consultas SDE<small>Seguimiento — UEP Santiago del Estero</small></div>
+    <nav>
+      <a href="/panel" class="active">Panel</a>
+      <a href="/informe">Informe</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="user">
+      <span>{{ usuario.nombre }}</span>
+      <span class="rol">{{ usuario.rol }}</span>
+      <a href="/logout">Salir</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="kpis" id="kpis"></div>
+
+    <div class="filtros">
+      <input type="search" id="q" placeholder="Buscar por nombre o CUIT…">
+      <select id="f-estado"><option value="">Todos los estados</option></select>
+      <select id="f-tecnico"><option value="">Todos los técnicos</option><option value="__sin__">— Sin asignar</option></select>
+      <span class="muted" id="cont"></span>
+    </div>
+
+    <div class="tabla-wrap card">
+      <table>
+        <thead><tr>
+          <th>Recepción</th><th>Solicitante</th><th>Localidad</th><th>Sector</th>
+          <th>Monto</th><th>Línea</th><th>Técnico</th><th>Estado</th><th>Acc.</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none">No hay consultas para este filtro.</div>
+    </div>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+let TIMER = null;
+
+async function cargarKpis(){
+  const r = await fetch('/api/informe'); const d = await r.json();
+  $('#kpis').innerHTML = `
+    <div class="kpi card"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>
+    <div class="kpi card accent"><div class="n">${d.activas}</div><div class="l">Activas</div></div>
+    <div class="kpi card"><div class="n">${d.sin_asignar}</div><div class="l">Sin asignar</div></div>
+    <div class="kpi card"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
+    <div class="kpi card"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
+}
+
+async function cargarCatalogos(){
+  const r = await fetch('/api/catalogos'); const c = await r.json();
+  const es = $('#f-estado');
+  (c.ESTADO||[]).forEach(v => es.add(new Option(v, v)));
+}
+
+async function cargarTecnicos(){
+  // técnicos presentes en las consultas
+  const r = await fetch('/api/consultas'); const d = await r.json();
+  const set = [...new Set(d.consultas.map(x=>x.tecnico).filter(Boolean))].sort();
+  const sel = $('#f-tecnico');
+  set.forEach(v => sel.add(new Option(v, v)));
+}
+
+function badge(g, estado){ return `<span class="badge g-${g}">${estado||'—'}</span>`; }
+
+async function cargarTabla(){
+  const p = new URLSearchParams();
+  if($('#q').value) p.set('q',$('#q').value);
+  if($('#f-estado').value) p.set('estado',$('#f-estado').value);
+  if($('#f-tecnico').value) p.set('tecnico',$('#f-tecnico').value);
+  const r = await fetch('/api/consultas?'+p); const d = await r.json();
+  $('#cont').textContent = d.total + ' consulta' + (d.total===1?'':'s');
+  const tb = $('#tbody');
+  $('#empty').style.display = d.total ? 'none':'block';
+  tb.innerHTML = d.consultas.map(c => `
+    <tr onclick="location.href='/consulta/${c.id}'">
+      <td>${c.fecha_recepcion||'—'}<div class="cod">${c.codigo}</div></td>
+      <td><span class="nom">${c.nombre||'—'}</span><div class="cod">${c.cuit||''}</div></td>
+      <td>${c.localidad||'—'}</td>
+      <td>${c.sector?`<span class="chip">${c.sector}</span>`:'—'}</td>
+      <td>${c.monto}</td>
+      <td>${c.linea||'—'}</td>
+      <td>${c.tecnico||'<span class="muted">sin asignar</span>'}</td>
+      <td>${badge(c.grupo,c.estado)}</td>
+      <td style="text-align:center">${c.n_acciones}</td>
+    </tr>`).join('');
+}
+
+$('#q').addEventListener('input', ()=>{clearTimeout(TIMER);TIMER=setTimeout(cargarTabla,250)});
+$('#f-estado').addEventListener('change', cargarTabla);
+$('#f-tecnico').addEventListener('change', cargarTabla);
+
+(async function(){ await cargarCatalogos(); await cargarTecnicos(); await cargarKpis(); await cargarTabla(); })();
+</script>
+</body>
+</html>

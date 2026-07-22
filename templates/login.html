@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ingresar · Consultas SDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/panel.css">
+<style>
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;
+       background:linear-gradient(135deg,#1C2443,#0f1530)}
+  .login{width:100%;max-width:390px;background:#fff;border-radius:20px;padding:38px 34px;
+         box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .login .logo{font-size:22px;font-weight:800;color:var(--navy);text-align:center}
+  .login .sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:26px}
+  .login label{display:block;font-size:13px;font-weight:600;color:var(--navy);margin:14px 0 5px}
+  .login input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:12px;font-size:15px;font-family:inherit}
+  .login button{width:100%;margin-top:22px;padding:13px;background:var(--celeste);color:#fff;border:none;
+                border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+  .err{background:#fdecea;color:var(--red);padding:10px 14px;border-radius:10px;font-size:13px;margin-top:16px;text-align:center}
+</style>
+</head>
+<body>
+  <form class="login" method="post" action="/login">
+    <div class="logo">Consultas · Santiago del Estero</div>
+    <div class="sub">Seguimiento de consultas — UEP CFI</div>
+    <label>Usuario</label>
+    <input name="username" autocomplete="username" autofocus required>
+    <label>Contraseña</label>
+    <input name="password" type="password" autocomplete="current-password" required>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <button type="submit">Ingresar</button>
+  </form>
+</body>
+</html>

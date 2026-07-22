@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informe · Consultas SDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/panel.css">
+<style>
+  .barra{height:22px;border-radius:6px;background:var(--celeste);min-width:2px}
+  .barrow{display:grid;grid-template-columns:210px 1fr 48px;gap:12px;align-items:center;margin:8px 0}
+  .barrow .lbl{font-size:14px;color:var(--navy);font-weight:600}
+  .barrow .val{text-align:right;font-weight:700;color:var(--navy)}
+  .doc-head{display:none}
+  @media print{
+    .topbar,.no-print{display:none!important}
+    .wrap{max-width:100%;padding:0}
+    .doc-head{display:block;margin-bottom:16px}
+    body{background:#fff}
+    .card{box-shadow:none;border:1px solid #ccc}
+  }
+</style>
+</head>
+<body>
+  <div class="topbar no-print">
+    <div class="brand">Consultas SDE<small>Seguimiento — UEP Santiago del Estero</small></div>
+    <nav><a href="/panel">Panel</a><a href="/informe" class="active">Informe</a></nav>
+    <div class="spacer"></div>
+    <div class="user"><span>{{ usuario.nombre }}</span><span class="rol">{{ usuario.rol }}</span><a href="/logout">Salir</a></div>
+  </div>
+
+  <div class="wrap">
+    <div class="doc-head">
+      <h1 style="margin:0">Informe de consultas — UEP Santiago del Estero</h1>
+      <div class="muted" id="fecha-doc"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px" class="no-print">
+      <h1 style="margin:0">Informe de gestión</h1>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn primary" onclick="window.print()">Imprimir / PDF</button>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid2">
+      <div class="card" style="padding:22px">
+        <h3>Por grupo de estado</h3>
+        <div id="grupos"></div>
+        <h3 style="margin-top:24px">Detalle por estado</h3>
+        <div class="tabla-wrap"><table><thead><tr><th>Estado</th><th>Grupo</th><th style="text-align:right">Consultas</th></tr></thead>
+        <tbody id="estados"></tbody></table></div>
+      </div>
+      <div class="card" style="padding:22px">
+        <h3>Por técnico</h3>
+        <div class="tabla-wrap"><table><thead><tr><th>Técnico</th><th style="text-align:right">Consultas</th></tr></thead>
+        <tbody id="tecnicos"></tbody></table></div>
+        <h3 style="margin-top:24px">Movimiento de la semana</h3>
+        <div class="barrow"><span class="lbl">Nuevas consultas</span><span></span><span class="val" id="mv-nuevas"></span></div>
+        <div class="barrow"><span class="lbl">Acciones cargadas</span><span></span><span class="val" id="mv-acc"></span></div>
+        <div class="barrow"><span class="lbl">Acciones por consulta</span><span></span><span class="val" id="mv-apc"></span></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+const hoy = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
+
+(async function(){
+  const d = await (await fetch('/api/informe')).json();
+  $('#fecha-doc').textContent = 'Fecha del informe: ' + hoy;
+
+  $('#kpis').innerHTML = `
+    <div class="kpi card"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>
+    <div class="kpi card accent"><div class="n">${d.activas}</div><div class="l">Activas</div></div>
+    <div class="kpi card"><div class="n">${d.sin_asignar}</div><div class="l">Sin asignar</div></div>
+    <div class="kpi card"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
+    <div class="kpi card"><div class="n">${d.total_acciones}</div><div class="l">Acciones totales</div></div>`;
+
+  const max = Math.max(1, ...d.grupos.map(g=>g.n));
+  $('#grupos').innerHTML = d.grupos.map(g => `
+    <div class="barrow"><span class="lbl">${g.label}</span>
+      <div class="barra" style="width:${Math.round(g.n/max*100)}%"></div>
+      <span class="val">${g.n}</span></div>`).join('');
+
+  $('#estados').innerHTML = d.estados.map(e => `
+    <tr><td>${e.estado}</td><td><span class="badge g-${e.grupo}">${e.grupo.replace('_',' ').toLowerCase()}</span></td>
+    <td style="text-align:right;font-weight:700">${e.n}</td></tr>`).join('');
+
+  $('#tecnicos').innerHTML = d.tecnicos.map(t => `
+    <tr><td>${t.tecnico}</td><td style="text-align:right;font-weight:700">${t.n}</td></tr>`).join('');
+
+  $('#mv-nuevas').textContent = d.nuevas_semana;
+  $('#mv-acc').textContent = d.acciones_semana;
+  $('#mv-apc').textContent = d.acciones_por_consulta;
+})();
+</script>
+</body>
+</html>

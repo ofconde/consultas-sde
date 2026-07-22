@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consulta · Consultas SDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/panel.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">Consultas SDE<small>Seguimiento — UEP Santiago del Estero</small></div>
+    <nav><a href="/panel">Panel</a><a href="/informe">Informe</a></nav>
+    <div class="spacer"></div>
+    <div class="user"><span>{{ usuario.nombre }}</span><span class="rol">{{ usuario.rol }}</span><a href="/logout">Salir</a></div>
+  </div>
+
+  <div class="wrap">
+    <a href="/panel" class="muted">&larr; Volver al panel</a>
+    <div style="display:flex;align-items:center;gap:14px;margin:8px 0 4px">
+      <h1 id="nombre" style="margin:0">…</h1>
+      <span class="badge" id="badge"></span>
+    </div>
+    <div class="pill-row">
+      <span class="chip" id="codigo"></span>
+      <span class="chip" id="cuit"></span>
+      <span class="chip" id="recepcion"></span>
+    </div>
+
+    <div class="grid2">
+      <!-- Gestión editable -->
+      <div class="card" style="padding:22px">
+        <div class="sec-title">Datos del solicitante</div>
+        <div class="row2">
+          <div class="field"><label>Teléfono</label><input id="v-telefono" disabled></div>
+          <div class="field"><label>Mail</label><input id="v-mail" disabled></div>
+        </div>
+        <div class="field"><label>Actividad declarada</label><textarea id="v-actividad" disabled></textarea></div>
+        <div class="field"><label>Destino del financiamiento</label><textarea id="v-destino" disabled></textarea></div>
+        <div class="row2">
+          <div class="field"><label>Monto solicitado</label><input id="v-monto" disabled></div>
+          <div class="field"><label>Cómo se enteró</label><input id="v-como" disabled></div>
+        </div>
+
+        <div class="sec-title">Gestión</div>
+        <div class="row2">
+          <div class="field"><label>Técnico responsable</label>
+            <select id="g-tecnico"><option value="">— Sin asignar</option></select></div>
+          <div class="field"><label>Estado</label><select id="g-estado"></select></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Departamento</label><select id="g-departamento"><option value=""></option></select></div>
+          <div class="field"><label>Localidad confirmada</label><input id="g-localidad_confirmada" list="loc-list"><datalist id="loc-list"></datalist></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Línea</label><select id="g-linea"><option value=""></option></select></div>
+          <div class="field"><label>Programa</label><select id="g-programa"><option value=""></option></select></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Garantía</label><select id="g-garantia"><option value=""></option></select></div>
+          <div class="field"><label>Monto confirmado</label><input id="g-monto_confirmado" placeholder="$"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>ARCA confirmado</label><select id="g-arca_confirmado"><option value=""></option></select></div>
+          <div class="field"><label>Situación BCRA</label><input id="g-situacion_bcra"></div>
+        </div>
+        <div class="field"><label>Actividad inscripta (ARCA)</label><input id="g-actividad_inscripta"></div>
+        <div class="field"><label>Observaciones</label><textarea id="g-observaciones"></textarea></div>
+        <div class="field"><label>Información extra</label><textarea id="g-informacion_extra"></textarea></div>
+        <button class="btn primary" id="guardar">Guardar gestión</button>
+        <span class="muted" id="guardado" style="margin-left:10px"></span>
+      </div>
+
+      <!-- Acciones -->
+      <div>
+        <div class="card" style="padding:22px;margin-bottom:18px">
+          <div class="sec-title" style="margin-top:0">Nueva acción</div>
+          <div class="field"><label>Tipo de acción</label><select id="a-accion"></select></div>
+          <div class="field"><label>Fecha</label><input id="a-fecha" type="date"></div>
+          <div class="field"><label>Detalle</label><textarea id="a-detalle" placeholder="Qué se hizo / resultado…"></textarea></div>
+          <button class="btn primary" id="add-accion">Agregar acción</button>
+        </div>
+        <div class="card" style="padding:22px">
+          <div class="sec-title" style="margin-top:0">Historial</div>
+          <ul class="timeline" id="timeline"></ul>
+          <div class="muted" id="sin-acc" style="display:none">Sin acciones registradas todavía.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const CID = {{ cid }};
+const $ = s => document.querySelector(s);
+let CAT = {};
+
+function fill(sel, arr, cur){
+  arr.forEach(v => sel.add(new Option(v, v, false, v===cur)));
+}
+
+async function cargarCat(){ CAT = await (await fetch('/api/catalogos')).json(); }
+
+async function cargarTecnicos(sel, cur){
+  const d = await (await fetch('/api/consultas')).json();
+  const set = [...new Set(d.consultas.map(x=>x.tecnico).filter(Boolean))].sort();
+  // asegurar que el actual esté aunque no exista en otras
+  if(cur && !set.includes(cur)) set.push(cur);
+  set.forEach(v => sel.add(new Option(v, v, false, v===cur)));
+}
+
+function badgeGrupo(g, estado){
+  const b = $('#badge'); b.className = 'badge g-'+g; b.textContent = estado||'—';
+}
+
+async function cargar(){
+  await cargarCat();
+  const d = await (await fetch('/api/consultas/'+CID)).json();
+  const c = d.consulta;
+  $('#nombre').textContent = c.nombre || 'Consulta';
+  $('#codigo').textContent = c.codigo;
+  $('#cuit').textContent = 'CUIT ' + (c.cuit||'—');
+  $('#recepcion').textContent = 'Recepción ' + (c.fecha_recepcion_fmt||'—');
+  badgeGrupo(c.grupo, c.estado);
+
+  $('#v-telefono').value = c.telefono||'';
+  $('#v-mail').value = c.mail||'';
+  $('#v-actividad').value = c.actividad_economica||'';
+  $('#v-destino').value = c.destino||'';
+  $('#v-monto').value = c.monto_fmt||'';
+  $('#v-como').value = c.como_se_entero||'';
+
+  // dropdowns de gestión
+  fill($('#g-estado'), CAT.ESTADO||[], c.estado);
+  fill($('#g-departamento'), CAT.DEPARTAMENTO||[], c.departamento);
+  fill($('#g-linea'), CAT.LINEA||[], c.linea);
+  fill($('#g-programa'), CAT.PROGRAMA||[], c.programa);
+  fill($('#g-garantia'), CAT.GARANTIA||[], c.garantia);
+  fill($('#g-arca_confirmado'), CAT.SITUACION_AFIP||[], c.arca_confirmado);
+  (CAT.LOCALIDAD||[]).forEach(v => $('#loc-list').appendChild(new Option(v,v)));
+  await cargarTecnicos($('#g-tecnico'), c.tecnico);
+
+  $('#g-localidad_confirmada').value = c.localidad_confirmada||'';
+  $('#g-situacion_bcra').value = c.situacion_bcra||'';
+  $('#g-actividad_inscripta').value = c.actividad_inscripta||'';
+  $('#g-observaciones').value = c.observaciones||'';
+  $('#g-informacion_extra').value = c.informacion_extra||'';
+  $('#g-monto_confirmado').value = c.monto_confirmado||'';
+
+  fill($('#a-accion'), CAT.ACCION||[], '');
+  renderAcciones(d.acciones);
+}
+
+function renderAcciones(acc){
+  $('#sin-acc').style.display = acc.length ? 'none':'block';
+  $('#timeline').innerHTML = acc.map(a => `
+    <li>
+      <div class="acc">${a.accion}</div>
+      <div class="meta">${a.fecha||'sin fecha'} · ${a.creado_por||''}
+        <a href="#" class="muted" onclick="borrarAccion(${a.id});return false" style="margin-left:8px">eliminar</a></div>
+      ${a.detalle?`<div class="det">${a.detalle}</div>`:''}
+    </li>`).join('');
+}
+
+$('#guardar').addEventListener('click', async () => {
+  const body = {
+    tecnico:$('#g-tecnico').value, estado:$('#g-estado').value,
+    departamento:$('#g-departamento').value, localidad_confirmada:$('#g-localidad_confirmada').value,
+    linea:$('#g-linea').value, programa:$('#g-programa').value, garantia:$('#g-garantia').value,
+    arca_confirmado:$('#g-arca_confirmado').value, situacion_bcra:$('#g-situacion_bcra').value,
+    actividad_inscripta:$('#g-actividad_inscripta').value, observaciones:$('#g-observaciones').value,
+    informacion_extra:$('#g-informacion_extra').value, monto_confirmado:$('#g-monto_confirmado').value,
+  };
+  const r = await fetch('/api/consultas/'+CID, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.ok){ $('#guardado').textContent='✓ Guardado'; badgeGrupo(gruponuevo($('#g-estado').value), $('#g-estado').value);
+    setTimeout(()=>$('#guardado').textContent='',2000); }
+  else $('#guardado').textContent='Error al guardar';
+});
+
+// grupo client-side (espejo de constantes.py) solo para refrescar el badge al vuelo
+const GMAP={'CONSULTA INICIAL':'INICIAL','COMPLETANDO DOCUMENTACION':'EN_GESTION','EN GESTION CON SGR O FONDO':'EN_GESTION','HAY INTERÉS PERO NO SE DECIDE':'EN_GESTION','INGRESADO EN CFI SEDE':'EN_SEDE','DERIVADO A FONDO DE GARANTIA CFI':'EN_SEDE','DERIVADO A MERCADO DE CAPITALES':'EN_SEDE','DERIVADO A OTRA PROVINCIA':'EN_SEDE','NO ES FINANCIABLE':'INACTIVAS','DESISTE DE TOMAR EL CRÉDITO':'INACTIVAS','REPETIDO':'INACTIVAS'};
+function gruponuevo(e){ return GMAP[e]||'INICIAL'; }
+
+$('#add-accion').addEventListener('click', async () => {
+  const accion = $('#a-accion').value;
+  if(!accion){ alert('Elegí un tipo de acción'); return; }
+  const body = {accion, fecha:$('#a-fecha').value||null, detalle:$('#a-detalle').value};
+  const r = await fetch('/api/consultas/'+CID+'/acciones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.ok){ $('#a-detalle').value=''; $('#a-fecha').value=''; refrescarAcciones(); }
+});
+
+async function refrescarAcciones(){
+  const acc = await (await fetch('/api/consultas/'+CID+'/acciones')).json();
+  renderAcciones(acc);
+}
+async function borrarAccion(aid){
+  if(!confirm('¿Eliminar esta acción?')) return;
+  await fetch('/api/consultas/'+CID+'/acciones/'+aid,{method:'DELETE'});
+  refrescarAcciones();
+}
+
+cargar();
+</script>
+</body>
+</html>
