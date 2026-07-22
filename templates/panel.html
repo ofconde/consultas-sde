@@ -49,10 +49,11 @@
 
 <script>
 const $ = s => document.querySelector(s);
+const ROL = "{{ usuario.rol }}";
 let TIMER = null;
 const PAGE_SIZE = 60;
 const GCOLOR = { INICIAL:'#2f6fd0', EN_GESTION:'#6c4bd0', EN_SEDE:'#1a9e57', INACTIVAS:'#8891a8' };
-const state = { estado: '', mios: false, pagina: 1 };
+const state = { estado: '', mios: false, dups: false, pagina: 1 };
 let ROWS = [];
 
 async function cargarResumen(){
@@ -72,20 +73,31 @@ async function cargarResumen(){
       <span>${e.estado}</span><span class="cnt">${e.n}</span></button>`;
   });
   botones += `<button class="ebtn mios" id="btn-mios">Mis casos</button>`;
+  if(d.duplicados > 0)
+    botones += `<button class="ebtn dups" id="btn-dups">⚠ Duplicados <span class="cnt">${d.duplicados}</span></button>`;
   $('#ebtns').innerHTML = botones;
 
   $('#ebtns').querySelectorAll('.ebtn[data-estado]').forEach(b => {
-    b.addEventListener('click', () => { state.estado = b.dataset.estado; pintarBotones(); cargarTabla(); });
+    b.addEventListener('click', () => {
+      state.estado = b.dataset.estado; state.dups = false; pintarBotones(); cargarTabla();
+    });
   });
-  $('#btn-mios').addEventListener('click', () => { state.mios = !state.mios; pintarBotones(); cargarTabla(); });
+  $('#btn-mios').addEventListener('click', () => {
+    state.mios = !state.mios; state.dups = false; pintarBotones(); cargarTabla();
+  });
+  const bd = $('#btn-dups');
+  if(bd) bd.addEventListener('click', () => {
+    state.dups = !state.dups; state.estado = ''; state.mios = false; pintarBotones(); cargarTabla();
+  });
   pintarBotones();
 }
 
 function pintarBotones(){
   $('#ebtns').querySelectorAll('.ebtn[data-estado]').forEach(b => {
-    b.classList.toggle('active', b.dataset.estado === state.estado);
+    b.classList.toggle('active', b.dataset.estado === state.estado && !state.dups && !state.mios);
   });
   const m = $('#btn-mios'); if(m) m.classList.toggle('active', state.mios);
+  const bd = $('#btn-dups'); if(bd) bd.classList.toggle('active', state.dups);
 }
 
 async function cargarTecnicos(){
@@ -104,6 +116,7 @@ async function cargarTabla(){
   if(state.estado) p.set('estado',state.estado);
   if($('#f-tecnico').value) p.set('tecnico',$('#f-tecnico').value);
   if(state.mios) p.set('mios','1');
+  if(state.dups) p.set('dups','1');
   const r = await fetch('/api/consultas?'+p); const d = await r.json();
   ROWS = d.consultas;
   state.pagina = 1;
@@ -112,18 +125,31 @@ async function cargarTabla(){
 }
 
 function filaHTML(c){
+  const dup = c.es_duplicado ? '<span class="dup">DUP</span>' : '';
+  const acc = (state.dups && ROL === 'coordinador')
+    ? `<button class="btn sm danger" onclick="event.stopPropagation();borrarConsulta(${c.id},this)">Eliminar</button>`
+    : c.n_acciones;
   return `
     <tr onclick="location.href='/consulta/${c.id}'">
       <td>${c.fecha_recepcion||'—'}<div class="cod">${c.codigo}</div></td>
-      <td><span class="nom">${c.nombre||'—'}</span><div class="cod">${c.cuit||''}</div></td>
+      <td><span class="nom">${c.nombre||'—'}</span><div class="cod">${c.cuit||''}${dup}</div></td>
       <td>${c.localidad||'—'}</td>
       <td>${c.sector?`<span class="chip">${c.sector}</span>`:'—'}</td>
       <td>${c.monto}</td>
       <td>${c.linea||'—'}</td>
       <td>${c.tecnico||'<span class="muted">sin asignar</span>'}</td>
       <td>${badge(c.grupo,c.estado)}</td>
-      <td style="text-align:center">${c.n_acciones}</td>
+      <td style="text-align:center">${acc}</td>
     </tr>`;
+}
+
+async function borrarConsulta(id, btn){
+  const tr = btn.closest('tr');
+  const nombre = tr.querySelector('.nom')?.textContent || 'esta consulta';
+  if(!confirm('¿Eliminar la consulta de ' + nombre + '?\nEsta acción no se puede deshacer.')) return;
+  const r = await fetch('/api/consultas/' + id, { method: 'DELETE' });
+  if(r.ok){ await cargarResumen(); await cargarTabla(); }
+  else alert('No se pudo eliminar (requiere rol coordinador).');
 }
 
 function renderPagina(){

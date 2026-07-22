@@ -39,7 +39,7 @@
         <div class="field"><label>Actividad declarada</label><textarea id="v-actividad" disabled></textarea></div>
         <div class="field"><label>Destino del financiamiento</label><textarea id="v-destino" disabled></textarea></div>
         <div class="row2">
-          <div class="field"><label>Monto solicitado</label><input id="v-monto" disabled></div>
+          <div class="field"><label>Monto solicitado ✎</label><input id="g-monto" placeholder="$"></div>
           <div class="field"><label>Cómo se enteró</label><input id="v-como" disabled></div>
         </div>
 
@@ -127,7 +127,7 @@ async function cargar(){
   $('#v-mail').value = c.mail||'';
   $('#v-actividad').value = c.actividad_economica||'';
   $('#v-destino').value = c.destino||'';
-  $('#v-monto').value = c.monto_fmt||'';
+  $('#g-monto').value = c.monto || '';
   $('#v-como').value = c.como_se_entero||'';
 
   // dropdowns de gestión
@@ -170,6 +170,7 @@ $('#guardar').addEventListener('click', async () => {
     arca_confirmado:$('#g-arca_confirmado').value, situacion_bcra:$('#g-situacion_bcra').value,
     actividad_inscripta:$('#g-actividad_inscripta').value, observaciones:$('#g-observaciones').value,
     informacion_extra:$('#g-informacion_extra').value, monto_confirmado:$('#g-monto_confirmado').value,
+    monto:$('#g-monto').value,
   };
   const r = await fetch('/api/consultas/'+CID, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(r.ok){ $('#guardado').textContent='✓ Guardado'; badgeGrupo(gruponuevo($('#g-estado').value), $('#g-estado').value);

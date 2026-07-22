@@ -38,6 +38,7 @@ class GestionIn(BaseModel):
     monto_confirmado:     Optional[str] = None
     actividad_inscripta:  Optional[str] = None
     situacion_bcra:       Optional[str] = None
+    monto:                Optional[str] = None
     estado:               Optional[str] = None
     observaciones:        Optional[str] = None
     informacion_extra:    Optional[str] = None

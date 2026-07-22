@@ -47,12 +47,23 @@ def _fila_resumen(r):
     }
 
 
+def _cuits_duplicados(conn):
+    """CUITs (no vacíos) que aparecen en más de una consulta."""
+    rows = conn.execute(text("""
+        SELECT cuit FROM sde_consultas
+        WHERE cuit IS NOT NULL AND cuit <> ''
+        GROUP BY cuit HAVING COUNT(*) > 1
+    """)).fetchall()
+    return {r[0] for r in rows}
+
+
 @router.get("")
 def listar(request: Request, estado: str = "", tecnico: str = "",
-           grupo: str = "", q: str = "", mios: bool = False,
+           grupo: str = "", q: str = "", mios: bool = False, dups: bool = False,
            usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca por nombre o CUIT.
-    `mios=1` filtra las asignadas al técnico logueado (match sin acentos/mayúsculas)."""
+    `mios=1` filtra las asignadas al técnico logueado (match sin acentos/mayúsculas).
+    `dups=1` muestra solo consultas con CUIT duplicado, agrupadas por CUIT."""
     where = ["1=1"]
     params = {}
     if estado:
@@ -66,15 +77,26 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         where.append("(c.nombre ILIKE :q OR c.cuit ILIKE :q)"); params["q"] = f"%{q}%"
 
     with engine.connect() as conn:
+        dup_cuits = _cuits_duplicados(conn)
+        if dups:
+            if not dup_cuits:
+                return {"total": 0, "consultas": []}
+            where.append("c.cuit = ANY(:dcuits)"); params["dcuits"] = list(dup_cuits)
+            orden = "c.cuit, c.id"
+        else:
+            orden = "c.fecha_recepcion DESC NULLS LAST, c.id DESC"
+
         rows = conn.execute(text(f"""
             SELECT c.*,
                    (SELECT COUNT(*) FROM sde_acciones a WHERE a.consulta_id = c.id) AS n_acciones
             FROM sde_consultas c
             WHERE {' AND '.join(where)}
-            ORDER BY c.fecha_recepcion DESC NULLS LAST, c.id DESC
+            ORDER BY {orden}
         """), params).mappings().all()
 
     data = [_fila_resumen(r) for r in rows]
+    for d in data:
+        d["es_duplicado"] = d["cuit"] in dup_cuits
     if grupo:
         data = [d for d in data if d["grupo"] == grupo]
     if mios:
@@ -118,6 +140,9 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
     if "monto_confirmado" in campos:
         sets.append("monto_confirmado = :monto_confirmado")
         params["monto_confirmado"] = _parse_monto(campos["monto_confirmado"])
+    if "monto" in campos:
+        sets.append("monto = :monto")
+        params["monto"] = _parse_monto(campos["monto"])
     if not sets:
         return {"ok": True, "sin_cambios": True}
     sets.append("updated_at = NOW()")

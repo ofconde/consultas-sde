@@ -47,6 +47,16 @@ def informe(_=Depends(require_login)):
 
         total_acciones = conn.execute(text("SELECT COUNT(*) FROM sde_acciones")).scalar() or 0
 
+        # consultas involucradas en un CUIT duplicado
+        duplicados = conn.execute(text("""
+            SELECT COUNT(*) FROM sde_consultas
+            WHERE cuit IN (
+                SELECT cuit FROM sde_consultas
+                WHERE cuit IS NOT NULL AND cuit <> ''
+                GROUP BY cuit HAVING COUNT(*) > 1
+            )
+        """)).scalar() or 0
+
         # montos solicitados
         m = conn.execute(text("""
             SELECT COALESCE(SUM(monto),0) total, COALESCE(ROUND(AVG(monto)),0) prom,
@@ -86,6 +96,7 @@ def informe(_=Depends(require_login)):
         "activas": activas,
         "sin_asignar": sin_asignar,
         "sin_acciones": sin_acciones,
+        "duplicados": duplicados,
         "total_acciones": total_acciones,
         "acciones_por_consulta": round(total_acciones / total, 2) if total else 0,
         "nuevas_semana": nuevas_semana,
