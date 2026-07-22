@@ -6,7 +6,8 @@
   font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5}
+/* interfaz ~30% más compacta */
+body{margin:0;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;zoom:.72}
 a{color:var(--celeste);text-decoration:none}
 h1,h2,h3{margin:0 0 .4em;color:var(--navy);font-weight:700}
 h1{font-size:28px}
@@ -32,6 +33,16 @@ h1{font-size:28px}
 .kpi .n{font-size:32px;font-weight:800;color:var(--navy);line-height:1}
 .kpi .l{color:var(--muted);font-size:13px;margin-top:6px;font-weight:500}
 .kpi.accent .n{color:var(--celeste)}
+
+/* Botones de estado (navegación rápida) */
+.estado-btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
+.ebtn{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border-radius:12px;border:1px solid var(--border);background:#fff;color:var(--navy);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
+.ebtn:hover{border-color:var(--celeste)}
+.ebtn .cnt{background:#eef1f7;color:var(--muted);border-radius:20px;padding:1px 9px;font-size:12px;font-weight:700}
+.ebtn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.ebtn.active .cnt{background:rgba(255,255,255,.22);color:#fff}
+.ebtn.mios{margin-left:auto}
+.ebtn.mios.active{background:var(--celeste);border-color:var(--celeste);color:#fff}
 
 /* Filtros */
 .filtros{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px}

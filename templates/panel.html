@@ -26,6 +26,8 @@
   <div class="wrap">
     <div class="kpis" id="kpis"></div>
 
+    <div class="estado-btns" id="ebtns"></div>
+
     <div class="filtros">
       <input type="search" id="q" placeholder="Buscar por nombre o CUIT…">
       <select id="f-estado"><option value="">Todos los estados</option></select>
@@ -48,8 +50,9 @@
 <script>
 const $ = s => document.querySelector(s);
 let TIMER = null;
+const state = { grupo: '', mios: false };
 
-async function cargarKpis(){
+async function cargarResumen(){
   const r = await fetch('/api/informe'); const d = await r.json();
   $('#kpis').innerHTML = `
     <div class="kpi card"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>
@@ -57,6 +60,27 @@ async function cargarKpis(){
     <div class="kpi card"><div class="n">${d.sin_asignar}</div><div class="l">Sin asignar</div></div>
     <div class="kpi card"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
     <div class="kpi card"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
+
+  // botones de estado (navegación rápida por grupo)
+  let botones = `<button class="ebtn" data-grupo=""><span>Todas</span><span class="cnt">${d.total}</span></button>`;
+  d.grupos.forEach(g => {
+    botones += `<button class="ebtn" data-grupo="${g.clave}"><span>${g.label}</span><span class="cnt">${g.n}</span></button>`;
+  });
+  botones += `<button class="ebtn mios" id="btn-mios">Mis casos</button>`;
+  $('#ebtns').innerHTML = botones;
+
+  $('#ebtns').querySelectorAll('.ebtn[data-grupo]').forEach(b => {
+    b.addEventListener('click', () => { state.grupo = b.dataset.grupo; pintarBotones(); cargarTabla(); });
+  });
+  $('#btn-mios').addEventListener('click', () => { state.mios = !state.mios; pintarBotones(); cargarTabla(); });
+  pintarBotones();
+}
+
+function pintarBotones(){
+  $('#ebtns').querySelectorAll('.ebtn[data-grupo]').forEach(b => {
+    b.classList.toggle('active', b.dataset.grupo === state.grupo);
+  });
+  const m = $('#btn-mios'); if(m) m.classList.toggle('active', state.mios);
 }
 
 async function cargarCatalogos(){
@@ -80,6 +104,8 @@ async function cargarTabla(){
   if($('#q').value) p.set('q',$('#q').value);
   if($('#f-estado').value) p.set('estado',$('#f-estado').value);
   if($('#f-tecnico').value) p.set('tecnico',$('#f-tecnico').value);
+  if(state.grupo) p.set('grupo',state.grupo);
+  if(state.mios) p.set('mios','1');
   const r = await fetch('/api/consultas?'+p); const d = await r.json();
   $('#cont').textContent = d.total + ' consulta' + (d.total===1?'':'s');
   const tb = $('#tbody');
@@ -102,7 +128,7 @@ $('#q').addEventListener('input', ()=>{clearTimeout(TIMER);TIMER=setTimeout(carg
 $('#f-estado').addEventListener('change', cargarTabla);
 $('#f-tecnico').addEventListener('change', cargarTabla);
 
-(async function(){ await cargarCatalogos(); await cargarTecnicos(); await cargarKpis(); await cargarTabla(); })();
+(async function(){ await cargarCatalogos(); await cargarTecnicos(); await cargarResumen(); await cargarTabla(); })();
 </script>
 </body>
 </html>

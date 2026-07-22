@@ -1,4 +1,5 @@
 """API de consultas — listar/filtrar, detalle, editar gestión, alta manual, baja."""
+import unicodedata
 from fastapi import APIRouter, Depends, HTTPException, Request, Body
 from sqlalchemy import text
 
@@ -16,6 +17,13 @@ _GESTION_COLS = [
     "programa", "arca_confirmado", "actividad_inscripta", "situacion_bcra",
     "estado", "observaciones", "informacion_extra", "genero",
 ]
+
+
+def _norm(s: str) -> str:
+    """Normaliza para comparar técnicos: sin acentos, mayúsculas, sin espacios extra."""
+    s = unicodedata.normalize("NFD", s or "")
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return s.upper().strip()
 
 
 def _fila_resumen(r):
@@ -41,8 +49,10 @@ def _fila_resumen(r):
 
 @router.get("")
 def listar(request: Request, estado: str = "", tecnico: str = "",
-           grupo: str = "", q: str = "", _=Depends(require_login)):
-    """Lista consultas con filtros. `q` busca por nombre o CUIT."""
+           grupo: str = "", q: str = "", mios: bool = False,
+           usuario=Depends(require_login)):
+    """Lista consultas con filtros. `q` busca por nombre o CUIT.
+    `mios=1` filtra las asignadas al técnico logueado (match sin acentos/mayúsculas)."""
     where = ["1=1"]
     params = {}
     if estado:
@@ -67,6 +77,9 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     data = [_fila_resumen(r) for r in rows]
     if grupo:
         data = [d for d in data if d["grupo"] == grupo]
+    if mios:
+        yo = _norm(usuario["nombre"])
+        data = [d for d in data if _norm(d["tecnico"]) == yo]
     return {"total": len(data), "consultas": data}
 
 
