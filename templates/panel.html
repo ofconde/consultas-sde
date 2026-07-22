@@ -30,7 +30,6 @@
 
     <div class="filtros">
       <input type="search" id="q" placeholder="Buscar por nombre o CUIT…">
-      <select id="f-estado"><option value="">Todos los estados</option></select>
       <select id="f-tecnico"><option value="">Todos los técnicos</option><option value="__sin__">— Sin asignar</option></select>
       <span class="muted" id="cont"></span>
     </div>
@@ -44,13 +43,17 @@
         <tbody id="tbody"></tbody>
       </table>
       <div class="empty" id="empty" style="display:none">No hay consultas para este filtro.</div>
+      <div class="pager" id="pager" style="display:none"></div>
     </div>
   </div>
 
 <script>
 const $ = s => document.querySelector(s);
 let TIMER = null;
-const state = { grupo: '', mios: false };
+const PAGE_SIZE = 60;
+const GCOLOR = { INICIAL:'#2f6fd0', EN_GESTION:'#6c4bd0', EN_SEDE:'#1a9e57', INACTIVAS:'#8891a8' };
+const state = { estado: '', mios: false, pagina: 1 };
+let ROWS = [];
 
 async function cargarResumen(){
   const r = await fetch('/api/informe'); const d = await r.json();
@@ -61,32 +64,28 @@ async function cargarResumen(){
     <div class="kpi card"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
     <div class="kpi card"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
 
-  // botones de estado (navegación rápida por grupo)
-  let botones = `<button class="ebtn" data-grupo=""><span>Todas</span><span class="cnt">${d.total}</span></button>`;
-  d.grupos.forEach(g => {
-    botones += `<button class="ebtn" data-grupo="${g.clave}"><span>${g.label}</span><span class="cnt">${g.n}</span></button>`;
+  // botones dinámicos: uno por cada estado que exista en los datos (se crean solos)
+  let botones = `<button class="ebtn" data-estado=""><span>Todas</span><span class="cnt">${d.total}</span></button>`;
+  d.estados.forEach(e => {
+    botones += `<button class="ebtn" data-estado="${e.estado}">
+      <span class="dot" style="background:${GCOLOR[e.grupo]||'#8891a8'}"></span>
+      <span>${e.estado}</span><span class="cnt">${e.n}</span></button>`;
   });
   botones += `<button class="ebtn mios" id="btn-mios">Mis casos</button>`;
   $('#ebtns').innerHTML = botones;
 
-  $('#ebtns').querySelectorAll('.ebtn[data-grupo]').forEach(b => {
-    b.addEventListener('click', () => { state.grupo = b.dataset.grupo; pintarBotones(); cargarTabla(); });
+  $('#ebtns').querySelectorAll('.ebtn[data-estado]').forEach(b => {
+    b.addEventListener('click', () => { state.estado = b.dataset.estado; pintarBotones(); cargarTabla(); });
   });
   $('#btn-mios').addEventListener('click', () => { state.mios = !state.mios; pintarBotones(); cargarTabla(); });
   pintarBotones();
 }
 
 function pintarBotones(){
-  $('#ebtns').querySelectorAll('.ebtn[data-grupo]').forEach(b => {
-    b.classList.toggle('active', b.dataset.grupo === state.grupo);
+  $('#ebtns').querySelectorAll('.ebtn[data-estado]').forEach(b => {
+    b.classList.toggle('active', b.dataset.estado === state.estado);
   });
   const m = $('#btn-mios'); if(m) m.classList.toggle('active', state.mios);
-}
-
-async function cargarCatalogos(){
-  const r = await fetch('/api/catalogos'); const c = await r.json();
-  const es = $('#f-estado');
-  (c.ESTADO||[]).forEach(v => es.add(new Option(v, v)));
 }
 
 async function cargarTecnicos(){
@@ -102,15 +101,18 @@ function badge(g, estado){ return `<span class="badge g-${g}">${estado||'—'}</
 async function cargarTabla(){
   const p = new URLSearchParams();
   if($('#q').value) p.set('q',$('#q').value);
-  if($('#f-estado').value) p.set('estado',$('#f-estado').value);
+  if(state.estado) p.set('estado',state.estado);
   if($('#f-tecnico').value) p.set('tecnico',$('#f-tecnico').value);
-  if(state.grupo) p.set('grupo',state.grupo);
   if(state.mios) p.set('mios','1');
   const r = await fetch('/api/consultas?'+p); const d = await r.json();
+  ROWS = d.consultas;
+  state.pagina = 1;
   $('#cont').textContent = d.total + ' consulta' + (d.total===1?'':'s');
-  const tb = $('#tbody');
-  $('#empty').style.display = d.total ? 'none':'block';
-  tb.innerHTML = d.consultas.map(c => `
+  renderPagina();
+}
+
+function filaHTML(c){
+  return `
     <tr onclick="location.href='/consulta/${c.id}'">
       <td>${c.fecha_recepcion||'—'}<div class="cod">${c.codigo}</div></td>
       <td><span class="nom">${c.nombre||'—'}</span><div class="cod">${c.cuit||''}</div></td>
@@ -121,14 +123,37 @@ async function cargarTabla(){
       <td>${c.tecnico||'<span class="muted">sin asignar</span>'}</td>
       <td>${badge(c.grupo,c.estado)}</td>
       <td style="text-align:center">${c.n_acciones}</td>
-    </tr>`).join('');
+    </tr>`;
+}
+
+function renderPagina(){
+  const total = ROWS.length;
+  $('#empty').style.display = total ? 'none':'block';
+  const pages = Math.max(1, Math.ceil(total/PAGE_SIZE));
+  if(state.pagina > pages) state.pagina = pages;
+  const start = (state.pagina-1)*PAGE_SIZE;
+  $('#tbody').innerHTML = ROWS.slice(start, start+PAGE_SIZE).map(filaHTML).join('');
+  const pg = $('#pager');
+  if(total > PAGE_SIZE){
+    pg.style.display = 'flex';
+    pg.innerHTML = `
+      <span class="info">Mostrando ${start+1}–${Math.min(start+PAGE_SIZE,total)} de ${total}</span>
+      <span class="ctrls">
+        <button class="btn sm" id="pg-prev" ${state.pagina<=1?'disabled':''}>← Anterior</button>
+        <span class="pg">Página ${state.pagina} / ${pages}</span>
+        <button class="btn sm" id="pg-next" ${state.pagina>=pages?'disabled':''}>Siguiente →</button>
+      </span>`;
+    $('#pg-prev').onclick = ()=>{ if(state.pagina>1){ state.pagina--; renderPagina(); window.scrollTo(0,0);} };
+    $('#pg-next').onclick = ()=>{ if(state.pagina<pages){ state.pagina++; renderPagina(); window.scrollTo(0,0);} };
+  } else {
+    pg.style.display = 'none';
+  }
 }
 
 $('#q').addEventListener('input', ()=>{clearTimeout(TIMER);TIMER=setTimeout(cargarTabla,250)});
-$('#f-estado').addEventListener('change', cargarTabla);
 $('#f-tecnico').addEventListener('change', cargarTabla);
 
-(async function(){ await cargarCatalogos(); await cargarTecnicos(); await cargarResumen(); await cargarTabla(); })();
+(async function(){ await cargarTecnicos(); await cargarResumen(); await cargarTabla(); })();
 </script>
 </body>
 </html>

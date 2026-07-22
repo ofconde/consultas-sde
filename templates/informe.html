@@ -61,6 +61,27 @@
         <div class="barrow"><span class="lbl">Acciones por consulta</span><span></span><span class="val" id="mv-apc"></span></div>
       </div>
     </div>
+
+    <h3 style="margin:26px 0 12px">Montos solicitados</h3>
+    <div class="kpis" id="kpis-montos"></div>
+
+    <div class="grid3">
+      <div class="card" style="padding:22px">
+        <h3>Por sector productivo</h3>
+        <div class="tabla-wrap"><table><thead><tr><th>Sector</th><th style="text-align:right">Cant.</th><th style="text-align:right">Monto solicitado</th></tr></thead>
+        <tbody id="sectores"></tbody></table></div>
+      </div>
+      <div class="card" style="padding:22px">
+        <h3>Por línea</h3>
+        <div class="tabla-wrap"><table><thead><tr><th>Línea</th><th style="text-align:right">Cant.</th><th style="text-align:right">Monto solicitado</th></tr></thead>
+        <tbody id="lineas"></tbody></table></div>
+      </div>
+      <div class="card" style="padding:22px">
+        <h3>Por programa</h3>
+        <div class="tabla-wrap"><table><thead><tr><th>Programa</th><th style="text-align:right">Cant.</th><th style="text-align:right">Monto solicitado</th></tr></thead>
+        <tbody id="programas"></tbody></table></div>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -94,6 +115,20 @@ const hoy = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'
   $('#mv-nuevas').textContent = d.nuevas_semana;
   $('#mv-acc').textContent = d.acciones_semana;
   $('#mv-apc').textContent = d.acciones_por_consulta;
+
+  const mn = d.montos;
+  $('#kpis-montos').innerHTML = `
+    <div class="kpi card"><div class="n" style="font-size:24px">${mn.total_fmt}</div><div class="l">Total solicitado (${mn.con_monto} consultas)</div></div>
+    <div class="kpi card"><div class="n" style="font-size:24px">${mn.promedio_fmt}</div><div class="l">Monto promedio</div></div>
+    <div class="kpi card"><div class="n" style="font-size:24px">${mn.maximo_fmt}</div><div class="l">Monto máximo</div></div>`;
+
+  const filas = arr => arr.map(x => `
+    <tr><td>${x.clave}</td>
+      <td style="text-align:right;font-weight:700">${x.n}</td>
+      <td style="text-align:right">${x.monto_fmt}</td></tr>`).join('');
+  $('#sectores').innerHTML = filas(d.sectores);
+  $('#lineas').innerHTML = filas(d.lineas);
+  $('#programas').innerHTML = filas(d.programas);
 })();
 </script>
 </body>

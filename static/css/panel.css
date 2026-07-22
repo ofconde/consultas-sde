@@ -24,7 +24,9 @@ h1{font-size:28px}
 .topbar .user .rol{background:var(--celeste);color:#fff;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase}
 .topbar .user a{color:#cfe6f5}
 
-.wrap{max-width:1240px;margin:0 auto;padding:26px 24px}
+/* Ancho completo — desktop-first, aprovechar toda la pantalla */
+.wrap{max-width:none;width:100%;margin:0;padding:22px 28px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;align-items:start;margin-top:6px}
 
 /* Cards / KPIs */
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
@@ -39,6 +41,7 @@ h1{font-size:28px}
 .ebtn{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border-radius:12px;border:1px solid var(--border);background:#fff;color:var(--navy);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
 .ebtn:hover{border-color:var(--celeste)}
 .ebtn .cnt{background:#eef1f7;color:var(--muted);border-radius:20px;padding:1px 9px;font-size:12px;font-weight:700}
+.ebtn .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto}
 .ebtn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
 .ebtn.active .cnt{background:rgba(255,255,255,.22);color:#fff}
 .ebtn.mios{margin-left:auto}
@@ -98,3 +101,10 @@ td .nom{font-weight:600;color:var(--navy)}
 .timeline .det{margin-top:3px;color:var(--text)}
 
 .pill-row{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 18px}
+
+/* Paginación */
+.pager{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px}
+.pager .info{color:var(--muted);font-size:13px}
+.pager .ctrls{display:flex;gap:8px;align-items:center}
+.pager .ctrls .pg{font-weight:700;color:var(--navy);min-width:120px;text-align:center;font-size:14px}
+.pager button:disabled{opacity:.4;cursor:default}
