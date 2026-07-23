@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Body
 from sqlalchemy import text
 
-from db import engine, proximo_codigo
+from db import engine, proximo_codigo, cuits_duplicados
 from auth import require_login, require_coordinador, puede_editar
 from models import GestionIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto
@@ -41,16 +41,6 @@ def _fila_resumen(r):
     }
 
 
-def _cuits_duplicados(conn):
-    """CUITs (no vacíos) que aparecen en más de una consulta."""
-    rows = conn.execute(text("""
-        SELECT cuit FROM sde_consultas
-        WHERE cuit IS NOT NULL AND cuit <> ''
-        GROUP BY cuit HAVING COUNT(*) > 1
-    """)).fetchall()
-    return {r[0] for r in rows}
-
-
 @router.get("")
 def listar(request: Request, estado: str = "", tecnico: str = "",
            grupo: str = "", q: str = "", mios: bool = False, dups: bool = False,
@@ -71,7 +61,7 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         where.append("(c.nombre ILIKE :q OR c.cuit ILIKE :q)"); params["q"] = f"%{q}%"
 
     with engine.connect() as conn:
-        dup_cuits = _cuits_duplicados(conn)
+        dup_cuits = cuits_duplicados(conn)
         if dups:
             if not dup_cuits:
                 return {"total": 0, "consultas": []}

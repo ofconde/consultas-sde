@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 
-from db import engine
+from db import engine, cuits_duplicados
 from auth import require_login
 from formatos import _monto
 from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS
@@ -48,14 +48,12 @@ def informe(_=Depends(require_login)):
         total_acciones = conn.execute(text("SELECT COUNT(*) FROM sde_acciones")).scalar() or 0
 
         # consultas involucradas en un CUIT duplicado
-        duplicados = conn.execute(text("""
-            SELECT COUNT(*) FROM sde_consultas
-            WHERE cuit IN (
-                SELECT cuit FROM sde_consultas
-                WHERE cuit IS NOT NULL AND cuit <> ''
-                GROUP BY cuit HAVING COUNT(*) > 1
-            )
-        """)).scalar() or 0
+        dup_cuits = cuits_duplicados(conn)
+        duplicados = 0
+        if dup_cuits:
+            duplicados = conn.execute(text("""
+                SELECT COUNT(*) FROM sde_consultas WHERE cuit = ANY(:dcuits)
+            """), {"dcuits": list(dup_cuits)}).scalar() or 0
 
         # montos solicitados
         m = conn.execute(text("""

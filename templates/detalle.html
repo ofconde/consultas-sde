@@ -90,7 +90,11 @@ function fill(sel, arr, cur){
   arr.forEach(v => sel.add(new Option(v, v, false, v===cur)));
 }
 
-async function cargarCat(){ CAT = await (await fetch('/api/catalogos')).json(); }
+let META = { estado_grupo: {} };
+async function cargarCat(){
+  CAT = await (await fetch('/api/catalogos')).json();
+  META = await (await fetch('/api/catalogos/estado-grupo')).json();
+}
 
 async function cargarTecnicos(sel, cur){
   const d = await (await fetch('/api/consultas')).json();
@@ -164,14 +168,14 @@ $('#guardar').addEventListener('click', async () => {
     monto:$('#g-monto').value,
   };
   const r = await fetch('/api/consultas/'+CID, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(r.ok){ $('#guardado').textContent='✓ Guardado'; badgeGrupo(gruponuevo($('#g-estado').value), $('#g-estado').value);
-    setTimeout(()=>$('#guardado').textContent='',2000); }
+  if(r.ok){
+    $('#guardado').textContent='✓ Guardado';
+    const nuevoEstado = $('#g-estado').value;
+    badgeGrupo(META.estado_grupo[nuevoEstado] || 'INICIAL', nuevoEstado);
+    setTimeout(()=>$('#guardado').textContent='',2000);
+  }
   else $('#guardado').textContent='Error al guardar';
 });
-
-// grupo client-side (espejo de constantes.py) solo para refrescar el badge al vuelo
-const GMAP={'CONSULTA INICIAL':'INICIAL','COMPLETANDO DOCUMENTACION':'EN_GESTION','EN GESTION CON SGR O FONDO':'EN_GESTION','HAY INTERÉS PERO NO SE DECIDE':'EN_GESTION','INGRESADO EN CFI SEDE':'EN_SEDE','DERIVADO A FONDO DE GARANTIA CFI':'EN_SEDE','DERIVADO A MERCADO DE CAPITALES':'EN_SEDE','DERIVADO A OTRA PROVINCIA':'EN_SEDE','NO ES FINANCIABLE':'INACTIVAS','DESISTE DE TOMAR EL CRÉDITO':'INACTIVAS','REPETIDO':'INACTIVAS'};
-function gruponuevo(e){ return GMAP[e]||'INICIAL'; }
 
 $('#add-accion').addEventListener('click', async () => {
   const accion = $('#a-accion').value;

@@ -28,6 +28,16 @@ GRUPOS = [
 # Un grupo se considera "activo" (dentro del universo de trabajo) si no es INACTIVAS
 GRUPOS_ACTIVOS = {"INICIAL", "EN_GESTION", "EN_SEDE"}
 
+# Color por grupo — misma paleta que .g-INICIAL/.g-EN_GESTION/.g-EN_SEDE/.g-INACTIVAS
+# de static/css/panel.css. Única fuente de verdad: antes vivía duplicado como hex
+# hardcodeado en el JS de panel.html y detalle.html (routers/catalogos.py lo expone).
+GRUPO_COLOR = {
+    "INICIAL":    "#2f6fd0",
+    "EN_GESTION": "#6c4bd0",
+    "EN_SEDE":    "#1a9e57",
+    "INACTIVAS":  "#8891a8",
+}
+
 ROL_COORDINADOR = "coordinador"
 ROL_TECNICO = "tecnico"
 

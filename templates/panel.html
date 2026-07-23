@@ -54,9 +54,11 @@ const $ = s => document.querySelector(s);
 const ROL = "{{ usuario.rol }}";
 let TIMER = null;
 const PAGE_SIZE = 60;
-const GCOLOR = { INICIAL:'#2f6fd0', EN_GESTION:'#6c4bd0', EN_SEDE:'#1a9e57', INACTIVAS:'#8891a8' };
 const state = { estado: '', mios: false, dups: false, pagina: 1 };
 let ROWS = [];
+let META = { grupo_color: {} };
+
+async function cargarMeta(){ META = await (await fetch('/api/catalogos/estado-grupo')).json(); }
 
 async function cargarResumen(){
   const r = await fetch('/api/informe'); const d = await r.json();
@@ -70,9 +72,9 @@ async function cargarResumen(){
   // botones dinámicos: uno por cada estado que exista en los datos (se crean solos)
   let botones = `<button class="ebtn" data-estado=""><span>Todas</span><span class="cnt">${d.total}</span></button>`;
   d.estados.forEach(e => {
-    botones += `<button class="ebtn" data-estado="${e.estado}">
-      <span class="dot" style="background:${GCOLOR[e.grupo]||'#8891a8'}"></span>
-      <span>${e.estado}</span><span class="cnt">${e.n}</span></button>`;
+    botones += `<button class="ebtn" data-estado="${escapeHtml(e.estado)}">
+      <span class="dot" style="background:${META.grupo_color[e.grupo]||'#8891a8'}"></span>
+      <span>${escapeHtml(e.estado)}</span><span class="cnt">${e.n}</span></button>`;
   });
   botones += `<button class="ebtn mios" id="btn-mios">Mis casos</button>`;
   if(d.duplicados > 0)
@@ -181,7 +183,7 @@ function renderPagina(){
 $('#q').addEventListener('input', ()=>{clearTimeout(TIMER);TIMER=setTimeout(cargarTabla,250)});
 $('#f-tecnico').addEventListener('change', cargarTabla);
 
-(async function(){ await cargarTecnicos(); await cargarResumen(); await cargarTabla(); })();
+(async function(){ await cargarMeta(); await cargarTecnicos(); await cargarResumen(); await cargarTabla(); })();
 </script>
 </body>
 </html>

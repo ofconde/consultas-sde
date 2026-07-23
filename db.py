@@ -115,6 +115,20 @@ def init_db():
             )
         """))
 
+        # Secuencia para los códigos SDE-NNNNNN. Reemplaza un SELECT COUNT(*) que,
+        # fuera de transacción, podía generar el mismo código dos veces si llegaban
+        # dos altas concurrentes (ej. Power Automate reintentando un webhook).
+        # setval() es idempotente: nunca retrocede, arranca desde el máximo código
+        # ya existente (importante para no colisionar con las 256 filas migradas).
+        conn.execute(text("CREATE SEQUENCE IF NOT EXISTS sde_consultas_codigo_seq"))
+        conn.execute(text("""
+            SELECT setval('sde_consultas_codigo_seq',
+                GREATEST(
+                    (SELECT COALESCE(MAX(CAST(SUBSTRING(codigo FROM 5) AS INT)), 0) FROM sde_consultas),
+                    (SELECT last_value FROM sde_consultas_codigo_seq)
+                ))
+        """))
+
     _seed_catalogos()
 
 
@@ -145,7 +159,20 @@ def catalogo(tipo: str):
 
 
 def proximo_codigo():
-    """Genera el próximo código correlativo SDE-000001."""
-    with engine.connect() as conn:
-        n = conn.execute(text("SELECT COUNT(*) FROM sde_consultas")).scalar() or 0
-    return f"SDE-{n + 1:06d}"
+    """Genera el próximo código correlativo SDE-000001, atómico entre conexiones
+    concurrentes (usa la secuencia de Postgres, no un SELECT COUNT(*) fuera de
+    transacción)."""
+    with engine.begin() as conn:
+        n = conn.execute(text("SELECT nextval('sde_consultas_codigo_seq')")).scalar()
+    return f"SDE-{n:06d}"
+
+
+def cuits_duplicados(conn):
+    """CUITs (no vacíos) que aparecen en más de una consulta. Función compartida
+    entre routers/consultas.py (marcar filas DUP) y routers/informe.py (contador)."""
+    rows = conn.execute(text("""
+        SELECT cuit FROM sde_consultas
+        WHERE cuit IS NOT NULL AND cuit <> ''
+        GROUP BY cuit HAVING COUNT(*) > 1
+    """)).fetchall()
+    return {r[0] for r in rows}
