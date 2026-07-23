@@ -93,7 +93,7 @@ def panel(request: Request):
     u = usuario_actual(request)
     if not u:
         return RedirectResponse("/login")
-    return templates.TemplateResponse("panel.html", {"request": request, "usuario": u})
+    return templates.TemplateResponse("panel.html", {"request": request, "usuario": u, "activo": "panel"})
 
 
 @app.get("/consulta/{cid}", response_class=HTMLResponse)
@@ -110,7 +110,7 @@ def informe_page(request: Request):
     u = usuario_actual(request)
     if not u:
         return RedirectResponse("/login")
-    return templates.TemplateResponse("informe.html", {"request": request, "usuario": u})
+    return templates.TemplateResponse("informe.html", {"request": request, "usuario": u, "activo": "informe"})
 
 
 @app.get("/perfil", response_class=HTMLResponse)

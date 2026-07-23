@@ -14,8 +14,12 @@ h1{font-size:28px}
 
 /* Topbar */
 .topbar{background:var(--navy);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:18px;position:sticky;top:0;z-index:10}
-.topbar .brand{font-weight:700;font-size:17px;letter-spacing:.2px}
+.topbar .brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:17px;letter-spacing:.2px}
+.topbar .brand-logo{height:1.75rem;width:auto;filter:brightness(0) invert(1)}
 .topbar .brand small{display:block;font-weight:400;font-size:12px;opacity:.75}
+
+/* Raleway — reservado para los momentos de marca (wordmark, títulos, informe) */
+.brand-font{font-family:'Raleway',Inter,system-ui,sans-serif}
 .topbar nav{display:flex;gap:6px;margin-left:12px}
 .topbar nav a{color:#dfe6f2;padding:7px 14px;border-radius:10px;font-weight:500;font-size:14px}
 .topbar nav a:hover,.topbar nav a.active{background:rgba(255,255,255,.14);color:#fff}

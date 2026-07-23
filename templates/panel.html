@@ -1,29 +1,7 @@
-<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Panel · Consultas SDE</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/panel.css">
-<script src="/static/js/util.js"></script>
-</head>
-<body>
-  <div class="topbar">
-    <div class="brand">Consultas SDE<small>Seguimiento — UEP Santiago del Estero</small></div>
-    <nav>
-      <a href="/panel" class="active">Panel</a>
-      <a href="/informe">Informe</a>
-    </nav>
-    <div class="spacer"></div>
-    <div class="user">
-      <span>{{ usuario.nombre }}</span>
-      <span class="rol">{{ usuario.rol }}</span>
-      <a href="/perfil">Cuenta</a>
-      <a href="/logout">Salir</a>
-    </div>
-  </div>
+{% extends "base.html" %}
+{% block title %}Panel · Consultas SDE{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
 
   <div class="wrap">
     <div class="kpis" id="kpis"></div>
@@ -48,7 +26,8 @@
       <div class="pager" id="pager" style="display:none"></div>
     </div>
   </div>
-
+{% endblock %}
+{% block scripts %}
 <script>
 const $ = s => document.querySelector(s);
 const ROL = "{{ usuario.rol }}";
@@ -185,5 +164,4 @@ $('#f-tecnico').addEventListener('change', cargarTabla);
 
 (async function(){ await cargarMeta(); await cargarTecnicos(); await cargarResumen(); await cargarTabla(); })();
 </script>
-</body>
-</html>
+{% endblock %}

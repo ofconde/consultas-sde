@@ -1,0 +1,17 @@
+  <div class="topbar">
+    <div class="brand">
+      <img src="/static/img/logo-cfi.png" alt="CFI" class="brand-logo">
+      <span class="brand-text brand-font">Consultas SDE<small>Seguimiento — UEP Santiago del Estero</small></span>
+    </div>
+    <nav>
+      <a href="/panel" class="{% if activo=='panel' %}active{% endif %}">Panel</a>
+      <a href="/informe" class="{% if activo=='informe' %}active{% endif %}">Informe</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="user">
+      <span>{{ usuario.nombre }}</span>
+      <span class="rol">{{ usuario.rol }}</span>
+      <a href="/perfil">Cuenta</a>
+      <a href="/logout">Salir</a>
+    </div>
+  </div>
