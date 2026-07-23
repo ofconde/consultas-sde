@@ -95,11 +95,15 @@ def ingesta_consulta(payload: ConsultaIngesta, x_api_key: str = Header(default="
 
 
 @router.post("/forms-santiago")
-def ingesta_forms_santiago(body: dict = Body(...), x_api_key: str = Header(default="")):
-    """Ingesta directa desde Power Automate: recibe tal cual el JSON de
-    'Obtener los detalles de la respuesta' (expresión `body('Obtener_los_detalles_de_la_respuesta')`
-    en el HTTP action de PA) y lo traduce con _FORMS_FIELD_MAP."""
+def ingesta_forms_santiago(payload_pa: dict = Body(...), x_api_key: str = Header(default="")):
+    """Ingesta directa desde Power Automate: recibe el JSON de 'Obtener los detalles
+    de la respuesta' y lo traduce con _FORMS_FIELD_MAP. Tolera dos formas del body
+    (según cómo Power Automate termine mandándolo): el objeto de respuestas directo
+    ({"submitDate":..., "r756947...":...}) o envuelto en {"body": {...}, "statusCode":...,
+    "headers":...} — si hay una clave "body" que es un dict, se usa esa."""
     _verificar_api_key(x_api_key)
+
+    body = payload_pa.get("body") if isinstance(payload_pa.get("body"), dict) else payload_pa
 
     def _campo(nombre_interno: str):
         val = body.get(_FORMS_FIELD_MAP[nombre_interno])
