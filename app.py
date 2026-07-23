@@ -2,16 +2,20 @@
 
 App FastAPI dedicada. Sirve el frontend y la API. Startup: crea esquema + seeds.
 """
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Response, Form
+from fastapi import FastAPI, Request, Response, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from db import init_db
-from auth import (seed_usuarios, autenticar, crear_token, usuario_actual,
-                  COOKIE_NAME)
+from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
+                  SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
 from routers import consultas, acciones, ingesta, informe, catalogos, usuarios
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("consultas_sde")
 
 
 @asynccontextmanager
@@ -24,6 +28,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Consultas SDE", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+
+@app.exception_handler(Exception)
+async def excepcion_no_controlada(request: Request, exc: Exception):
+    log.exception("Error no controlado en %s %s", request.method, request.url.path)
+    return JSONResponse({"detail": "Error interno del servidor."}, status_code=500)
 
 app.include_router(consultas.router)
 app.include_router(acciones.router)
@@ -50,16 +60,24 @@ def login_page(request: Request):
 
 @app.post("/login")
 def login_post(request: Request, username: str = Form(...), password: str = Form(...)):
+    if rate_limit_excedido(username):
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "error": "Demasiados intentos fallidos. Esperá unos minutos."},
+            status_code=429,
+        )
     u = autenticar(username, password)
     if not u:
+        registrar_intento_fallido(username)
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": "Usuario o contraseña incorrectos."},
             status_code=401,
         )
+    limpiar_intentos(username)
     resp = RedirectResponse("/panel", status_code=303)
     resp.set_cookie(COOKIE_NAME, crear_token(u["username"]),
-                    httponly=True, samesite="lax", max_age=60 * 60 * 12)
+                    httponly=True, samesite="lax", max_age=SESSION_MAX_AGE)
     return resp
 
 

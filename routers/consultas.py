@@ -1,15 +1,16 @@
 """API de consultas — listar/filtrar, detalle, editar gestión, alta manual, baja."""
-import unicodedata
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Body
 from sqlalchemy import text
 
 from db import engine, proximo_codigo
-from auth import require_login, require_coordinador
+from auth import require_login, require_coordinador, puede_editar
 from models import GestionIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto
-from constantes import grupo_de, ROL_COORDINADOR
+from constantes import grupo_de, _norm, ROL_COORDINADOR
 
 router = APIRouter(prefix="/api/consultas", tags=["consultas"])
+log = logging.getLogger("consultas_sde.consultas")
 
 # columnas de gestión que puede editar el técnico
 _GESTION_COLS = [
@@ -17,13 +18,6 @@ _GESTION_COLS = [
     "programa", "arca_confirmado", "actividad_inscripta", "situacion_bcra",
     "estado", "observaciones", "informacion_extra", "genero",
 ]
-
-
-def _norm(s: str) -> str:
-    """Normaliza para comparar técnicos: sin acentos, mayúsculas, sin espacios extra."""
-    s = unicodedata.normalize("NFD", s or "")
-    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-    return s.upper().strip()
 
 
 def _fila_resumen(r):
@@ -132,7 +126,18 @@ def detalle(cid: int, _=Depends(require_login)):
 
 @router.patch("/{cid}")
 def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
+    with engine.connect() as conn:
+        actual = conn.execute(text("SELECT tecnico FROM sde_consultas WHERE id = :id"),
+                              {"id": cid}).mappings().first()
+    if not actual:
+        raise HTTPException(404, "Consulta no encontrada")
+    if not puede_editar(usuario, actual["tecnico"]):
+        raise HTTPException(403, "Esta consulta está asignada a otro técnico")
+
     campos = body.model_dump(exclude_none=True)
+    if usuario["rol"] != ROL_COORDINADOR:
+        # solo el coordinador reasigna: un técnico no cambia el campo `tecnico`
+        campos.pop("tecnico", None)
     sets, params = [], {"id": cid}
     for col in _GESTION_COLS:
         if col in campos:
@@ -156,10 +161,11 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
 
 
 @router.delete("/{cid}")
-def eliminar(cid: int, _=Depends(require_coordinador)):
+def eliminar(cid: int, usuario=Depends(require_coordinador)):
     with engine.begin() as conn:
-        r = conn.execute(text("DELETE FROM sde_consultas WHERE id = :id RETURNING id"),
+        r = conn.execute(text("DELETE FROM sde_consultas WHERE id = :id RETURNING id, codigo"),
                          {"id": cid}).first()
     if not r:
         raise HTTPException(404, "Consulta no encontrada")
+    log.info("Consulta eliminada: id=%s codigo=%s por=%s", cid, r[1], usuario["username"])
     return {"ok": True}

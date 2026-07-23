@@ -94,6 +94,16 @@ def init_db():
             ON sde_acciones (consulta_id)
         """))
 
+        # Índices sobre las columnas más filtradas/ordenadas del panel. Baratos de
+        # crear ahora (tabla chica); preparan el crecimiento futuro sin costo hoy.
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_consultas_estado ON sde_consultas (estado)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_consultas_tecnico ON sde_consultas (tecnico)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_consultas_cuit ON sde_consultas (cuit)"))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_sde_consultas_fecha_recepcion
+            ON sde_consultas (fecha_recepcion)
+        """))
+
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS sde_catalogos (
                 id     SERIAL PRIMARY KEY,

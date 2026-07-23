@@ -1,4 +1,5 @@
 """Constantes de negocio del seguimiento de consultas."""
+import unicodedata
 
 # Mapa estado → grupo (para kanban e informe). Basado en la hoja `indicadores`
 # del Excel de Santiago del Estero.
@@ -33,3 +34,10 @@ ROL_TECNICO = "tecnico"
 
 def grupo_de(estado: str) -> str:
     return ESTADO_GRUPO.get((estado or "").strip().upper(), "INICIAL")
+
+
+def _norm(s: str) -> str:
+    """Normaliza para comparar nombres de técnico: sin acentos, mayúsculas, sin espacios extra."""
+    s = unicodedata.normalize("NFD", s or "")
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return s.upper().strip()

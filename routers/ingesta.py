@@ -4,6 +4,8 @@ PA dispara "cuando se envía una nueva respuesta" → HTTP POST acá con header 
 Un solo formulario → mapeo fijo. Inserta la consulta como CONSULTA INICIAL, sin técnico.
 """
 import os
+import secrets
+import logging
 from fastapi import APIRouter, HTTPException, Header
 from sqlalchemy import text
 
@@ -12,13 +14,15 @@ from models import ConsultaIngesta
 from formatos import _parse_monto, _parse_fecha
 
 router = APIRouter(prefix="/api/ingesta", tags=["ingesta"])
+log = logging.getLogger("consultas_sde.ingesta")
 
 _API_KEY = os.environ.get("SDE_API_KEY", "")
 
 
 @router.post("/consulta")
 def ingesta_consulta(payload: ConsultaIngesta, x_api_key: str = Header(default="")):
-    if not _API_KEY or x_api_key != _API_KEY:
+    if not _API_KEY or not secrets.compare_digest(x_api_key, _API_KEY):
+        log.warning("Ingesta rechazada: X-API-Key inválida")
         raise HTTPException(401, "X-API-Key inválida")
 
     fecha = _parse_fecha(payload.fecha_recepcion)
@@ -51,4 +55,5 @@ def ingesta_consulta(payload: ConsultaIngesta, x_api_key: str = Header(default="
             "monto": _parse_monto(payload.monto), "destino": payload.destino,
             "como": payload.como_se_entero, "genero": payload.genero,
         })
+    log.info("Alta por ingesta: codigo=%s cuit=%s", codigo, payload.cuit)
     return {"ok": True, "codigo": codigo}
