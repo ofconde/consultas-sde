@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from db import init_db
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual,
                   COOKIE_NAME)
-from routers import consultas, acciones, ingesta, informe, catalogos
+from routers import consultas, acciones, ingesta, informe, catalogos, usuarios
 
 
 @asynccontextmanager
@@ -30,6 +30,7 @@ app.include_router(acciones.router)
 app.include_router(ingesta.router)
 app.include_router(informe.router)
 app.include_router(catalogos.router)
+app.include_router(usuarios.router)
 
 
 # ── Páginas ──────────────────────────────────────────────────────────
@@ -92,6 +93,14 @@ def informe_page(request: Request):
     if not u:
         return RedirectResponse("/login")
     return templates.TemplateResponse("informe.html", {"request": request, "usuario": u})
+
+
+@app.get("/perfil", response_class=HTMLResponse)
+def perfil_page(request: Request):
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("password.html", {"request": request, "usuario": u})
 
 
 @app.get("/api/yo")

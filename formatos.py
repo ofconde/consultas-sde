@@ -58,10 +58,20 @@ def _monto(valor) -> str:
 
 
 def _parse_monto(valor):
-    """Limpia un monto que llega como texto ('$ 16.000.000', '16000000') → int o None."""
+    """Limpia un monto que llega como texto ('$ 16.000.000', '16000000') → int o None.
+    Si ya llega como int/float (ej. celda numérica de Excel) se usa directo, sin mutilar
+    el valor al pasarlo por string. Si llega como texto con coma decimal (formato AR,
+    ej. '16.000.000,50') se descarta la parte decimal antes de limpiar dígitos — si no,
+    concatenar todos los dígitos ignorando la coma da un monto 100x mayor al real."""
     if valor is None or valor == "":
         return None
-    s = "".join(ch for ch in str(valor) if ch.isdigit())
+    if isinstance(valor, (int, float)):
+        return int(round(valor))
+    s = str(valor).strip()
+    if "," in s:
+        entero, _, _decimales = s.rpartition(",")
+        s = entero or s
+    s = "".join(ch for ch in s if ch.isdigit())
     return int(s) if s else None
 
 

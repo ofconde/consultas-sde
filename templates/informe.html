@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/panel.css">
+<script src="/static/js/util.js"></script>
 <style>
   .barra{height:22px;border-radius:6px;background:var(--celeste);min-width:2px}
   .barrow{display:grid;grid-template-columns:210px 1fr 48px;gap:12px;align-items:center;margin:8px 0}
@@ -27,7 +28,7 @@
     <div class="brand">Consultas SDE<small>Seguimiento — UEP Santiago del Estero</small></div>
     <nav><a href="/panel">Panel</a><a href="/informe" class="active">Informe</a></nav>
     <div class="spacer"></div>
-    <div class="user"><span>{{ usuario.nombre }}</span><span class="rol">{{ usuario.rol }}</span><a href="/logout">Salir</a></div>
+    <div class="user"><span>{{ usuario.nombre }}</span><span class="rol">{{ usuario.rol }}</span><a href="/perfil">Cuenta</a><a href="/logout">Salir</a></div>
   </div>
 
   <div class="wrap">
@@ -106,11 +107,11 @@ const hoy = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'
       <span class="val">${g.n}</span></div>`).join('');
 
   $('#estados').innerHTML = d.estados.map(e => `
-    <tr><td>${e.estado}</td><td><span class="badge g-${e.grupo}">${e.grupo.replace('_',' ').toLowerCase()}</span></td>
+    <tr><td>${escapeHtml(e.estado)}</td><td><span class="badge g-${e.grupo}">${e.grupo.replace('_',' ').toLowerCase()}</span></td>
     <td style="text-align:right;font-weight:700">${e.n}</td></tr>`).join('');
 
   $('#tecnicos').innerHTML = d.tecnicos.map(t => `
-    <tr><td>${t.tecnico}</td><td style="text-align:right;font-weight:700">${t.n}</td></tr>`).join('');
+    <tr><td>${escapeHtml(t.tecnico)}</td><td style="text-align:right;font-weight:700">${t.n}</td></tr>`).join('');
 
   $('#mv-nuevas').textContent = d.nuevas_semana;
   $('#mv-acc').textContent = d.acciones_semana;
@@ -123,9 +124,9 @@ const hoy = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'
     <div class="kpi card"><div class="n" style="font-size:24px">${mn.maximo_fmt}</div><div class="l">Monto máximo</div></div>`;
 
   const filas = arr => arr.map(x => `
-    <tr><td>${x.clave}</td>
+    <tr><td>${escapeHtml(x.clave)}</td>
       <td style="text-align:right;font-weight:700">${x.n}</td>
-      <td style="text-align:right">${x.monto_fmt}</td></tr>`).join('');
+      <td style="text-align:right">${escapeHtml(x.monto_fmt)}</td></tr>`).join('');
   $('#sectores').innerHTML = filas(d.sectores);
   $('#lineas').innerHTML = filas(d.lineas);
   $('#programas').innerHTML = filas(d.programas);

@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/panel.css">
+<script src="/static/js/util.js"></script>
 </head>
 <body>
   <div class="topbar">
@@ -19,6 +20,7 @@
     <div class="user">
       <span>{{ usuario.nombre }}</span>
       <span class="rol">{{ usuario.rol }}</span>
+      <a href="/perfil">Cuenta</a>
       <a href="/logout">Salir</a>
     </div>
   </div>
@@ -108,7 +110,7 @@ async function cargarTecnicos(){
   set.forEach(v => sel.add(new Option(v, v)));
 }
 
-function badge(g, estado){ return `<span class="badge g-${g}">${estado||'—'}</span>`; }
+function badge(g, estado){ return `<span class="badge g-${g}">${escapeHtml(estado)||'—'}</span>`; }
 
 async function cargarTabla(){
   const p = new URLSearchParams();
@@ -131,13 +133,13 @@ function filaHTML(c){
     : c.n_acciones;
   return `
     <tr onclick="location.href='/consulta/${c.id}'">
-      <td>${c.fecha_recepcion||'—'}<div class="cod">${c.codigo}</div></td>
-      <td><span class="nom">${c.nombre||'—'}</span><div class="cod">${c.cuit||''}${dup}</div></td>
-      <td>${c.localidad||'—'}</td>
-      <td>${c.sector?`<span class="chip">${c.sector}</span>`:'—'}</td>
-      <td>${c.monto}</td>
-      <td>${c.linea||'—'}</td>
-      <td>${c.tecnico||'<span class="muted">sin asignar</span>'}</td>
+      <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">${escapeHtml(c.codigo)}</div></td>
+      <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span><div class="cod">${escapeHtml(c.cuit)}${dup}</div></td>
+      <td>${escapeHtml(c.localidad)||'—'}</td>
+      <td>${c.sector?`<span class="chip">${escapeHtml(c.sector)}</span>`:'—'}</td>
+      <td>${escapeHtml(c.monto)}</td>
+      <td>${escapeHtml(c.linea)||'—'}</td>
+      <td>${c.tecnico?escapeHtml(c.tecnico):'<span class="muted">sin asignar</span>'}</td>
       <td>${badge(c.grupo,c.estado)}</td>
       <td style="text-align:center">${acc}</td>
     </tr>`;
