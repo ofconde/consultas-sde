@@ -30,45 +30,35 @@
 
     <div class="grid2">
       <!-- Gestión editable -->
-      <div class="card" style="padding:22px">
-        <div class="sec-title">Datos del solicitante</div>
-        <div class="row2">
-          <div class="field"><label>Teléfono</label><input id="v-telefono" disabled></div>
-          <div class="field"><label>Mail</label><input id="v-mail" disabled></div>
-        </div>
-        <div class="field"><label>Actividad declarada</label><textarea id="v-actividad" disabled></textarea></div>
-        <div class="field"><label>Destino del financiamiento</label><textarea id="v-destino" disabled></textarea></div>
-        <div class="row2">
-          <div class="field"><label>Monto solicitado ✎</label><input id="g-monto" placeholder="$"></div>
-          <div class="field"><label>Cómo se enteró</label><input id="v-como" disabled></div>
+      <div class="card detalle-card">
+        <div class="sec-title" style="margin-top:0">Datos del solicitante</div>
+        <div class="info-grid">
+          <div><label>Teléfono</label><span id="s-telefono">—</span></div>
+          <div><label>Mail</label><span id="s-mail">—</span></div>
+          <div><label>Cómo se enteró</label><span id="s-como">—</span></div>
+          <div class="col-full"><label>Actividad declarada</label><span id="s-actividad">—</span></div>
+          <div class="col-full"><label>Destino del financiamiento</label><span id="s-destino">—</span></div>
         </div>
 
         <div class="sec-title">Gestión</div>
-        <div class="row2">
+        <div class="g-grid">
           <div class="field"><label>Técnico responsable</label>
             <select id="g-tecnico"><option value="">— Sin asignar</option></select></div>
           <div class="field"><label>Estado</label><select id="g-estado"></select></div>
-        </div>
-        <div class="row2">
           <div class="field"><label>Departamento</label><select id="g-departamento"><option value=""></option></select></div>
           <div class="field"><label>Localidad confirmada</label><input id="g-localidad_confirmada" list="loc-list"><datalist id="loc-list"></datalist></div>
-        </div>
-        <div class="row2">
           <div class="field"><label>Línea</label><select id="g-linea"><option value=""></option></select></div>
           <div class="field"><label>Programa</label><select id="g-programa"><option value=""></option></select></div>
-        </div>
-        <div class="row2">
           <div class="field"><label>Garantía</label><select id="g-garantia"><option value=""></option></select></div>
+          <div class="field"><label>Monto solicitado ✎</label><input id="g-monto" placeholder="$"></div>
           <div class="field"><label>Monto confirmado</label><input id="g-monto_confirmado" placeholder="$"></div>
-        </div>
-        <div class="row2">
           <div class="field"><label>ARCA confirmado</label><select id="g-arca_confirmado"><option value=""></option></select></div>
           <div class="field"><label>Situación BCRA</label><input id="g-situacion_bcra"></div>
+          <div class="field"><label>Actividad inscripta (ARCA)</label><input id="g-actividad_inscripta"></div>
         </div>
-        <div class="field"><label>Actividad inscripta (ARCA)</label><input id="g-actividad_inscripta"></div>
-        <div class="field"><label>Observaciones</label><textarea id="g-observaciones"></textarea></div>
-        <div class="field"><label>Información extra</label><textarea id="g-informacion_extra"></textarea></div>
-        <button class="btn primary" id="guardar">Guardar gestión</button>
+        <div class="field" style="margin-top:12px"><label>Observaciones</label><textarea id="g-observaciones"></textarea></div>
+        <div class="field" style="margin-top:10px"><label>Información extra</label><textarea id="g-informacion_extra"></textarea></div>
+        <button class="btn primary" id="guardar" style="margin-top:14px">Guardar gestión</button>
         <span class="muted" id="guardado" style="margin-left:10px"></span>
       </div>
 
@@ -123,12 +113,12 @@ async function cargar(){
   $('#recepcion').textContent = 'Recepción ' + (c.fecha_recepcion_fmt||'—');
   badgeGrupo(c.grupo, c.estado);
 
-  $('#v-telefono').value = c.telefono||'';
-  $('#v-mail').value = c.mail||'';
-  $('#v-actividad').value = c.actividad_economica||'';
-  $('#v-destino').value = c.destino||'';
+  $('#s-telefono').textContent = c.telefono||'—';
+  $('#s-mail').textContent = c.mail||'—';
+  $('#s-actividad').textContent = c.actividad_economica||'—';
+  $('#s-destino').textContent = c.destino||'—';
   $('#g-monto').value = c.monto || '';
-  $('#v-como').value = c.como_se_entero||'';
+  $('#s-como').textContent = c.como_se_entero||'—';
 
   // dropdowns de gestión
   fill($('#g-estado'), CAT.ESTADO||[], c.estado);
