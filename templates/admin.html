@@ -15,7 +15,7 @@
         <div class="field"><label>Rol</label>
           <select id="n-rol">
             <option value="tecnico">Técnico</option>
-            <option value="coordinador">Coordinador</option>
+            <option value="coordinador">Admin</option>
           </select>
         </div>
       </div>
@@ -62,7 +62,7 @@ async function cargarUsuarios(){
     <tr>
       <td>${escapeHtml(u.username)}</td>
       <td>${escapeHtml(u.nombre)}</td>
-      <td>${escapeHtml(u.rol)}</td>
+      <td>${u.rol === 'coordinador' ? 'Admin' : escapeHtml(u.rol)}</td>
       <td>${u.activo ? '<span class="badge g-EN_SEDE">Activo</span>' : '<span class="badge g-INACTIVAS">Inactivo</span>'}</td>
       <td style="text-align:right;white-space:nowrap">
         <button class="btn sm" onclick="resetear('${u.username}')">Resetear contraseña</button>

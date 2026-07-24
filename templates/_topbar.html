@@ -13,7 +13,7 @@
     <div class="spacer"></div>
     <div class="user">
       <span>{{ usuario.nombre }}</span>
-      <span class="rol">{{ usuario.rol }}</span>
+      <span class="rol">{{ 'admin' if usuario.rol == 'coordinador' else usuario.rol }}</span>
       <a href="/perfil">Cuenta</a>
       <a href="/logout">Salir</a>
     </div>
