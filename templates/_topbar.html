@@ -6,6 +6,9 @@
     <nav>
       <a href="/panel" class="{% if activo=='panel' %}active{% endif %}">Panel</a>
       <a href="/informe" class="{% if activo=='informe' %}active{% endif %}">Informe</a>
+      {% if usuario.rol == 'coordinador' %}
+      <a href="/admin" class="{% if activo=='admin' %}active{% endif %}">Admin</a>
+      {% endif %}
     </nav>
     <div class="spacer"></div>
     <div class="user">

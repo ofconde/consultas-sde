@@ -67,6 +67,9 @@
         <h3 style="margin-top:1.5rem">"Consulta inicial" sin trabajar, por técnico</h3>
         <div class="tabla-wrap"><table><thead><tr><th>Técnico</th><th style="text-align:right">Consultas</th></tr></thead>
         <tbody id="inicial-tecnico"></tbody></table></div>
+        <h3 style="margin-top:1.5rem">Sin ninguna acción cargada, por técnico</h3>
+        <div class="tabla-wrap"><table><thead><tr><th>Técnico</th><th style="text-align:right">Consultas</th></tr></thead>
+        <tbody id="sin-acciones-tecnico"></tbody></table></div>
         <h3 style="margin-top:1.5rem">Movimiento de la semana</h3>
         <div class="barrow"><span class="lbl">Nuevas consultas</span><span></span><span class="val" id="mv-nuevas"></span></div>
         <div class="barrow"><span class="lbl">Acciones cargadas</span><span></span><span class="val" id="mv-acc"></span></div>
@@ -141,6 +144,9 @@ const hoy = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'
     </tr>`;
 
   $('#inicial-tecnico').innerHTML = d.inicial_por_tecnico.map(t => `
+    <tr><td>${escapeHtml(t.tecnico)}</td><td style="text-align:right;font-weight:700">${t.n}</td></tr>`).join('');
+
+  $('#sin-acciones-tecnico').innerHTML = d.sin_acciones_por_tecnico.map(t => `
     <tr><td>${escapeHtml(t.tecnico)}</td><td style="text-align:right;font-weight:700">${t.n}</td></tr>`).join('');
 
   $('#mv-nuevas').textContent = d.nuevas_semana;

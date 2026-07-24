@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Admin · Consultas SDE{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+
+  <div class="wrap">
+    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">Administración de usuarios</h1>
+    <p class="muted" style="margin:0 0 1rem">Alta de técnicos, blanqueo de contraseña, activar/desactivar acceso.</p>
+
+    <div class="card" style="padding:1.25rem;margin-bottom:1.25rem;max-width:32rem">
+      <div class="sec-title" style="margin-top:0">Nuevo usuario</div>
+      <div class="field"><label>Nombre y apellido</label><input id="n-nombre"></div>
+      <div class="row2">
+        <div class="field"><label>Usuario (para login)</label><input id="n-username" autocapitalize="off" autocomplete="off"></div>
+        <div class="field"><label>Rol</label>
+          <select id="n-rol">
+            <option value="tecnico">Técnico</option>
+            <option value="coordinador">Coordinador</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Contraseña inicial (mínimo 8 caracteres)</label><input id="n-password" type="text"></div>
+      <button class="btn primary" id="n-crear" style="margin-top:0.5rem">Crear usuario</button>
+      <span class="muted" id="n-msg" style="margin-left:0.625rem"></span>
+    </div>
+
+    <div class="tabla-wrap card">
+      <table>
+        <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="tabla-usuarios"></tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = s => document.querySelector(s);
+
+async function cargarUsuarios(){
+  const r = await fetch('/api/usuarios');
+  const lista = await r.json();
+  $('#tabla-usuarios').innerHTML = lista.map(u => `
+    <tr>
+      <td>${escapeHtml(u.username)}</td>
+      <td>${escapeHtml(u.nombre)}</td>
+      <td>${escapeHtml(u.rol)}</td>
+      <td>${u.activo ? '<span class="badge g-EN_SEDE">Activo</span>' : '<span class="badge g-INACTIVAS">Inactivo</span>'}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn sm" onclick="resetear('${u.username}')">Resetear contraseña</button>
+        <button class="btn sm ${u.activo ? 'danger' : ''}" onclick="toggleActivo('${u.username}', ${!u.activo})">
+          ${u.activo ? 'Desactivar' : 'Activar'}
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+async function resetear(username){
+  const nueva = prompt('Nueva contraseña para ' + username + ' (mínimo 8 caracteres):');
+  if (!nueva) return;
+  if (nueva.length < 8) { alert('Debe tener al menos 8 caracteres.'); return; }
+  const r = await fetch(`/api/usuarios/${encodeURIComponent(username)}/resetear-password`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nueva}),
+  });
+  if (r.ok) alert('Contraseña actualizada.');
+  else { const d = await r.json().catch(()=>({})); alert(d.detail || 'No se pudo actualizar.'); }
+}
+
+async function toggleActivo(username, activo){
+  const r = await fetch(`/api/usuarios/${encodeURIComponent(username)}`, {
+    method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({activo}),
+  });
+  if (r.ok) cargarUsuarios();
+  else { const d = await r.json().catch(()=>({})); alert(d.detail || 'No se pudo actualizar.'); }
+}
+
+$('#n-crear').addEventListener('click', async () => {
+  const nombre = $('#n-nombre').value.trim();
+  const username = $('#n-username').value.trim().toLowerCase();
+  const rol = $('#n-rol').value;
+  const password = $('#n-password').value;
+  const msg = $('#n-msg');
+  msg.textContent = '';
+  if (!nombre || !username) { msg.textContent = 'Nombre y usuario son obligatorios.'; return; }
+  if (password.length < 8) { msg.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+  $('#n-crear').disabled = true; msg.textContent = 'Creando…';
+  const r = await fetch('/api/usuarios', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username, nombre, rol, password}),
+  });
+  $('#n-crear').disabled = false;
+  if (r.ok) {
+    msg.textContent = '✓ Usuario creado.';
+    $('#n-nombre').value = ''; $('#n-username').value = ''; $('#n-password').value = '';
+    cargarUsuarios();
+  } else {
+    const d = await r.json().catch(()=>({}));
+    msg.textContent = d.detail || 'No se pudo crear.';
+  }
+});
+
+cargarUsuarios();
+</script>
+{% endblock %}

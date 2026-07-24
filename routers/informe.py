@@ -100,6 +100,14 @@ def informe(_=Depends(require_login)):
             GROUP BY 1 ORDER BY n DESC
         """)).mappings().all()
 
+        # consultas sin ninguna acción cargada, por técnico (a quién pertenecen)
+        sin_acciones_por_tecnico = conn.execute(text("""
+            SELECT COALESCE(NULLIF(c.tecnico, ''), '— Sin asignar') AS tecnico, COUNT(*) AS n
+            FROM sde_consultas c
+            WHERE NOT EXISTS (SELECT 1 FROM sde_acciones a WHERE a.consulta_id = c.id)
+            GROUP BY 1 ORDER BY n DESC
+        """)).mappings().all()
+
     # agrupar estados en grupos
     grupos_cnt = {g[0]: 0 for g in GRUPOS}
     estados_out = []
@@ -142,4 +150,5 @@ def informe(_=Depends(require_login)):
         "programas": por_programa,
         "situacion": situacion,
         "inicial_por_tecnico": [{"tecnico": r["tecnico"], "n": r["n"]} for r in inicial_por_tecnico],
+        "sin_acciones_por_tecnico": [{"tecnico": r["tecnico"], "n": r["n"]} for r in sin_acciones_por_tecnico],
     }

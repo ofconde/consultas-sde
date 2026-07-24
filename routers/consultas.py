@@ -5,8 +5,8 @@ from sqlalchemy import text
 
 from db import engine, proximo_codigo, cuits_duplicados
 from auth import require_login, require_coordinador, puede_editar
-from models import GestionIn
-from formatos import _dmy, _monto, _hora_local, _parse_monto
+from models import GestionIn, ConsultaManualIn
+from formatos import _dmy, _monto, _hora_local, _parse_monto, _parse_fecha
 from constantes import grupo_de, _norm, ROL_COORDINADOR
 
 router = APIRouter(prefix="/api/consultas", tags=["consultas"])
@@ -110,6 +110,54 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         yo = _norm(usuario["nombre"])
         data = [d for d in data if _norm(d["tecnico"]) == yo]
     return {"total": len(data), "consultas": data}
+
+
+@router.post("")
+def crear_manual(payload: ConsultaManualIn, usuario=Depends(require_login)):
+    """Alta manual de una consulta que llegó por un medio distinto al formulario
+    (llamada, presencial, mail directo). Sin anti-duplicado automático: si genera
+    un CUIT repetido, la vista de "Duplicados" del panel ya lo va a marcar."""
+    nombre = payload.nombre.strip()
+    if not nombre:
+        raise HTTPException(422, "El nombre es obligatorio")
+    fecha = _parse_fecha(payload.fecha_recepcion)
+    with engine.begin() as conn:
+        codigo = proximo_codigo()
+        r = conn.execute(text("""
+            INSERT INTO sde_consultas
+                (codigo, fuente, fecha_recepcion, nombre, cuit, situacion_arca,
+                 telefono, mail, localidad, actividad_economica, sector, monto,
+                 destino, como_se_entero, genero, tecnico, departamento,
+                 localidad_confirmada, garantia, linea, programa, arca_confirmado,
+                 monto_confirmado, actividad_inscripta, situacion_bcra, estado,
+                 observaciones, informacion_extra)
+            VALUES
+                (:codigo, 'Manual', :fecha, :nombre, :cuit, :arca,
+                 :tel, :mail, :localidad, :actividad, :sector, :monto,
+                 :destino, :como, :genero, :tecnico, :departamento,
+                 :localidad_confirmada, :garantia, :linea, :programa, :arca_confirmado,
+                 :monto_confirmado, :actividad_inscripta, :situacion_bcra, :estado,
+                 :observaciones, :informacion_extra)
+            RETURNING id
+        """), {
+            "codigo": codigo, "fecha": fecha, "nombre": nombre,
+            "cuit": payload.cuit, "arca": payload.situacion_arca, "tel": payload.telefono,
+            "mail": payload.mail, "localidad": payload.localidad,
+            "actividad": payload.actividad_economica, "sector": payload.sector,
+            "monto": _parse_monto(payload.monto), "destino": payload.destino,
+            "como": payload.como_se_entero, "genero": payload.genero,
+            "tecnico": payload.tecnico, "departamento": payload.departamento,
+            "localidad_confirmada": payload.localidad_confirmada, "garantia": payload.garantia,
+            "linea": payload.linea, "programa": payload.programa,
+            "arca_confirmado": payload.arca_confirmado,
+            "monto_confirmado": _parse_monto(payload.monto_confirmado),
+            "actividad_inscripta": payload.actividad_inscripta,
+            "situacion_bcra": payload.situacion_bcra,
+            "estado": (payload.estado or "CONSULTA INICIAL"),
+            "observaciones": payload.observaciones, "informacion_extra": payload.informacion_extra,
+        }).first()
+    log.info("Alta manual: codigo=%s id=%s por=%s", codigo, r[0], usuario["username"])
+    return {"ok": True, "codigo": codigo, "id": r[0]}
 
 
 @router.get("/{cid}")

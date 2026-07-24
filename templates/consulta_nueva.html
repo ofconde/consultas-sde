@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Nueva consulta · Consultas SDE{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+
+  <div class="wrap">
+    <a href="/panel" class="muted">&larr; Volver al panel</a>
+    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">Cargar consulta manual</h1>
+    <p class="muted" style="margin:0 0 1rem">
+      Para consultas que llegaron por un medio distinto al formulario (llamada, presencial, mail directo).
+    </p>
+
+    <div class="grid2">
+      <div class="card detalle-card">
+        <div class="sec-title" style="margin-top:0">Datos del solicitante</div>
+        <div class="row2">
+          <div class="field"><label>Nombre / razón social *</label><input id="nombre" required></div>
+          <div class="field"><label>CUIT</label><input id="cuit"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Teléfono</label><input id="telefono"></div>
+          <div class="field"><label>Mail</label><input id="mail"></div>
+        </div>
+        <div class="field"><label>Localidad</label><input id="localidad" list="loc-list"><datalist id="loc-list"></datalist></div>
+        <div class="field"><label>Actividad declarada</label><textarea id="actividad_economica"></textarea></div>
+        <div class="field"><label>Destino del financiamiento</label><textarea id="destino"></textarea></div>
+        <div class="row2">
+          <div class="field"><label>Monto solicitado</label><input id="monto" placeholder="$"></div>
+          <div class="field"><label>Cómo se enteró</label><input id="como_se_entero"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Sector productivo</label><select id="sector"><option value=""></option></select></div>
+          <div class="field"><label>Fecha de recepción</label><input id="fecha_recepcion" type="date"></div>
+        </div>
+      </div>
+
+      <div class="card detalle-card">
+        <div class="sec-title" style="margin-top:0">Gestión</div>
+        <div class="g-grid">
+          <div class="field"><label>Técnico responsable</label>
+            <select id="tecnico"><option value="">— Sin asignar</option></select></div>
+          <div class="field"><label>Estado</label><select id="estado"></select></div>
+          <div class="field"><label>Departamento</label><select id="departamento"><option value=""></option></select></div>
+          <div class="field"><label>Localidad confirmada</label><input id="localidad_confirmada" list="loc-list"></div>
+          <div class="field"><label>Línea</label><select id="linea"><option value=""></option></select></div>
+          <div class="field"><label>Programa</label><select id="programa"><option value=""></option></select></div>
+          <div class="field"><label>Garantía</label><select id="garantia"><option value=""></option></select></div>
+          <div class="field"><label>Monto confirmado</label><input id="monto_confirmado" placeholder="$"></div>
+          <div class="field"><label>ARCA confirmado</label><select id="arca_confirmado"><option value=""></option></select></div>
+          <div class="field"><label>Situación BCRA</label><input id="situacion_bcra"></div>
+          <div class="field"><label>Actividad inscripta (ARCA)</label><input id="actividad_inscripta"></div>
+        </div>
+        <div class="field" style="margin-top:0.75rem"><label>Observaciones</label><textarea id="observaciones"></textarea></div>
+        <div class="field" style="margin-top:0.625rem"><label>Información extra</label><textarea id="informacion_extra"></textarea></div>
+        <button class="btn primary" id="guardar" style="margin-top:0.875rem">Cargar consulta</button>
+        <span class="muted" id="msg" style="margin-left:0.625rem"></span>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = s => document.querySelector(s);
+const ROL = "{{ usuario.rol }}";
+const NOMBRE_USUARIO = "{{ usuario.nombre }}";
+
+function fill(sel, arr, cur){
+  arr.forEach(v => sel.add(new Option(v, v, false, v===cur)));
+}
+
+function normalizar(s){
+  return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+}
+
+async function cargarOpciones(){
+  const CAT = await (await fetch('/api/catalogos')).json();
+  fill($('#estado'), CAT.ESTADO||[], 'CONSULTA INICIAL');
+  fill($('#departamento'), CAT.DEPARTAMENTO||[], '');
+  fill($('#linea'), CAT.LINEA||[], '');
+  fill($('#programa'), CAT.PROGRAMA||[], '');
+  fill($('#garantia'), CAT.GARANTIA||[], '');
+  fill($('#arca_confirmado'), CAT.SITUACION_AFIP||[], '');
+  (CAT.LOCALIDAD||[]).forEach(v => $('#loc-list').appendChild(new Option(v,v)));
+
+  // sector: valores reales de los datos (no el catálogo de referencia — ver panel.html)
+  const info = await (await fetch('/api/informe')).json();
+  const sectoresReales = (info.sectores||[]).map(s=>s.clave).filter(s=>s && !s.startsWith('(sin')).sort();
+  fill($('#sector'), sectoresReales, '');
+
+  // técnicos: listado real + a mí mismo preseleccionado si soy técnico (match
+  // normalizado, sin acentos/mayúsculas: en los datos figura "VICTOR SUAREZ",
+  // en la sesión "Víctor Suárez" — no coinciden como string exacto)
+  const d = await (await fetch('/api/consultas')).json();
+  const set = [...new Set(d.consultas.map(x=>x.tecnico).filter(Boolean))].sort();
+  let cur = '';
+  if(ROL === 'tecnico'){
+    cur = set.find(v => normalizar(v) === normalizar(NOMBRE_USUARIO)) || '';
+  }
+  fill($('#tecnico'), set, cur);
+
+  $('#fecha_recepcion').value = new Date().toISOString().slice(0,10);
+}
+
+$('#guardar').addEventListener('click', async () => {
+  const nombre = $('#nombre').value.trim();
+  const msg = $('#msg');
+  if(!nombre){ msg.textContent = 'El nombre es obligatorio.'; return; }
+  const body = {
+    nombre, cuit: $('#cuit').value, telefono: $('#telefono').value, mail: $('#mail').value,
+    localidad: $('#localidad').value, actividad_economica: $('#actividad_economica').value,
+    destino: $('#destino').value, monto: $('#monto').value, como_se_entero: $('#como_se_entero').value,
+    sector: $('#sector').value, fecha_recepcion: $('#fecha_recepcion').value,
+    tecnico: $('#tecnico').value, estado: $('#estado').value, departamento: $('#departamento').value,
+    localidad_confirmada: $('#localidad_confirmada').value, linea: $('#linea').value,
+    programa: $('#programa').value, garantia: $('#garantia').value,
+    monto_confirmado: $('#monto_confirmado').value, arca_confirmado: $('#arca_confirmado').value,
+    situacion_bcra: $('#situacion_bcra').value, actividad_inscripta: $('#actividad_inscripta').value,
+    observaciones: $('#observaciones').value, informacion_extra: $('#informacion_extra').value,
+  };
+  $('#guardar').disabled = true; msg.textContent = 'Guardando…';
+  const r = await fetch('/api/consultas', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+  });
+  if(r.ok){
+    const d = await r.json();
+    location.href = '/consulta/' + d.id;
+  } else {
+    const d = await r.json().catch(()=>({}));
+    msg.textContent = 'Error: ' + (d.detail || 'no se pudo guardar');
+    $('#guardar').disabled = false;
+  }
+});
+
+cargarOpciones();
+</script>
+{% endblock %}

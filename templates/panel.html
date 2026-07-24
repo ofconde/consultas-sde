@@ -4,6 +4,10 @@
 {% include "_topbar.html" %}
 
   <div class="wrap">
+    <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-bottom:0.75rem">
+      <a href="/consulta/nueva" class="btn primary sm">+ Cargar consulta</a>
+      <button class="btn sm" id="btn-refrescar">↻ Actualizar</button>
+    </div>
     <div class="kpis" id="kpis"></div>
 
     <div class="estado-btns" id="ebtns"></div>
@@ -230,6 +234,11 @@ $('#f-sector').addEventListener('change', cargarTabla);
 $('#f-estado').addEventListener('change', () => {
   state.estado = $('#f-estado').value; state.dups = false;
   pintarBotones(); cargarTabla();
+});
+$('#btn-refrescar').addEventListener('click', async () => {
+  const b = $('#btn-refrescar'); b.disabled = true; b.textContent = 'Actualizando…';
+  await cargarResumen(); await cargarTabla();
+  b.disabled = false; b.textContent = '↻ Actualizar';
 });
 
 (async function(){

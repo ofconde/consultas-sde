@@ -96,6 +96,16 @@ def panel(request: Request):
     return templates.TemplateResponse("panel.html", {"request": request, "usuario": u, "activo": "panel"})
 
 
+@app.get("/consulta/nueva", response_class=HTMLResponse)
+def consulta_nueva_page(request: Request):
+    # esta ruta debe registrarse ANTES que /consulta/{cid}: si no, FastAPI intenta
+    # convertir "nueva" a int para esa otra ruta y devuelve 422 en vez de esta página.
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("consulta_nueva.html", {"request": request, "usuario": u})
+
+
 @app.get("/consulta/{cid}", response_class=HTMLResponse)
 def detalle_page(request: Request, cid: int):
     u = usuario_actual(request)
@@ -111,6 +121,16 @@ def informe_page(request: Request):
     if not u:
         return RedirectResponse("/login")
     return templates.TemplateResponse("informe.html", {"request": request, "usuario": u, "activo": "informe"})
+
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_page(request: Request):
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    if u["rol"] != "coordinador":
+        return RedirectResponse("/panel")
+    return templates.TemplateResponse("admin.html", {"request": request, "usuario": u, "activo": "admin"})
 
 
 @app.get("/perfil", response_class=HTMLResponse)

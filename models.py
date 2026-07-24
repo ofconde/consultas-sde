@@ -42,6 +42,14 @@ class GestionIn(BaseModel):
     genero:               Optional[str] = _TXT
 
 
+class ConsultaManualIn(ConsultaIngesta, GestionIn):
+    """Alta manual de una consulta que llegó por un medio distinto al formulario
+    (llamada telefónica, presencial, mail directo, etc.). Combina los campos del
+    solicitante con los de gestión en un solo alta — a diferencia de la ingesta
+    automática, acá el técnico ya conoce y confirma todo de una."""
+    nombre: str = Field(max_length=2000)
+
+
 class AccionIn(BaseModel):
     fecha:   Optional[str] = _TXT
     accion:  str = Field(max_length=2000)
