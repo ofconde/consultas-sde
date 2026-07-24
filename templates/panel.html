@@ -76,11 +76,11 @@ async function cargarResumen(){
   llenar($('#f-sector'), sectoresReales.sort(), 'Todos los sectores');
 
   $('#kpis').innerHTML = `
-    <div class="kpi card clickable" id="kpi-total"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>
-    <div class="kpi card accent"><div class="n">${d.activas}</div><div class="l">Activas</div></div>
-    <div class="kpi card clickable" id="kpi-sin-asignar"><div class="n">${d.sin_asignar}</div><div class="l">Sin asignar</div></div>
-    <div class="kpi card clickable" id="kpi-sin-acciones"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
-    <div class="kpi card"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
+    <div class="kpi card kpi-blue clickable" id="kpi-total"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>
+    <div class="kpi card kpi-green"><div class="n">${d.activas}</div><div class="l">Activas</div></div>
+    <div class="kpi card kpi-amber clickable" id="kpi-sin-asignar"><div class="n">${d.sin_asignar}</div><div class="l">Sin asignar</div></div>
+    <div class="kpi card kpi-red clickable" id="kpi-sin-acciones"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
+    <div class="kpi card kpi-violet"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
 
   $('#kpi-total').addEventListener('click', () => {
     Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false });

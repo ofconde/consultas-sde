@@ -109,11 +109,11 @@ const hoy = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'
   $('#fecha-doc').textContent = 'Fecha del informe: ' + hoy;
 
   $('#kpis').innerHTML = `
-    <div class="kpi card"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>
-    <div class="kpi card accent"><div class="n">${d.activas}</div><div class="l">Activas</div></div>
-    <div class="kpi card"><div class="n">${d.sin_asignar}</div><div class="l">Sin asignar</div></div>
-    <div class="kpi card"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
-    <div class="kpi card"><div class="n">${d.total_acciones}</div><div class="l">Acciones totales</div></div>`;
+    <div class="kpi card kpi-blue"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>
+    <div class="kpi card kpi-green"><div class="n">${d.activas}</div><div class="l">Activas</div></div>
+    <div class="kpi card kpi-amber"><div class="n">${d.sin_asignar}</div><div class="l">Sin asignar</div></div>
+    <div class="kpi card kpi-red"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
+    <div class="kpi card kpi-violet"><div class="n">${d.total_acciones}</div><div class="l">Acciones totales</div></div>`;
 
   const max = Math.max(1, ...d.grupos.map(g=>g.n));
   $('#grupos').innerHTML = d.grupos.map(g => `

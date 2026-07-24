@@ -38,13 +38,16 @@ def listar_usuarios(_=Depends(require_coordinador)):
 
 @router.post("")
 def crear_usuario(username: str = Body(...), nombre: str = Body(...),
-                   rol: str = Body(...), password: str = Body(...),
+                   rol: str = Body(default=ROL_TECNICO), password: str = Body(...),
                    admin=Depends(require_coordinador)):
-    """Alta de un usuario nuevo (técnico o coordinador) — solo coordinador."""
+    """Alta de un usuario nuevo — por defecto técnico, salvo que se indique
+    explícitamente coordinador (admin). Solo coordinador puede dar de alta."""
     username = username.strip().lower()
     nombre = nombre.strip()
     if not username or not nombre:
         raise HTTPException(422, "Usuario y nombre son obligatorios.")
+    if not rol:
+        rol = ROL_TECNICO
     if rol not in (ROL_COORDINADOR, ROL_TECNICO):
         raise HTTPException(422, "Rol inválido.")
     if len(password) < 6:
