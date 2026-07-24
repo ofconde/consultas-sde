@@ -11,6 +11,12 @@
     <div class="filtros">
       <input type="search" id="q" placeholder="Buscar por nombre o CUIT…">
       <select id="f-tecnico"><option value="">Todos los técnicos</option><option value="__sin__">— Sin asignar</option></select>
+      <select id="f-estado"><option value="">Todos los estados</option></select>
+      <select id="f-accion"><option value="">Última acción (todas)</option></select>
+      <select id="f-departamento"><option value="">Todos los departamentos</option></select>
+      <select id="f-linea"><option value="">Todas las líneas</option></select>
+      <select id="f-programa"><option value="">Todos los programas</option></select>
+      <select id="f-sector"><option value="">Todos los sectores</option></select>
       <span class="muted" id="cont"></span>
     </div>
 
@@ -33,20 +39,60 @@ const $ = s => document.querySelector(s);
 const ROL = "{{ usuario.rol }}";
 let TIMER = null;
 const PAGE_SIZE = 60;
-const state = { estado: '', mios: false, dups: false, pagina: 1 };
+const state = { estado: '', mios: false, dups: false, sinAcciones: false, pagina: 1 };
 let ROWS = [];
 let META = { grupo_color: {} };
+let CAT = {};
 
 async function cargarMeta(){ META = await (await fetch('/api/catalogos/estado-grupo')).json(); }
 
+function llenar(sel, valores, placeholder){
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  valores.forEach(v => sel.add(new Option(v, v)));
+}
+
+async function cargarCatalogos(){
+  CAT = await (await fetch('/api/catalogos')).json();
+  llenar($('#f-estado'), CAT.ESTADO||[], 'Todos los estados');
+  llenar($('#f-accion'), CAT.ACCION||[], 'Última acción (todas)');
+  llenar($('#f-departamento'), CAT.DEPARTAMENTO||[], 'Todos los departamentos');
+  llenar($('#f-linea'), CAT.LINEA||[], 'Todas las líneas');
+  llenar($('#f-programa'), CAT.PROGRAMA||[], 'Todos los programas');
+  // sector NO se llena desde CAT.SECTOR: ese catálogo de referencia (25 rubros detallados)
+  // no coincide con los valores reales guardados en los datos (COMERCIAL/SERVICIOS/etc,
+  // que vienen tal cual del Excel). Se llena en cargarResumen() con los valores reales.
+}
+
 async function cargarResumen(){
   const r = await fetch('/api/informe'); const d = await r.json();
+
+  // sector: valores reales presentes en los datos (no el catálogo de referencia,
+  // que usa una taxonomía distinta — ver nota en cargarCatalogos())
+  const sectoresReales = (d.sectores||[]).map(s=>s.clave).filter(s=>s && !s.startsWith('(sin'));
+  llenar($('#f-sector'), sectoresReales.sort(), 'Todos los sectores');
+
   $('#kpis').innerHTML = `
-    <div class="kpi card"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>
+    <div class="kpi card clickable" id="kpi-total"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>
     <div class="kpi card accent"><div class="n">${d.activas}</div><div class="l">Activas</div></div>
-    <div class="kpi card"><div class="n">${d.sin_asignar}</div><div class="l">Sin asignar</div></div>
-    <div class="kpi card"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
+    <div class="kpi card clickable" id="kpi-sin-asignar"><div class="n">${d.sin_asignar}</div><div class="l">Sin asignar</div></div>
+    <div class="kpi card clickable" id="kpi-sin-acciones"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
     <div class="kpi card"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
+
+  $('#kpi-total').addEventListener('click', () => {
+    Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false });
+    $('#q').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
+    $('#f-accion').value=''; $('#f-departamento').value=''; $('#f-linea').value='';
+    $('#f-programa').value=''; $('#f-sector').value='';
+    pintarBotones(); pintarKpis(); cargarTabla();
+  });
+  $('#kpi-sin-asignar').addEventListener('click', () => {
+    $('#f-tecnico').value = $('#f-tecnico').value === '__sin__' ? '' : '__sin__';
+    pintarKpis(); cargarTabla();
+  });
+  $('#kpi-sin-acciones').addEventListener('click', () => {
+    state.sinAcciones = !state.sinAcciones; pintarKpis(); cargarTabla();
+  });
+  pintarKpis();
 
   // botones dinámicos: uno por cada estado que exista en los datos (se crean solos)
   let botones = `<button class="ebtn" data-estado=""><span>Todas</span><span class="cnt">${d.total}</span></button>`;
@@ -62,7 +108,9 @@ async function cargarResumen(){
 
   $('#ebtns').querySelectorAll('.ebtn[data-estado]').forEach(b => {
     b.addEventListener('click', () => {
-      state.estado = b.dataset.estado; state.dups = false; pintarBotones(); cargarTabla();
+      state.estado = b.dataset.estado; state.dups = false;
+      $('#f-estado').value = state.estado;
+      pintarBotones(); cargarTabla();
     });
   });
   $('#btn-mios').addEventListener('click', () => {
@@ -70,7 +118,9 @@ async function cargarResumen(){
   });
   const bd = $('#btn-dups');
   if(bd) bd.addEventListener('click', () => {
-    state.dups = !state.dups; state.estado = ''; state.mios = false; pintarBotones(); cargarTabla();
+    state.dups = !state.dups; state.estado = ''; state.mios = false;
+    $('#f-estado').value = '';
+    pintarBotones(); cargarTabla();
   });
   pintarBotones();
 }
@@ -81,6 +131,11 @@ function pintarBotones(){
   });
   const m = $('#btn-mios'); if(m) m.classList.toggle('active', state.mios);
   const bd = $('#btn-dups'); if(bd) bd.classList.toggle('active', state.dups);
+}
+
+function pintarKpis(){
+  const k = $('#kpi-sin-acciones'); if(k) k.classList.toggle('active', state.sinAcciones);
+  const a = $('#kpi-sin-asignar'); if(a) a.classList.toggle('active', $('#f-tecnico').value === '__sin__');
 }
 
 async function cargarTecnicos(){
@@ -100,6 +155,12 @@ async function cargarTabla(){
   if($('#f-tecnico').value) p.set('tecnico',$('#f-tecnico').value);
   if(state.mios) p.set('mios','1');
   if(state.dups) p.set('dups','1');
+  if(state.sinAcciones) p.set('sin_acciones','1');
+  if($('#f-accion').value) p.set('tipo_accion',$('#f-accion').value);
+  if($('#f-departamento').value) p.set('departamento',$('#f-departamento').value);
+  if($('#f-linea').value) p.set('linea',$('#f-linea').value);
+  if($('#f-programa').value) p.set('programa',$('#f-programa').value);
+  if($('#f-sector').value) p.set('sector',$('#f-sector').value);
   const r = await fetch('/api/consultas?'+p); const d = await r.json();
   ROWS = d.consultas;
   state.pagina = 1;
@@ -160,8 +221,20 @@ function renderPagina(){
 }
 
 $('#q').addEventListener('input', ()=>{clearTimeout(TIMER);TIMER=setTimeout(cargarTabla,250)});
-$('#f-tecnico').addEventListener('change', cargarTabla);
+$('#f-tecnico').addEventListener('change', ()=>{ pintarKpis(); cargarTabla(); });
+$('#f-accion').addEventListener('change', cargarTabla);
+$('#f-departamento').addEventListener('change', cargarTabla);
+$('#f-linea').addEventListener('change', cargarTabla);
+$('#f-programa').addEventListener('change', cargarTabla);
+$('#f-sector').addEventListener('change', cargarTabla);
+$('#f-estado').addEventListener('change', () => {
+  state.estado = $('#f-estado').value; state.dups = false;
+  pintarBotones(); cargarTabla();
+});
 
-(async function(){ await cargarMeta(); await cargarTecnicos(); await cargarResumen(); await cargarTabla(); })();
+(async function(){
+  await cargarMeta(); await cargarCatalogos(); await cargarTecnicos();
+  await cargarResumen(); await cargarTabla();
+})();
 </script>
 {% endblock %}

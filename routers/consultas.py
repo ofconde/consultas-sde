@@ -44,10 +44,14 @@ def _fila_resumen(r):
 @router.get("")
 def listar(request: Request, estado: str = "", tecnico: str = "",
            grupo: str = "", q: str = "", mios: bool = False, dups: bool = False,
+           departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
+           tipo_accion: str = "", sin_acciones: bool = False,
            usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca por nombre o CUIT.
     `mios=1` filtra las asignadas al técnico logueado (match sin acentos/mayúsculas).
-    `dups=1` muestra solo consultas con CUIT duplicado, agrupadas por CUIT."""
+    `dups=1` muestra solo consultas con CUIT duplicado, agrupadas por CUIT.
+    `tipo_accion` filtra por el tipo de la ÚLTIMA acción registrada (no cualquiera del
+    historial). `sin_acciones=1` filtra las que todavía no tienen ninguna acción cargada."""
     where = ["1=1"]
     params = {}
     if estado:
@@ -59,6 +63,18 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
             where.append("c.tecnico = :tecnico"); params["tecnico"] = tecnico
     if q:
         where.append("(c.nombre ILIKE :q OR c.cuit ILIKE :q)"); params["q"] = f"%{q}%"
+    if departamento:
+        where.append("c.departamento = :departamento"); params["departamento"] = departamento
+    if linea:
+        where.append("c.linea = :linea"); params["linea"] = linea
+    if programa:
+        where.append("c.programa = :programa"); params["programa"] = programa
+    if sector:
+        where.append("c.sector = :sector"); params["sector"] = sector
+    if sin_acciones:
+        where.append("NOT EXISTS (SELECT 1 FROM sde_acciones a WHERE a.consulta_id = c.id)")
+    if tipo_accion:
+        where.append("ua.accion = :tipo_accion"); params["tipo_accion"] = tipo_accion
 
     with engine.connect() as conn:
         dup_cuits = cuits_duplicados(conn)
@@ -72,8 +88,15 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
 
         rows = conn.execute(text(f"""
             SELECT c.*,
-                   (SELECT COUNT(*) FROM sde_acciones a WHERE a.consulta_id = c.id) AS n_acciones
+                   (SELECT COUNT(*) FROM sde_acciones a WHERE a.consulta_id = c.id) AS n_acciones,
+                   ua.accion AS ultima_accion
             FROM sde_consultas c
+            LEFT JOIN LATERAL (
+                SELECT accion FROM sde_acciones a2
+                WHERE a2.consulta_id = c.id
+                ORDER BY a2.fecha DESC NULLS LAST, a2.id DESC
+                LIMIT 1
+            ) ua ON true
             WHERE {' AND '.join(where)}
             ORDER BY {orden}
         """), params).mappings().all()
