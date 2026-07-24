@@ -17,8 +17,8 @@ def cambiar_password(actual: str = Body(...), nueva: str = Body(...),
     """Cada usuario cambia su propia contraseña (necesita la actual)."""
     if not autenticar(usuario["username"], actual):
         raise HTTPException(400, "La contraseña actual es incorrecta.")
-    if len(nueva) < 8:
-        raise HTTPException(400, "La nueva contraseña debe tener al menos 8 caracteres.")
+    if len(nueva) < 6:
+        raise HTTPException(400, "La nueva contraseña debe tener al menos 6 caracteres.")
     with engine.begin() as conn:
         conn.execute(text("""
             UPDATE sde_usuarios SET password_hash = :p WHERE username = :u
@@ -47,8 +47,8 @@ def crear_usuario(username: str = Body(...), nombre: str = Body(...),
         raise HTTPException(422, "Usuario y nombre son obligatorios.")
     if rol not in (ROL_COORDINADOR, ROL_TECNICO):
         raise HTTPException(422, "Rol inválido.")
-    if len(password) < 8:
-        raise HTTPException(422, "La contraseña debe tener al menos 8 caracteres.")
+    if len(password) < 6:
+        raise HTTPException(422, "La contraseña debe tener al menos 6 caracteres.")
     with engine.begin() as conn:
         existe = conn.execute(text("SELECT 1 FROM sde_usuarios WHERE username = :u"),
                               {"u": username}).scalar()
@@ -66,8 +66,8 @@ def crear_usuario(username: str = Body(...), nombre: str = Body(...),
 def resetear_password(username: str, nueva: str = Body(..., embed=True),
                        admin=Depends(require_coordinador)):
     """El coordinador blanquea la contraseña de cualquier usuario, sin necesitar la actual."""
-    if len(nueva) < 8:
-        raise HTTPException(422, "La contraseña debe tener al menos 8 caracteres.")
+    if len(nueva) < 6:
+        raise HTTPException(422, "La contraseña debe tener al menos 6 caracteres.")
     with engine.begin() as conn:
         r = conn.execute(text("""
             UPDATE sde_usuarios SET password_hash = :p WHERE username = :u RETURNING username

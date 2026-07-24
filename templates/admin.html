@@ -19,7 +19,7 @@
           </select>
         </div>
       </div>
-      <div class="field"><label>Contraseña inicial (mínimo 8 caracteres)</label><input id="n-password" type="text"></div>
+      <div class="field"><label>Contraseña inicial (mínimo 6 caracteres)</label><input id="n-password" type="text"></div>
       <button class="btn primary" id="n-crear" style="margin-top:0.5rem">Crear usuario</button>
       <span class="muted" id="n-msg" style="margin-left:0.625rem"></span>
     </div>
@@ -74,9 +74,9 @@ async function cargarUsuarios(){
 }
 
 async function resetear(username){
-  const nueva = prompt('Nueva contraseña para ' + username + ' (mínimo 8 caracteres):');
+  const nueva = prompt('Nueva contraseña para ' + username + ' (mínimo 6 caracteres):');
   if (!nueva) return;
-  if (nueva.length < 8) { alert('Debe tener al menos 8 caracteres.'); return; }
+  if (nueva.length < 6) { alert('Debe tener al menos 6 caracteres.'); return; }
   const r = await fetch(`/api/usuarios/${encodeURIComponent(username)}/resetear-password`, {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nueva}),
   });
@@ -100,7 +100,7 @@ $('#n-crear').addEventListener('click', async () => {
   const msg = $('#n-msg');
   msg.textContent = '';
   if (!nombre || !username) { msg.textContent = 'Nombre y usuario son obligatorios.'; return; }
-  if (password.length < 8) { msg.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+  if (password.length < 6) { msg.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
   $('#n-crear').disabled = true; msg.textContent = 'Creando…';
   const r = await fetch('/api/usuarios', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
