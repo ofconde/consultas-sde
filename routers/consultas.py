@@ -7,7 +7,7 @@ from db import engine, proximo_codigo, cuits_duplicados
 from auth import require_login, require_coordinador, puede_editar
 from models import GestionIn, ConsultaManualIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto, _parse_fecha
-from constantes import grupo_de, _norm, ROL_COORDINADOR
+from constantes import grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS
 
 router = APIRouter(prefix="/api/consultas", tags=["consultas"])
 log = logging.getLogger("consultas_sde.consultas")
@@ -110,6 +110,49 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         yo = _norm(usuario["nombre"])
         data = [d for d in data if _norm(d["tecnico"]) == yo]
     return {"total": len(data), "consultas": data}
+
+
+@router.get("/resumen")
+def resumen(_=Depends(require_login)):
+    """KPIs operativos para el header del panel — accesible a cualquier usuario
+    logueado (a diferencia de /api/informe, que es el informe de gestión de los
+    viernes y es solo para el coordinador)."""
+    with engine.connect() as conn:
+        total = conn.execute(text("SELECT COUNT(*) FROM sde_consultas")).scalar() or 0
+        por_estado = conn.execute(text("""
+            SELECT COALESCE(estado, 'SIN ESTADO') AS estado, COUNT(*) AS n
+            FROM sde_consultas GROUP BY estado ORDER BY n DESC
+        """)).mappings().all()
+        sin_asignar = conn.execute(text("""
+            SELECT COUNT(*) FROM sde_consultas WHERE tecnico IS NULL OR tecnico = ''
+        """)).scalar() or 0
+        sin_acciones = conn.execute(text("""
+            SELECT COUNT(*) FROM sde_consultas c
+            WHERE NOT EXISTS (SELECT 1 FROM sde_acciones a WHERE a.consulta_id = c.id)
+        """)).scalar() or 0
+        nuevas_semana = conn.execute(text("""
+            SELECT COUNT(*) FROM sde_consultas WHERE fecha_recepcion >= NOW() - INTERVAL '7 days'
+        """)).scalar() or 0
+        dup_cuits = cuits_duplicados(conn)
+        duplicados = 0
+        if dup_cuits:
+            duplicados = conn.execute(text("""
+                SELECT COUNT(*) FROM sde_consultas WHERE cuit = ANY(:dcuits)
+            """), {"dcuits": list(dup_cuits)}).scalar() or 0
+        sectores = conn.execute(text("""
+            SELECT DISTINCT sector FROM sde_consultas
+            WHERE sector IS NOT NULL AND sector <> '' ORDER BY sector
+        """)).all()
+
+    estados_out = [{"estado": r["estado"], "n": r["n"], "grupo": grupo_de(r["estado"])} for r in por_estado]
+    activas = sum(r["n"] for r in estados_out if r["grupo"] in GRUPOS_ACTIVOS)
+
+    return {
+        "total": total, "activas": activas, "sin_asignar": sin_asignar,
+        "sin_acciones": sin_acciones, "nuevas_semana": nuevas_semana, "duplicados": duplicados,
+        "estados": estados_out,
+        "sectores": [{"clave": r[0]} for r in sectores],
+    }
 
 
 @router.post("")

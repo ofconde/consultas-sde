@@ -11,7 +11,7 @@
       <div class="sec-title" style="margin-top:0">Nuevo usuario</div>
       <div class="field"><label>Nombre y apellido</label><input id="n-nombre"></div>
       <div class="row2">
-        <div class="field"><label>Usuario (para login)</label><input id="n-username" autocapitalize="off" autocomplete="off"></div>
+        <div class="field"><label>Usuario (para login)</label><input id="n-username" autocapitalize="off" autocomplete="off" placeholder="ej: oconde"></div>
         <div class="field"><label>Rol</label>
           <select id="n-rol">
             <option value="tecnico">Técnico</option>
@@ -35,6 +35,25 @@
 {% block scripts %}
 <script>
 const $ = s => document.querySelector(s);
+
+// sugerencia de usuario tipo "oconde" (inicial + apellido) a partir del nombre,
+// como los ya existentes (omar->omar/victor->victor son la excepción histórica;
+// de acá en más se sigue este patrón). El campo se puede editar a mano.
+function normalizarUsername(s){
+  return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z]/g,'');
+}
+function sugerirUsername(nombre){
+  const partes = nombre.trim().split(/\s+/).filter(Boolean);
+  if(!partes.length) return '';
+  const inicial = normalizarUsername(partes[0]).charAt(0);
+  const apellido = normalizarUsername(partes[partes.length-1]);
+  return inicial + apellido;
+}
+let usernameTocado = false;
+$('#n-username').addEventListener('input', () => { usernameTocado = true; });
+$('#n-nombre').addEventListener('input', () => {
+  if(!usernameTocado) $('#n-username').value = sugerirUsername($('#n-nombre').value);
+});
 
 async function cargarUsuarios(){
   const r = await fetch('/api/usuarios');
@@ -91,6 +110,7 @@ $('#n-crear').addEventListener('click', async () => {
   if (r.ok) {
     msg.textContent = '✓ Usuario creado.';
     $('#n-nombre').value = ''; $('#n-username').value = ''; $('#n-password').value = '';
+    usernameTocado = false;
     cargarUsuarios();
   } else {
     const d = await r.json().catch(()=>({}));

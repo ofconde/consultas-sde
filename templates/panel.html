@@ -68,7 +68,7 @@ async function cargarCatalogos(){
 }
 
 async function cargarResumen(){
-  const r = await fetch('/api/informe'); const d = await r.json();
+  const r = await fetch('/api/consultas/resumen'); const d = await r.json();
 
   // sector: valores reales presentes en los datos (no el catálogo de referencia,
   // que usa una taxonomía distinta — ver nota en cargarCatalogos())

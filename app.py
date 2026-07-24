@@ -120,6 +120,8 @@ def informe_page(request: Request):
     u = usuario_actual(request)
     if not u:
         return RedirectResponse("/login")
+    if u["rol"] != "coordinador":
+        return RedirectResponse("/panel")
     return templates.TemplateResponse("informe.html", {"request": request, "usuario": u, "activo": "informe"})
 
 

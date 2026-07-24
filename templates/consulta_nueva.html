@@ -83,7 +83,7 @@ async function cargarOpciones(){
   (CAT.LOCALIDAD||[]).forEach(v => $('#loc-list').appendChild(new Option(v,v)));
 
   // sector: valores reales de los datos (no el catálogo de referencia — ver panel.html)
-  const info = await (await fetch('/api/informe')).json();
+  const info = await (await fetch('/api/consultas/resumen')).json();
   const sectoresReales = (info.sectores||[]).map(s=>s.clave).filter(s=>s && !s.startsWith('(sin')).sort();
   fill($('#sector'), sectoresReales, '');
 
