@@ -22,6 +22,9 @@
         <div class="info-grid">
           <div><label>Teléfono</label><span id="s-telefono">—</span></div>
           <div><label>Mail</label><span id="s-mail">—</span></div>
+          <div><label>Localidad</label><span id="s-localidad">—</span></div>
+          <div><label>Situación ARCA</label><span id="s-arca">—</span></div>
+          <div><label>Sector</label><span id="s-sector">—</span></div>
           <div><label>Cómo se enteró</label><span id="s-como">—</span></div>
           <div class="col-full"><label>Actividad declarada</label><span id="s-actividad">—</span></div>
           <div class="col-full"><label>Destino del financiamiento</label><span id="s-destino">—</span></div>
@@ -107,6 +110,9 @@ async function cargar(){
 
   $('#s-telefono').textContent = c.telefono||'—';
   $('#s-mail').textContent = c.mail||'—';
+  $('#s-localidad').textContent = c.localidad||'—';
+  $('#s-arca').textContent = c.situacion_arca||'—';
+  $('#s-sector').textContent = c.sector||'—';
   $('#s-actividad').textContent = c.actividad_economica||'—';
   $('#s-destino').textContent = c.destino||'—';
   $('#g-monto').value = c.monto || '';
