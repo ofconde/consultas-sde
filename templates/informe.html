@@ -35,6 +35,23 @@
 
     <div class="kpis" id="kpis"></div>
 
+    <h3 style="margin:1.625rem 0 0.75rem">Situación de consultas</h3>
+    <div class="tabla-wrap card" style="margin-bottom:1.625rem">
+      <table><thead><tr>
+        <th style="text-align:right">Consultas</th>
+        <th style="text-align:right">Inicial</th>
+        <th style="text-align:right">Repetidas</th>
+        <th style="text-align:right">Desistidas</th>
+        <th style="text-align:right">No financiables</th>
+        <th style="text-align:right">Pensando</th>
+        <th style="text-align:right">En SGR/Fondo</th>
+        <th style="text-align:right">En preparación</th>
+        <th style="text-align:right">En sede</th>
+        <th style="text-align:right">Activas</th>
+      </tr></thead>
+      <tbody id="situacion"></tbody></table>
+    </div>
+
     <div class="grid2">
       <div class="card" style="padding:1.375rem">
         <h3>Por grupo de estado</h3>
@@ -47,6 +64,9 @@
         <h3>Por técnico</h3>
         <div class="tabla-wrap"><table><thead><tr><th>Técnico</th><th style="text-align:right">Consultas</th></tr></thead>
         <tbody id="tecnicos"></tbody></table></div>
+        <h3 style="margin-top:1.5rem">"Consulta inicial" sin trabajar, por técnico</h3>
+        <div class="tabla-wrap"><table><thead><tr><th>Técnico</th><th style="text-align:right">Consultas</th></tr></thead>
+        <tbody id="inicial-tecnico"></tbody></table></div>
         <h3 style="margin-top:1.5rem">Movimiento de la semana</h3>
         <div class="barrow"><span class="lbl">Nuevas consultas</span><span></span><span class="val" id="mv-nuevas"></span></div>
         <div class="barrow"><span class="lbl">Acciones cargadas</span><span></span><span class="val" id="mv-acc"></span></div>
@@ -103,6 +123,24 @@ const hoy = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'
     <td style="text-align:right;font-weight:700">${e.n}</td></tr>`).join('');
 
   $('#tecnicos').innerHTML = d.tecnicos.map(t => `
+    <tr><td>${escapeHtml(t.tecnico)}</td><td style="text-align:right;font-weight:700">${t.n}</td></tr>`).join('');
+
+  const s = d.situacion;
+  $('#situacion').innerHTML = `
+    <tr>
+      <td style="text-align:right;font-weight:700">${s.consultas}</td>
+      <td style="text-align:right">${s.inicial}</td>
+      <td style="text-align:right">${s.repetidas}</td>
+      <td style="text-align:right">${s.desistidas}</td>
+      <td style="text-align:right">${s.no_financiables}</td>
+      <td style="text-align:right">${s.pensando}</td>
+      <td style="text-align:right">${s.en_sgr_fondo}</td>
+      <td style="text-align:right">${s.en_preparacion}</td>
+      <td style="text-align:right">${s.creditos}</td>
+      <td style="text-align:right"><span class="badge g-EN_SEDE">${s.activas_pct}%</span></td>
+    </tr>`;
+
+  $('#inicial-tecnico').innerHTML = d.inicial_por_tecnico.map(t => `
     <tr><td>${escapeHtml(t.tecnico)}</td><td style="text-align:right;font-weight:700">${t.n}</td></tr>`).join('');
 
   $('#mv-nuevas').textContent = d.nuevas_semana;

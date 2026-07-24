@@ -7,6 +7,21 @@ from auth import require_login
 from formatos import _monto
 from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS
 
+# "Situación de consultas" — desglose fino por estado (equivalente a la hoja
+# `indicadores` del Excel viejo, sin la dimensión de rama/línea de formulario
+# que ese Excel tenía y este sistema no: acá todo entra por un solo formulario).
+_SITUACION_MAP = {
+    "inicial":         {"CONSULTA INICIAL"},
+    "repetidas":       {"REPETIDO"},
+    "desistidas":      {"DESISTE DE TOMAR EL CRÉDITO"},
+    "no_financiables": {"NO ES FINANCIABLE"},
+    "pensando":        {"HAY INTERÉS PERO NO SE DECIDE"},
+    "en_sgr_fondo":    {"EN GESTION CON SGR O FONDO"},
+    "en_preparacion":  {"COMPLETANDO DOCUMENTACION"},
+    "creditos":        {"INGRESADO EN CFI SEDE", "DERIVADO A FONDO DE GARANTIA CFI",
+                         "DERIVADO A MERCADO DE CAPITALES", "DERIVADO A OTRA PROVINCIA"},
+}
+
 
 def _breakdown(conn, columna, etiqueta_vacia):
     """Cantidad + monto solicitado agrupado por una columna, ordenado por cantidad."""
@@ -78,6 +93,13 @@ def informe(_=Depends(require_login)):
             WHERE created_at >= NOW() - INTERVAL '7 days'
         """)).scalar() or 0
 
+        # backlog de "consulta inicial" (sin trabajar todavía) por técnico
+        inicial_por_tecnico = conn.execute(text("""
+            SELECT COALESCE(NULLIF(tecnico, ''), '— Sin asignar') AS tecnico, COUNT(*) AS n
+            FROM sde_consultas WHERE estado = 'CONSULTA INICIAL'
+            GROUP BY 1 ORDER BY n DESC
+        """)).mappings().all()
+
     # agrupar estados en grupos
     grupos_cnt = {g[0]: 0 for g in GRUPOS}
     estados_out = []
@@ -88,6 +110,14 @@ def informe(_=Depends(require_login)):
 
     activas = sum(v for k, v in grupos_cnt.items() if k in GRUPOS_ACTIVOS)
     grupos_out = [{"clave": k, "label": lbl, "n": grupos_cnt.get(k, 0)} for k, lbl in GRUPOS]
+
+    situacion = {clave: 0 for clave in _SITUACION_MAP}
+    for r in por_estado:
+        for clave, estados in _SITUACION_MAP.items():
+            if r["estado"] in estados:
+                situacion[clave] += r["n"]
+    situacion["consultas"] = total
+    situacion["activas_pct"] = round(activas / total * 100) if total else 0
 
     return {
         "total": total,
@@ -110,4 +140,6 @@ def informe(_=Depends(require_login)):
         "sectores": por_sector,
         "lineas": por_linea,
         "programas": por_programa,
+        "situacion": situacion,
+        "inicial_por_tecnico": [{"tecnico": r["tecnico"], "n": r["n"]} for r in inicial_por_tecnico],
     }
