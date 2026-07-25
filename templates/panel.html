@@ -28,7 +28,8 @@
       <table>
         <thead><tr>
           <th>Recepción</th><th>Solicitante</th><th>Localidad</th><th>Sector</th>
-          <th>Monto</th><th>Línea</th><th>Técnico</th><th>Estado</th><th>Acc.</th>
+          <th>Monto</th><th>Línea</th><th>Técnico</th><th>Estado</th><th>Última acción</th>
+          {% if usuario.rol == 'coordinador' %}<th></th>{% endif %}
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -174,9 +175,17 @@ async function cargarTabla(){
 
 function filaHTML(c){
   const dup = c.es_duplicado ? '<span class="dup">DUP</span>' : '';
-  const acc = (state.dups && ROL === 'coordinador')
-    ? `<button class="btn sm danger" onclick="event.stopPropagation();borrarConsulta(${c.id},this)">Eliminar</button>`
-    : c.n_acciones;
+  // Última acción del historial. Si hay más de una se aclara cuántas van, para no
+  // perder el dato de volumen que mostraba la columna anterior.
+  const acc = c.ultima_accion
+    ? `<span class="nom">${escapeHtml(c.ultima_accion)}</span>
+       <div class="cod">${escapeHtml(c.ultima_accion_fecha)||'sin fecha'}${
+         c.n_acciones > 1 ? ` · ${c.n_acciones} acciones` : ''}</div>`
+    : '<span class="muted">sin acciones</span>';
+  const borrar = ROL === 'coordinador'
+    ? `<td style="text-align:right"><button class="btn sm danger"
+         onclick="event.stopPropagation();borrarConsulta(${c.id},this)">Eliminar</button></td>`
+    : '';
   return `
     <tr onclick="location.href='/consulta/${c.id}'">
       <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">${escapeHtml(c.codigo)}</div></td>
@@ -187,14 +196,19 @@ function filaHTML(c){
       <td>${escapeHtml(c.linea)||'—'}</td>
       <td>${c.tecnico?escapeHtml(c.tecnico):'<span class="muted">sin asignar</span>'}</td>
       <td>${badge(c.grupo,c.estado)}</td>
-      <td style="text-align:center">${acc}</td>
+      <td>${acc}</td>
+      ${borrar}
     </tr>`;
 }
 
 async function borrarConsulta(id, btn){
   const tr = btn.closest('tr');
+  const c = ROWS.find(x => x.id === id) || {};
   const nombre = tr.querySelector('.nom')?.textContent || 'esta consulta';
-  if(!confirm('¿Eliminar la consulta de ' + nombre + '?\nEsta acción no se puede deshacer.')) return;
+  // El borrado arrastra las acciones (FK ON DELETE CASCADE): se avisa cuántas
+  // se pierden, que es lo que realmente no se puede recuperar.
+  const acc = c.n_acciones ? `\n\nSe eliminan también sus ${c.n_acciones} acción(es) del historial.` : '';
+  if(!confirm(`¿Eliminar ${c.codigo || ''} — ${nombre}?${acc}\n\nEsta acción no se puede deshacer.`)) return;
   const r = await fetch('/api/consultas/' + id, { method: 'DELETE' });
   if(r.ok){ await cargarResumen(); await cargarTabla(); }
   else alert('No se pudo eliminar (requiere rol coordinador).');

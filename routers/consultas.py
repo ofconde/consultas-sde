@@ -38,6 +38,8 @@ def _fila_resumen(r):
         "estado": r["estado"],
         "grupo": grupo_de(r["estado"]),
         "n_acciones": r["n_acciones"],
+        "ultima_accion": r["ultima_accion"],
+        "ultima_accion_fecha": _dmy(r["ultima_accion_fecha"]),
     }
 
 
@@ -89,10 +91,10 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         rows = conn.execute(text(f"""
             SELECT c.*,
                    (SELECT COUNT(*) FROM sde_acciones a WHERE a.consulta_id = c.id) AS n_acciones,
-                   ua.accion AS ultima_accion
+                   ua.accion AS ultima_accion, ua.fecha AS ultima_accion_fecha
             FROM sde_consultas c
             LEFT JOIN LATERAL (
-                SELECT accion FROM sde_acciones a2
+                SELECT accion, fecha FROM sde_acciones a2
                 WHERE a2.consulta_id = c.id
                 ORDER BY a2.fecha DESC NULLS LAST, a2.id DESC
                 LIMIT 1
