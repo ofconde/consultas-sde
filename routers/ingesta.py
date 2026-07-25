@@ -14,7 +14,8 @@ Dos endpoints:
 import os
 import secrets
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Header, Body
 from sqlalchemy import text
 
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/api/ingesta", tags=["ingesta"])
 log = logging.getLogger("consultas_sde.ingesta")
 
 _API_KEY = os.environ.get("SDE_API_KEY", "")
+_TZ_AR = ZoneInfo("America/Argentina/Buenos_Aires")
 
 # Claves internas (hash opacos) del formulario "FORMULARIO DE CONSULTA SANTIAGO DEL
 # ESTERO" -> nuestros campos. El formulario es fijo (nadie lo edita sin avisar antes),
@@ -113,7 +115,11 @@ def ingesta_forms_santiago(payload_pa: dict = Body(...), x_api_key: str = Header
     fecha_raw = body.get("submitDate")
     if fecha_raw:
         try:
-            fecha_iso = datetime.strptime(fecha_raw, "%m/%d/%Y %I:%M:%S %p").strftime("%Y-%m-%d")
+            # submitDate viene en UTC. Sin convertir a hora argentina, una consulta
+            # enviada después de las 21:00 se guarda con la fecha del día siguiente
+            # y deja de coincidir con la que ve la UEP en el Excel/formulario.
+            utc = datetime.strptime(fecha_raw, "%m/%d/%Y %I:%M:%S %p").replace(tzinfo=timezone.utc)
+            fecha_iso = utc.astimezone(_TZ_AR).strftime("%Y-%m-%d")
         except ValueError:
             log.warning("submitDate con formato inesperado: %r", fecha_raw)
 

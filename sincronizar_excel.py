@@ -159,14 +159,38 @@ def main(path, aplicar):
         for r in existentes:
             por_clave[_clave(r["cuit"], r["nombre"], r["f"])].append(r["id"])
 
+        # 1ra pasada: match exacto por (CUIT, fecha). Tiene prioridad, así una persona
+        # que consultó dos veces el mismo día se empareja bien antes de aflojar el criterio.
         usados = defaultdict(int)
-        a_actualizar, a_insertar = [], []
+        tomados = set()
+        a_actualizar, pendientes = [], []
         for f in filas:
             ids = por_clave.get(f["clave"], [])
             n = usados[f["clave"]]
             if n < len(ids):
                 usados[f["clave"]] += 1
+                tomados.add(ids[n])
                 a_actualizar.append((ids[n], f))
+            else:
+                pendientes.append(f)
+
+        # 2da pasada: mismo CUIT con ±1 día. Cubre las consultas que entraron por la
+        # ingesta antes del fix de UTC y quedaron guardadas con la fecha del día
+        # siguiente. Al actualizarlas, la fecha del Excel corrige la desplazada.
+        por_cuit_libre = defaultdict(list)
+        for r in existentes:
+            if _cuit(r["cuit"]) and r["id"] not in tomados:
+                por_cuit_libre[_cuit(r["cuit"])].append(r)
+        a_insertar = []
+        for f in pendientes:
+            cu, fe = _cuit(f["vals"]["cuit"]), f["vals"]["fecha_recepcion"]
+            cand = [r for r in por_cuit_libre.get(cu, [])
+                    if r["id"] not in tomados and r["f"] and fe
+                    and abs((r["f"] - fe).days) <= 1]
+            if cand:
+                r = min(cand, key=lambda r: abs((r["f"] - fe).days))
+                tomados.add(r["id"])
+                a_actualizar.append((r["id"], f))
             else:
                 a_insertar.append(f)
 
