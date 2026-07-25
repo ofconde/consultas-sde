@@ -99,6 +99,8 @@ async function cargarOpciones(){
   fill($('#tecnico'), set, cur);
 
   $('#fecha_recepcion').value = new Date().toISOString().slice(0,10);
+  montoAutoFormato('#monto');
+  montoAutoFormato('#monto_confirmado');
 }
 
 $('#guardar').addEventListener('click', async () => {

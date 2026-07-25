@@ -6,3 +6,27 @@ function escapeHtml(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
+
+// Montos en los inputs editables. Espejo de _parse_monto()/_monto() de formatos.py:
+// si hay coma se descarta la parte decimal (formato AR) antes de quedarse con los
+// dígitos — si no, concatenarlos ignorando la coma da un monto muy superior al real.
+function montoNum(v) {
+  if (v === null || v === undefined || v === "") return null;
+  let s = String(v);
+  const coma = s.lastIndexOf(",");
+  if (coma !== -1) s = s.slice(0, coma);
+  const d = s.replace(/\D/g, "");
+  return d ? parseInt(d, 10) : null;
+}
+
+function montoFmt(v) {
+  const n = montoNum(v);
+  return n === null ? "" : n.toLocaleString("es-AR");
+}
+
+// Deja el campo formateado apenas el usuario sale de él, para que se lea igual que
+// en las tablas. Mientras escribe no se interfiere.
+function montoAutoFormato(sel) {
+  const el = typeof sel === "string" ? document.querySelector(sel) : sel;
+  if (el) el.addEventListener("blur", () => { el.value = montoFmt(el.value); });
+}

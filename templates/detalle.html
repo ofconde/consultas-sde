@@ -115,7 +115,7 @@ async function cargar(){
   $('#s-sector').textContent = c.sector||'—';
   $('#s-actividad').textContent = c.actividad_economica||'—';
   $('#s-destino').textContent = c.destino||'—';
-  $('#g-monto').value = c.monto || '';
+  $('#g-monto').value = montoFmt(c.monto);
   $('#s-como').textContent = c.como_se_entero||'—';
 
   // dropdowns de gestión
@@ -133,7 +133,9 @@ async function cargar(){
   $('#g-actividad_inscripta').value = c.actividad_inscripta||'';
   $('#g-observaciones').value = c.observaciones||'';
   $('#g-informacion_extra').value = c.informacion_extra||'';
-  $('#g-monto_confirmado').value = c.monto_confirmado||'';
+  $('#g-monto_confirmado').value = montoFmt(c.monto_confirmado);
+  montoAutoFormato('#g-monto');
+  montoAutoFormato('#g-monto_confirmado');
 
   fill($('#a-accion'), CAT.ACCION||[], '');
   renderAcciones(d.acciones);
