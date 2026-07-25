@@ -231,10 +231,15 @@ def main(path, aplicar):
             conn.rollback()
             return
 
+        # En lotes: contra una base remota, mandar ~700 sentencias de a una tarda
+        # minutos. Agrupadas, es cuestión de segundos y la transacción no queda
+        # abierta tanto tiempo.
         sets = ", ".join(f"{c} = :{c}" for c in CAMPOS)
-        for cid, f in a_actualizar:
-            conn.execute(text(f"UPDATE sde_consultas SET {sets}, updated_at = NOW() WHERE id = :id"),
-                         {**f["vals"], "id": cid})
+        if a_actualizar:
+            conn.execute(
+                text(f"UPDATE sde_consultas SET {sets}, updated_at = NOW() WHERE id = :id"),
+                [{**f["vals"], "id": cid} for cid, f in a_actualizar],
+            )
 
         for f in a_insertar:
             n = conn.execute(text("SELECT nextval('sde_consultas_codigo_seq')")).scalar()
@@ -252,21 +257,16 @@ def main(path, aplicar):
             DELETE FROM sde_acciones WHERE creado_por = :cp AND consulta_id = ANY(:ids)
         """), {"cp": CREADO_POR_EXCEL, "ids": ids_tocados})
 
-        n_acc = 0
-        for cid, f in a_actualizar:
-            for a in f["acciones"]:
-                conn.execute(text("""
-                    INSERT INTO sde_acciones (consulta_id, fecha, accion, detalle, creado_por)
-                    VALUES (:cid, :fecha, :accion, :detalle, :cp)
-                """), {**a, "cid": cid, "cp": CREADO_POR_EXCEL})
-                n_acc += 1
-        for f in a_insertar:
-            for a in f["acciones"]:
-                conn.execute(text("""
-                    INSERT INTO sde_acciones (consulta_id, fecha, accion, detalle, creado_por)
-                    VALUES (:cid, :fecha, :accion, :detalle, :cp)
-                """), {**a, "cid": f["_id"], "cp": CREADO_POR_EXCEL})
-                n_acc += 1
+        lote = [{**a, "cid": cid, "cp": CREADO_POR_EXCEL}
+                for cid, f in a_actualizar for a in f["acciones"]]
+        lote += [{**a, "cid": f["_id"], "cp": CREADO_POR_EXCEL}
+                 for f in a_insertar for a in f["acciones"]]
+        if lote:
+            conn.execute(text("""
+                INSERT INTO sde_acciones (consulta_id, fecha, accion, detalle, creado_por)
+                VALUES (:cid, :fecha, :accion, :detalle, :cp)
+            """), lote)
+        n_acc = len(lote)
 
         print(f"✓ Aplicado: {len(a_actualizar)} actualizadas | {len(a_insertar)} insertadas "
               f"| {n_acc} acciones del Excel")

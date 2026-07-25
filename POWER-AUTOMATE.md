@@ -10,7 +10,7 @@ Así el Excel y el sistema conviven hasta que decidamos cortar el Excel.
 2. **Acción:** *Microsoft Forms → "Obtener los detalles de la respuesta"* (usa el Id de la respuesta del paso 1).
 3. **Acción:** *HTTP → "HTTP"* (o "Enviar una solicitud HTTP") con:
    - **Método:** `POST`
-   - **URI:** `https://consultas-sde-production.up.railway.app/api/ingesta/consulta`
+   - **URI:** `https://consultas-sde.up.railway.app/api/ingesta/consulta`
    - **Encabezados:**
      - `Content-Type`: `application/json`
      - `X-API-Key`: el valor de la variable `SDE_API_KEY` del servicio `consultas-sde` en Railway
@@ -58,7 +58,7 @@ Todos son opcionales salvo que quieras exigirlos; el sistema tolera faltantes.
 ## Probar el endpoint (sin PA)
 
 ```bash
-curl -X POST https://consultas-sde-production.up.railway.app/api/ingesta/consulta \
+curl -X POST https://consultas-sde.up.railway.app/api/ingesta/consulta \
   -H "Content-Type: application/json" \
   -H "X-API-Key: <SDE_API_KEY>" \
   -d '{"nombre":"PRUEBA SRL","cuit":"30999999999","fecha_recepcion":"2026-07-22","monto":"15000000"}'
