@@ -6,9 +6,10 @@
   --radius:1rem; --shadow:0 0.125rem 0.875rem rgba(28,36,67,.06);
   font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
 }
-/* Densidad ~30% más compacta — escala real en rem (reemplaza un hack de zoom
-   no estándar que Firefox <126 ignoraba y que no se reseteaba al imprimir). */
-html{font-size:72%}
+/* Escala global de la interfaz. Como todo el CSS está en rem, esto es la única
+   perilla de tamaño: 61.2% = los 72% que teníamos, reducidos otro 15% a pedido
+   de Omar (25/07/2026). El @media print del informe lo lleva a 100%. */
+html{font-size:61.2%}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-size:0.9375rem;line-height:1.5}
 a{color:var(--celeste);text-decoration:none;transition:color .15s}
@@ -68,6 +69,9 @@ h3{font-size:1.125rem}
 .ebtn.active .cnt{background:rgba(255,255,255,.22);color:#fff}
 .ebtn.mios{margin-left:auto}
 .ebtn.mios.active{background:var(--celeste);border-color:var(--celeste);color:#fff}
+/* Neutral en reposo y rojo al activarse: comparte color con su KPI "Sin acciones",
+   pero sin competir visualmente con el botón de Duplicados, que ya va en rojo. */
+.ebtn.sinacc.active{background:var(--red);border-color:var(--red);color:#fff}
 
 /* Filtros */
 .filtros{display:flex;flex-wrap:wrap;gap:0.625rem;align-items:center;margin-bottom:1.125rem}

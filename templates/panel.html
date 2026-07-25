@@ -95,7 +95,9 @@ async function cargarResumen(){
     pintarKpis(); cargarTabla();
   });
   $('#kpi-sin-acciones').addEventListener('click', () => {
-    state.sinAcciones = !state.sinAcciones; pintarKpis(); cargarTabla();
+    // mismo filtro que el botón "Sin acciones": se repintan los dos para que no
+    // queden desfasados (uno marcado y el otro no).
+    state.sinAcciones = !state.sinAcciones; pintarKpis(); pintarBotones(); cargarTabla();
   });
   pintarKpis();
 
@@ -107,6 +109,7 @@ async function cargarResumen(){
       <span>${escapeHtml(e.estado)}</span><span class="cnt">${e.n}</span></button>`;
   });
   botones += `<button class="ebtn mios" id="btn-mios">Mis casos</button>`;
+  botones += `<button class="ebtn sinacc" id="btn-sinacc">Sin acciones <span class="cnt">${d.sin_acciones}</span></button>`;
   if(d.duplicados > 0)
     botones += `<button class="ebtn dups" id="btn-dups">⚠ Duplicados <span class="cnt">${d.duplicados}</span></button>`;
   $('#ebtns').innerHTML = botones;
@@ -120,6 +123,10 @@ async function cargarResumen(){
   });
   $('#btn-mios').addEventListener('click', () => {
     state.mios = !state.mios; state.dups = false; pintarBotones(); cargarTabla();
+  });
+  $('#btn-sinacc').addEventListener('click', () => {
+    state.sinAcciones = !state.sinAcciones; state.dups = false;
+    pintarBotones(); pintarKpis(); cargarTabla();
   });
   const bd = $('#btn-dups');
   if(bd) bd.addEventListener('click', () => {
@@ -136,6 +143,7 @@ function pintarBotones(){
   });
   const m = $('#btn-mios'); if(m) m.classList.toggle('active', state.mios);
   const bd = $('#btn-dups'); if(bd) bd.classList.toggle('active', state.dups);
+  const sa = $('#btn-sinacc'); if(sa) sa.classList.toggle('active', state.sinAcciones);
 }
 
 function pintarKpis(){
