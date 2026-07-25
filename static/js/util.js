@@ -7,6 +7,15 @@ function escapeHtml(s) {
   }[c]));
 }
 
+// Fecha de hoy como YYYY-MM-DD para un <input type="date">, tomada del reloj local.
+// No usar toISOString(): convierte a UTC, así que después de las 21:00 en Argentina
+// devuelve la fecha del día siguiente.
+function hoyISO() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 // Montos en los inputs editables. Espejo de _parse_monto()/_monto() de formatos.py:
 // si hay coma se descarta la parte decimal (formato AR) antes de quedarse con los
 // dígitos — si no, concatenarlos ignorando la coma da un monto muy superior al real.

@@ -98,7 +98,7 @@ async function cargarOpciones(){
   }
   fill($('#tecnico'), set, cur);
 
-  $('#fecha_recepcion').value = new Date().toISOString().slice(0,10);
+  $('#fecha_recepcion').value = hoyISO();
   montoAutoFormato('#monto');
   montoAutoFormato('#monto_confirmado');
 }
