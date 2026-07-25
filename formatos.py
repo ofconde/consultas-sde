@@ -43,17 +43,18 @@ def _hora_local(ts) -> str:
 
 
 def _monto(valor) -> str:
-    """Formatea un monto en pesos: 'mil M' >= 1e9, 'M' >= 1e6, si no con separador de miles."""
+    """Formatea un monto en pesos completo, con punto de miles: '$ 12.500.000'.
+
+    Se muestra el número entero y no una abreviatura ('12,5 M'): en las pantallas
+    operativas el técnico necesita el monto exacto, y redondear a un decimal hace
+    que $12.500.000 y $12.543.000 se vean iguales.
+    """
     if valor is None or valor == "":
         return "—"
     try:
         n = float(valor)
     except (TypeError, ValueError):
         return str(valor)
-    if n >= 1_000_000_000:
-        return f"$ {n / 1_000_000_000:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".") + " mil M"
-    if n >= 1_000_000:
-        return f"$ {n / 1_000_000:,.1f}".replace(",", "@").replace(".", ",").replace("@", ".") + " M"
     return "$ " + f"{n:,.0f}".replace(",", ".")
 
 
