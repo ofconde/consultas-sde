@@ -7,6 +7,27 @@
   .barrow .lbl{font-size:0.875rem;color:var(--navy);font-weight:600}
   .barrow .val{text-align:right;font-weight:700;color:var(--navy)}
   .doc-head{display:none}
+
+  /* Gráfico de consultas por día. Una sola serie, así que un solo color y sin
+     leyenda: el título ya dice qué se está midiendo. --blue en vez del celeste
+     de marca porque es el que alcanza 3:1 de contraste contra la tarjeta. */
+  .rango-btns{display:inline-flex;gap:0.25rem}
+  .rbtn{border:1px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;
+    font-family:inherit;font-size:0.8125rem;font-weight:600;padding:0.1875rem 0.625rem;
+    border-radius:0.5rem;transition:border-color .15s,color .15s,background .15s}
+  .rbtn:hover{border-color:var(--blue);color:var(--blue)}
+  .rbtn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+  #graf-dia svg{display:block;width:100%;height:auto}
+  .g-bar{fill:var(--blue)}
+  .g-bar:hover{fill:var(--navy)}
+  .g-grid{stroke:var(--border);stroke-width:1}
+  .g-axis{fill:var(--muted);font-size:9px;font-family:inherit}
+  .g-lbl{fill:var(--navy);font-size:9px;font-weight:700;font-family:inherit}
+  .graf-tt{position:fixed;z-index:50;background:var(--navy);color:#fff;border-radius:0.5rem;
+    padding:0.3125rem 0.5625rem;font-size:0.8125rem;pointer-events:none;white-space:nowrap;
+    box-shadow:0 0.25rem 0.75rem rgba(28,36,67,.22)}
+  .graf-tt b{font-size:1rem}
+
   @media print{
     /* con zoom ya no en juego, este reset de escala sí funciona de verdad:
        el informe se imprime a tamaño completo, no a la escala reducida de pantalla */
@@ -34,6 +55,27 @@
     </div>
 
     <div class="kpis" id="kpis"></div>
+
+    <div style="display:flex;align-items:baseline;gap:0.875rem;margin:1.625rem 0 0.75rem">
+      <h3 style="margin:0">Consultas recibidas por día</h3>
+      <div class="rango-btns no-print">
+        <button class="rbtn" data-dias="30">30 días</button>
+        <button class="rbtn active" data-dias="60">60 días</button>
+        <button class="rbtn" data-dias="90">90 días</button>
+      </div>
+      <span class="muted" id="graf-resumen" style="margin-left:auto"></span>
+    </div>
+    <div class="card" style="padding:1.125rem 1.25rem;margin-bottom:1.625rem">
+      <div id="graf-dia"></div>
+      <div id="graf-tooltip" class="graf-tt" hidden></div>
+      <details class="no-print" style="margin-top:0.75rem">
+        <summary class="muted" style="cursor:pointer;font-size:0.8125rem">Ver los datos en tabla</summary>
+        <div class="tabla-wrap" style="margin-top:0.5rem;max-height:16rem;overflow:auto">
+          <table><thead><tr><th>Día</th><th style="text-align:right">Consultas</th></tr></thead>
+          <tbody id="graf-tabla"></tbody></table>
+        </div>
+      </details>
+    </div>
 
     <h3 style="margin:1.625rem 0 0.75rem">Situación de consultas</h3>
     <div class="tabla-wrap card" style="margin-bottom:1.625rem">
@@ -104,9 +146,105 @@
 const $ = s => document.querySelector(s);
 const hoy = new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
 
+// ── Gráfico de consultas por día ────────────────────────────────────────────
+// SVG a mano, sin librerías (el proyecto no tiene dependencias de frontend).
+let POR_DIA = [];
+
+function ticksLindos(max){
+  // escalones redondos (1/2/5 × potencia de 10) para que el eje no diga "37"
+  const paso = [1,2,5,10,20,25,50,100,200].find(p => max/p <= 5) || 500;
+  const tope = Math.ceil(max/paso)*paso;
+  return { tope, valores: Array.from({length: tope/paso + 1}, (_,i) => i*paso) };
+}
+
+function dibujarGrafico(dias){
+  const datos = POR_DIA.slice(-dias);
+  const cont = $('#graf-dia');
+  const W = 1000, H = 260, ML = 34, MR = 8, MT = 12, MB = 34;
+  const pw = W - ML - MR, ph = H - MT - MB;
+  const maxN = Math.max(1, ...datos.map(x=>x.n));
+  const { tope, valores } = ticksLindos(maxN);
+  const banda = pw / datos.length;
+  // barra fina: nunca llena la banda (el aire que queda es del diseño), tope 24px
+  const bw = Math.max(2, Math.min(24, banda - 2));
+  const y = n => MT + ph - (n/tope)*ph;
+
+  const grid = valores.map(v =>
+    `<line class="g-grid" x1="${ML}" x2="${W-MR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/>
+     <text class="g-axis" x="${ML-6}" y="${(y(v)+3).toFixed(1)}" text-anchor="end">${v}</text>`).join('');
+
+  const idxMax = datos.findIndex(x => x.n === maxN);
+  const barras = datos.map((x,i) => {
+    const cx = ML + banda*i + banda/2;
+    const alto = x.n === 0 ? 0 : Math.max(2, ph - (y(x.n) - MT));
+    if(!alto) return '';
+    // esquina superior redondeada (4px) y base cuadrada: el dato "crece" desde la línea cero
+    const r = Math.min(4, bw/2, alto);
+    const x0 = cx - bw/2, y0 = y(x.n), y1 = MT + ph;
+    return `<path class="g-bar" data-i="${i}"
+      d="M${x0} ${y1} L${x0} ${(y0+r).toFixed(1)} Q${x0} ${y0} ${(x0+r).toFixed(1)} ${y0}
+         L${(x0+bw-r).toFixed(1)} ${y0} Q${(x0+bw).toFixed(1)} ${y0} ${(x0+bw).toFixed(1)} ${(y0+r).toFixed(1)}
+         L${(x0+bw).toFixed(1)} ${y1} Z"><title>${x.dia_fmt}: ${x.n}</title></path>`;
+  }).join('');
+
+  // etiqueta directa solo en el máximo — un número sobre cada barra no se lee
+  let lblMax = '';
+  if(idxMax >= 0 && maxN > 0){
+    const cx = ML + banda*idxMax + banda/2;
+    lblMax = `<text class="g-lbl" x="${cx.toFixed(1)}" y="${(y(maxN)-5).toFixed(1)}" text-anchor="middle">${maxN}</text>`;
+  }
+
+  // ~8 fechas en el eje. La última se fuerza salvo que caiga demasiado cerca de la
+  // anterior marcada, para que no se solapen.
+  const cada = Math.ceil(datos.length/8);
+  const ult = datos.length - 1;
+  const ultMarcada = ult - (ult % cada);
+  const mostrarUlt = (ult - ultMarcada) >= cada/2;
+  const ejeX = datos.map((x,i) => (i % cada === 0 || (i === ult && mostrarUlt))
+    ? `<text class="g-axis" x="${(ML+banda*i+banda/2).toFixed(1)}" y="${H-MB+16}" text-anchor="middle">${x.dia_fmt.slice(0,5)}</text>`
+    : '').join('');
+
+  cont.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="Consultas recibidas por día en los últimos ${dias} días">
+    ${grid}${barras}${lblMax}${ejeX}
+    <line class="g-grid" x1="${ML}" x2="${W-MR}" y1="${MT+ph}" y2="${MT+ph}"/>
+  </svg>`;
+
+  const total = datos.reduce((a,b)=>a+b.n,0);
+  const conMovim = datos.filter(x=>x.n>0).length;
+  $('#graf-resumen').textContent =
+    `${total} consultas en ${dias} días · ${(total/dias).toFixed(1)} por día · ${conMovim} días con movimiento`;
+
+  $('#graf-tabla').innerHTML = datos.slice().reverse()
+    .map(x => `<tr><td>${x.dia_fmt}</td><td style="text-align:right;font-weight:${x.n?700:400}">${x.n}</td></tr>`).join('');
+
+  // tooltip por barra (el <title> solo no alcanza: tarda y no se ve en touch)
+  const tt = $('#graf-tooltip');
+  cont.querySelectorAll('.g-bar').forEach(b => {
+    b.addEventListener('mouseenter', e => {
+      const x = datos[+b.dataset.i];
+      tt.innerHTML = `<b>${x.n}</b> consulta${x.n===1?'':'s'}<br>${x.dia_fmt}`;
+      tt.hidden = false;
+    });
+    b.addEventListener('mousemove', e => {
+      tt.style.left = Math.min(e.clientX + 12, innerWidth - tt.offsetWidth - 8) + 'px';
+      tt.style.top  = (e.clientY - tt.offsetHeight - 10) + 'px';
+    });
+    b.addEventListener('mouseleave', () => { tt.hidden = true; });
+  });
+}
+
+document.querySelectorAll('.rbtn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.rbtn').forEach(o => o.classList.toggle('active', o === b));
+  dibujarGrafico(+b.dataset.dias);
+}));
+
 (async function(){
   const d = await (await fetch('/api/informe')).json();
   $('#fecha-doc').textContent = 'Fecha del informe: ' + hoy;
+
+  POR_DIA = d.por_dia || [];
+  if(POR_DIA.length) dibujarGrafico(60);
 
   $('#kpis').innerHTML = `
     <div class="kpi card kpi-blue"><div class="n">${d.total}</div><div class="l">Total consultas</div></div>

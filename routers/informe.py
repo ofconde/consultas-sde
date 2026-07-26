@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from db import engine, cuits_duplicados
 from auth import require_coordinador
-from formatos import _monto
+from formatos import _monto, _dmy
 from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS
 
 # "Situación de consultas" — desglose fino por estado (equivalente a la hoja
@@ -93,6 +93,16 @@ def informe(_=Depends(require_coordinador)):
             WHERE created_at >= NOW() - INTERVAL '7 days'
         """)).scalar() or 0
 
+        # consultas por día, últimos 90 días. Se rellenan con generate_series los días
+        # sin consultas: si se devolvieran solo los días con datos, el gráfico
+        # comprimiría los huecos y un fin de semana muerto se vería como actividad.
+        por_dia = conn.execute(text("""
+            SELECT d::date AS dia, COUNT(c.id) AS n
+            FROM generate_series(CURRENT_DATE - INTERVAL '89 days', CURRENT_DATE, '1 day') d
+            LEFT JOIN sde_consultas c ON c.fecha_recepcion::date = d::date
+            GROUP BY 1 ORDER BY 1
+        """)).mappings().all()
+
         # backlog de "consulta inicial" (sin trabajar todavía) por técnico
         inicial_por_tecnico = conn.execute(text("""
             SELECT COALESCE(NULLIF(tecnico, ''), '— Sin asignar') AS tecnico, COUNT(*) AS n
@@ -149,6 +159,8 @@ def informe(_=Depends(require_coordinador)):
         "lineas": por_linea,
         "programas": por_programa,
         "situacion": situacion,
+        "por_dia": [{"dia": r["dia"].isoformat(), "dia_fmt": _dmy(r["dia"]), "n": r["n"]}
+                    for r in por_dia],
         "inicial_por_tecnico": [{"tecnico": r["tecnico"], "n": r["n"]} for r in inicial_por_tecnico],
         "sin_acciones_por_tecnico": [{"tecnico": r["tecnico"], "n": r["n"]} for r in sin_acciones_por_tecnico],
     }
