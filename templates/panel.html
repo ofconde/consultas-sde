@@ -197,7 +197,9 @@ function filaHTML(c){
   return `
     <tr onclick="location.href='/consulta/${c.id}'">
       <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">${escapeHtml(c.codigo)}</div></td>
-      <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span><div class="cod">${escapeHtml(c.cuit)}${dup}</div></td>
+      <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>
+        <div class="cod">${escapeHtml(c.cuit)}${dup}${
+          c.situacion_arca ? ` · ${escapeHtml(c.situacion_arca)}` : ''}</div></td>
       <td>${escapeHtml(c.localidad)||'—'}</td>
       <td>${c.sector?`<span class="chip">${escapeHtml(c.sector)}</span>`:'—'}</td>
       <td>${escapeHtml(c.monto)}</td>

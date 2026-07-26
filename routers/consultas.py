@@ -27,6 +27,7 @@ def _fila_resumen(r):
         "fecha_recepcion": _dmy(r["fecha_recepcion"]),
         "nombre": r["nombre"],
         "cuit": r["cuit"],
+        "situacion_arca": r["arca_confirmado"] or r["situacion_arca"],
         "localidad": r["localidad_confirmada"] or r["localidad"],
         "departamento": r["departamento"],
         "sector": r["sector"],

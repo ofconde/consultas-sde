@@ -94,6 +94,19 @@ def init_db():
             ON sde_acciones (consulta_id)
         """))
 
+        # Caché de la Central de Deudores del BCRA. Se cachea porque el BCRA publica
+        # una vez por mes: repreguntar en cada apertura de consulta es puro costo.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sde_bcra_cache (
+                cuit          TEXT PRIMARY KEY,
+                denominacion  TEXT,
+                situacion_max INT,
+                periodo       TEXT,
+                payload       JSONB,
+                consultado_en TIMESTAMP DEFAULT NOW()
+            )
+        """))
+
         # Índices sobre las columnas más filtradas/ordenadas del panel. Baratos de
         # crear ahora (tabla chica); preparan el crecimiento futuro sin costo hoy.
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_consultas_estado ON sde_consultas (estado)"))

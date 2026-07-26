@@ -29,6 +29,8 @@
             <button class="copy-btn" id="cp-mail" title="Copiar el mail">copiar</button></div>
           <div><label>Localidad</label><span id="s-localidad">—</span></div>
           <div><label>Situación ARCA</label><span id="s-arca">—</span></div>
+          <div class="col-full"><label>Central de Deudores (BCRA)</label>
+            <span id="s-bcra" class="muted">—</span></div>
           <div><label>Sector</label><span id="s-sector">—</span></div>
           <div><label>Cómo se enteró</label><span id="s-como">—</span></div>
           <div class="col-full"><label>Actividad declarada</label><span id="s-actividad">—</span></div>
@@ -135,6 +137,42 @@ $('#cp-elevar').addEventListener('click', e => {
   copiar(texto, e.target);
 });
 
+// Situación crediticia del BCRA. Se pide aparte y después de pintar la consulta:
+// depende de un servicio externo y no debe demorar ni romper la pantalla.
+// Situación 1 = Normal; de 3 en adelante ya es un problema para otorgar crédito.
+async function cargarBcra(cuit){
+  const el = $('#s-bcra');
+  if(!cuit){ el.textContent = 'sin CUIT cargado'; return; }
+  el.textContent = 'consultando…';
+  let d;
+  try {
+    const r = await fetch('/api/bcra/' + encodeURIComponent(cuit));
+    if(!r.ok){
+      const err = await r.json().catch(()=>({}));
+      el.textContent = err.detail || 'no disponible';
+      return;
+    }
+    d = await r.json();
+  } catch(e){ el.textContent = 'no disponible'; return; }
+
+  if(d.sin_datos){
+    el.className = 'muted';
+    el.textContent = 'Sin registro en la Central de Deudores';
+    return;
+  }
+  const g = d.situacion_max <= 1 ? 'EN_SEDE' : (d.situacion_max === 2 ? 'INICIAL' : 'INACTIVAS');
+  const partes = [`<span class="badge g-${g}">${d.situacion_max} · ${escapeHtml(d.situacion_label)}</span>`];
+  if(d.periodo) partes.push(`<span class="cod">período ${escapeHtml(d.periodo)}</span>`);
+  if(d.entidades?.length) partes.push(`<span class="cod">${d.entidades.length} entidad(es)</span>`);
+  if(d.cheques?.length) partes.push(`<span class="dup">${d.cheques.length} cheque(s) rechazado(s)</span>`);
+  el.className = '';
+  el.innerHTML = partes.join(' ');
+  if(d.alertas?.length){
+    el.innerHTML += `<div class="cod" style="color:var(--red);margin-top:0.25rem">${
+      d.alertas.map(a=>escapeHtml(a)).join(' · ')}</div>`;
+  }
+}
+
 // Tope de crédito del CFI. Un monto por encima casi siempre es un error de tipeo
 // del solicitante en el formulario público, no un pedido real.
 const LIMITE_CREDITO = 500000000;
@@ -186,6 +224,7 @@ async function cargar(){
   $('#s-mail').textContent = c.mail||'—';
   $('#s-localidad').textContent = c.localidad||'—';
   $('#s-arca').textContent = c.situacion_arca||'—';
+  cargarBcra(c.cuit);
   $('#s-sector').textContent = c.sector||'—';
   $('#s-actividad').textContent = c.actividad_economica||'—';
   $('#s-destino').textContent = c.destino||'—';
