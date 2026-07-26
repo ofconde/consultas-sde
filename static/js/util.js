@@ -7,6 +7,35 @@ function escapeHtml(s) {
   }[c]));
 }
 
+// Copia texto al portapapeles y confirma en el propio botón. navigator.clipboard
+// necesita contexto seguro (https o localhost); si no está, se cae al textarea
+// temporal, que funciona en cualquier lado.
+async function copiar(texto, btn) {
+  const valor = String(texto ?? "").trim();
+  if (!valor || valor === "—") return;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(valor);
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = valor;
+      ta.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    if (btn) {
+      const previo = btn.textContent;
+      btn.textContent = "✓";
+      btn.classList.add("ok");
+      setTimeout(() => { btn.textContent = previo; btn.classList.remove("ok"); }, 1200);
+    }
+  } catch (e) {
+    alert("No se pudo copiar. Copialo a mano:\n\n" + valor);
+  }
+}
+
 // Fecha de hoy como YYYY-MM-DD para un <input type="date">, tomada del reloj local.
 // No usar toISOString(): convierte a UTC, así que después de las 21:00 en Argentina
 // devuelve la fecha del día siguiente.

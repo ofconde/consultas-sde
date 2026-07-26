@@ -12,7 +12,10 @@
     <div class="pill-row">
       <span class="chip" id="codigo"></span>
       <span class="chip" id="cuit"></span>
+      <button class="copy-btn" id="cp-cuit" title="Copiar el CUIT">copiar</button>
       <span class="chip" id="recepcion"></span>
+      <button class="copy-btn destacado" id="cp-elevar"
+              title="Copia Solicitante / CUIT / Actividad / Solicitud, listo para pegar en el mail de elevación">copiar datos para el mail</button>
     </div>
 
     <div class="grid2">
@@ -20,8 +23,10 @@
       <div class="card detalle-card">
         <div class="sec-title" style="margin-top:0">Datos del solicitante</div>
         <div class="info-grid">
-          <div><label>Teléfono</label><span id="s-telefono">—</span></div>
-          <div><label>Mail</label><span id="s-mail">—</span></div>
+          <div><label>Teléfono</label><span id="s-telefono">—</span>
+            <button class="copy-btn" id="cp-telefono" title="Copiar el teléfono">copiar</button></div>
+          <div><label>Mail</label><span id="s-mail">—</span>
+            <button class="copy-btn" id="cp-mail" title="Copiar el mail">copiar</button></div>
           <div><label>Localidad</label><span id="s-localidad">—</span></div>
           <div><label>Situación ARCA</label><span id="s-arca">—</span></div>
           <div><label>Sector</label><span id="s-sector">—</span></div>
@@ -75,6 +80,7 @@
 const CID = {{ cid }};
 const $ = s => document.querySelector(s);
 let CAT = {};
+let CONSULTA = {};   // datos crudos, para copiar sin los prefijos que se ven en pantalla
 
 function fill(sel, arr, cur){
   arr.forEach(v => sel.add(new Option(v, v, false, v===cur)));
@@ -98,10 +104,35 @@ function badgeGrupo(g, estado){
   const b = $('#badge'); b.className = 'badge g-'+g; b.textContent = estado||'—';
 }
 
+// Botones de copiado: los datos que se usan fuera del sistema (buscar el CUIT en
+// ARCA, pegar el mail o el teléfono en un mensaje).
+$('#cp-cuit').addEventListener('click', e => copiar(CONSULTA.cuit, e.target));
+$('#cp-telefono').addEventListener('click', e => copiar(CONSULTA.telefono, e.target));
+$('#cp-mail').addEventListener('click', e => copiar(CONSULTA.mail, e.target));
+
+// Bloque armado para el mail de elevación a sede, con los campos en el orden en
+// que van (Solicitante / CUIT / Actividad / Solicitud). Queda para editar: la
+// actividad y el destino salen tal cual los escribió el solicitante.
+$('#cp-elevar').addEventListener('click', e => {
+  const c = CONSULTA;
+  const monto = c.monto_confirmado_fmt && c.monto_confirmado_fmt !== '—'
+    ? c.monto_confirmado_fmt : c.monto_fmt;
+  const texto = [
+    `Solicitante: ${c.nombre || ''}`,
+    `CUIT: ${c.cuit || ''}`,
+    '',
+    `Actividad: ${c.actividad_economica || ''}`,
+    '',
+    `Solicitud: ${c.destino || ''}${monto && monto !== '—' ? ` — ${monto}` : ''}`,
+  ].join('\n');
+  copiar(texto, e.target);
+});
+
 async function cargar(){
   await cargarCat();
   const d = await (await fetch('/api/consultas/'+CID)).json();
   const c = d.consulta;
+  CONSULTA = c;
   $('#nombre').textContent = c.nombre || 'Consulta';
   $('#codigo').textContent = c.codigo;
   $('#cuit').textContent = 'CUIT ' + (c.cuit||'—');
