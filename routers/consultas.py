@@ -237,10 +237,14 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
                               {"id": cid}).mappings().first()
     if not actual:
         raise HTTPException(404, "Consulta no encontrada")
-    if not puede_editar(usuario, actual["tecnico"]):
-        raise HTTPException(403, "Esta consulta está asignada a otro técnico")
 
     campos = body.model_dump(exclude_none=True)
+    # El monto solicitado lo carga el propio interesado en el formulario público y a
+    # veces llega con errores gruesos (se detectaron cargas de $150.000.000.000 contra
+    # un límite de crédito de $500 M). Corregirlo se habilita a cualquier usuario,
+    # esté la consulta asignada a quien esté — pero solo si es lo único que se toca.
+    if set(campos) != {"monto"} and not puede_editar(usuario, actual["tecnico"]):
+        raise HTTPException(403, "Esta consulta está asignada a otro técnico")
     if usuario["rol"] != ROL_COORDINADOR:
         # solo el coordinador reasigna: un técnico no cambia el campo `tecnico`
         campos.pop("tecnico", None)
@@ -259,10 +263,14 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
     sets.append("updated_at = NOW()")
     with engine.begin() as conn:
         r = conn.execute(text(f"""
-            UPDATE sde_consultas SET {', '.join(sets)} WHERE id = :id RETURNING id
+            UPDATE sde_consultas SET {', '.join(sets)} WHERE id = :id RETURNING id, codigo
         """), params).first()
     if not r:
         raise HTTPException(404, "Consulta no encontrada")
+    if "monto" in params:
+        # corregir un monto cambia un dato que vino del solicitante: queda registrado
+        log.info("Monto corregido: codigo=%s nuevo=%s por=%s",
+                 r[1], params["monto"], usuario["username"])
     return {"ok": True}
 
 
