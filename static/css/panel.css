@@ -95,7 +95,33 @@ h3{font-size:1.125rem}
 .tabla-wrap{overflow-x:auto;border-radius:var(--radius)}
 table{width:100%;border-collapse:collapse;background:#fff;font-size:0.875rem}
 th,td{text-align:left;padding:0.6875rem 0.875rem;border-bottom:1px solid var(--border);vertical-align:middle}
-th{background:#fafbfe;color:var(--muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0}
+th{background:#fafbfe;color:var(--muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;
+   letter-spacing:.3px;position:sticky;top:0;z-index:5;box-shadow:0 1px 0 var(--border)}
+
+/* Caja propia de scroll para la tabla del panel: es lo que hace que el header
+   sticky funcione de verdad. `.tabla-wrap` (usado en todo el sitio) tiene
+   overflow-x:auto, y por la spec de CSS eso promueve overflow-y a "auto"
+   también en esa misma caja — el sticky termina anclado a un contenedor que
+   nunca scrollea él mismo (scrollea la página entera), así que no hace nada.
+   Con una caja propia de alto acotado y overflow:auto, el sticky sí tiene un
+   scrollport real al cual pegarse. Deja siempre visibles los encabezados Y
+   el paginador (que queda afuera de esta caja, nunca atrapado adentro). */
+.tabla-scroll{overflow:auto;max-height:calc(100vh - 21rem)}
+
+/* Tabla del panel: columnas anchas fijas para que el usuario pueda redimensionarlas
+   a gusto arrastrando el borde. table-layout:fixed es lo que hace que el ancho de
+   cada <col> se respete — sin esto el navegador ignora los anchos y ajusta según
+   el contenido. */
+.tabla-resizable{table-layout:fixed}
+/* sin position:relative acá: position:sticky (heredado de la regla general de
+   th) ya funciona como referencia para el .th-rz absolutely-positioned — un
+   position:relative en esta regla más específica pisaría el sticky y lo
+   dejaría fijo (relative) en vez de pegajoso. */
+.tabla-resizable th{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tabla-resizable td{overflow-wrap:break-word}
+.th-rz{position:absolute;right:0;top:0;bottom:0;width:0.4375rem;cursor:col-resize;
+       user-select:none;touch-action:none}
+.th-rz:hover,.th-rz.arrastrando{background:var(--celeste)}
 tbody tr{cursor:pointer;transition:background .15s}
 tbody tr:hover{background:#f7f9fd}
 td .cod{color:var(--muted);font-size:0.75rem;font-family:ui-monospace,monospace}

@@ -26,14 +26,33 @@
     </div>
 
     <div class="tabla-wrap card">
-      <table>
-        <thead><tr>
-          <th>Recepción</th><th>Solicitante</th><th>Localidad</th><th>Sector</th>
-          <th>Monto</th><th>Línea</th><th>Técnico</th><th>Estado</th><th>Última acción</th>
-          {% if usuario.rol == 'coordinador' %}<th></th>{% endif %}
-        </tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
+      <div class="tabla-scroll">
+        <table id="tabla" class="tabla-resizable">
+          <colgroup>
+            <col data-col="recepcion"><col data-col="solicitante"><col data-col="localidad">
+            <col data-col="sector"><col data-col="monto"><col data-col="linea">
+            <col data-col="tecnico"><col data-col="estado"><col data-col="ultima_accion">
+            <col data-col="arca"><col data-col="bcra"><col data-col="destino">
+            {% if usuario.rol == 'coordinador' %}<col data-col="acciones">{% endif %}
+          </colgroup>
+          <thead><tr>
+            <th data-col="recepcion">Recepción<span class="th-rz"></span></th>
+            <th data-col="solicitante">Solicitante<span class="th-rz"></span></th>
+            <th data-col="localidad">Localidad<span class="th-rz"></span></th>
+            <th data-col="sector">Sector<span class="th-rz"></span></th>
+            <th data-col="monto">Monto<span class="th-rz"></span></th>
+            <th data-col="linea">Línea / Programa<span class="th-rz"></span></th>
+            <th data-col="tecnico">Técnico<span class="th-rz"></span></th>
+            <th data-col="estado">Estado<span class="th-rz"></span></th>
+            <th data-col="ultima_accion">Última acción<span class="th-rz"></span></th>
+            <th data-col="arca">ARCA confirmado<span class="th-rz"></span></th>
+            <th data-col="bcra">Situación BCRA<span class="th-rz"></span></th>
+            <th data-col="destino">Destino<span class="th-rz"></span></th>
+            {% if usuario.rol == 'coordinador' %}<th data-col="acciones"></th>{% endif %}
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
       <div class="empty" id="empty" style="display:none">No hay consultas para este filtro.</div>
       <div class="pager" id="pager" style="display:none"></div>
     </div>
@@ -187,7 +206,7 @@ async function cargarTabla(){
   renderPagina();
 }
 
-function filaHTML(c){
+function filaHTML(c, numeroFila){
   const dup = c.es_duplicado ? '<span class="dup">DUP</span>' : '';
   // Última acción del historial. Si hay más de una se aclara cuántas van, para no
   // perder el dato de volumen que mostraba la columna anterior.
@@ -196,23 +215,30 @@ function filaHTML(c){
        <div class="cod">${escapeHtml(c.ultima_accion_fecha)||'sin fecha'}${
          c.n_acciones > 1 ? ` · ${c.n_acciones} acciones` : ''}</div>`
     : '<span class="muted">sin acciones</span>';
+  // Línea + Programa juntos en la misma columna, mismo patrón que CUIT/situación ARCA.
+  const linea = c.linea
+    ? `<span class="nom">${escapeHtml(c.linea)}</span>${c.programa?`<div class="cod">${escapeHtml(c.programa)}</div>`:''}`
+    : '—';
   const borrar = ROL === 'coordinador'
     ? `<td style="text-align:right"><button class="btn sm danger"
          onclick="event.stopPropagation();borrarConsulta(${c.id},this)">Eliminar</button></td>`
     : '';
   return `
     <tr onclick="location.href='/consulta/${c.id}'">
-      <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">${escapeHtml(c.codigo)}</div></td>
+      <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">#${numeroFila}</div></td>
       <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>
         <div class="cod">${escapeHtml(c.cuit)}${dup}${
           c.situacion_arca ? ` · ${escapeHtml(c.situacion_arca)}` : ''}</div></td>
       <td>${escapeHtml(c.localidad)||'—'}</td>
       <td>${c.sector?`<span class="chip">${escapeHtml(c.sector)}</span>`:'—'}</td>
       <td>${escapeHtml(c.monto)}</td>
-      <td>${escapeHtml(c.linea)||'—'}</td>
+      <td>${linea}</td>
       <td>${c.tecnico?escapeHtml(c.tecnico):'<span class="muted">sin asignar</span>'}</td>
       <td>${badge(c.grupo,c.estado)}</td>
       <td>${acc}</td>
+      <td>${escapeHtml(c.arca_confirmado)||'—'}</td>
+      <td>${escapeHtml(c.situacion_bcra)||'—'}</td>
+      <td>${escapeHtml(c.destino)||'—'}</td>
       ${borrar}
     </tr>`;
 }
@@ -236,7 +262,8 @@ function renderPagina(){
   const pages = Math.max(1, Math.ceil(total/PAGE_SIZE));
   if(state.pagina > pages) state.pagina = pages;
   const start = (state.pagina-1)*PAGE_SIZE;
-  $('#tbody').innerHTML = ROWS.slice(start, start+PAGE_SIZE).map(filaHTML).join('');
+  $('#tbody').innerHTML = ROWS.slice(start, start+PAGE_SIZE)
+    .map((c,i) => filaHTML(c, start+i+1)).join('');
   const pg = $('#pager');
   if(total > PAGE_SIZE){
     pg.style.display = 'flex';
@@ -272,7 +299,61 @@ $('#btn-refrescar').addEventListener('click', async () => {
   b.disabled = false; b.textContent = '↻ Actualizar';
 });
 
+// ── Columnas redimensionables ────────────────────────────────────────────
+// Anchos en px reales de pantalla. table-layout:fixed (en .tabla-resizable)
+// es lo que hace que el navegador respete el ancho de cada <col> en vez de
+// recalcularlo por contenido.
+const ANCHOS_COL_DEFECTO = {
+  recepcion: 96, solicitante: 190, localidad: 110, sector: 100, monto: 100,
+  linea: 150, tecnico: 120, estado: 120, ultima_accion: 160,
+  arca: 130, bcra: 130, destino: 160, acciones: 90,
+};
+const LS_ANCHOS = 'sde-panel-col-widths';
+
+function anchosGuardados(){
+  try { return JSON.parse(localStorage.getItem(LS_ANCHOS)) || {}; }
+  catch(e){ return {}; }
+}
+function guardarAncho(col, px){
+  const a = anchosGuardados(); a[col] = px;
+  localStorage.setItem(LS_ANCHOS, JSON.stringify(a));
+}
+function aplicarAnchosColumnas(){
+  const guardados = anchosGuardados();
+  document.querySelectorAll('#tabla colgroup col').forEach(col => {
+    const key = col.dataset.col;
+    const w = guardados[key] || ANCHOS_COL_DEFECTO[key];
+    if(w) col.style.width = w + 'px';
+  });
+}
+function iniciarRedimensionColumnas(){
+  document.querySelectorAll('#tabla thead .th-rz').forEach(handle => {
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const key = handle.closest('th').dataset.col;
+      const col = document.querySelector(`#tabla colgroup col[data-col="${key}"]`);
+      if(!col) return;
+      const startX = e.clientX;
+      const startW = col.getBoundingClientRect().width;
+      handle.classList.add('arrastrando');
+      const mover = ev => {
+        col.style.width = Math.max(50, Math.round(startW + (ev.clientX - startX))) + 'px';
+      };
+      const soltar = () => {
+        document.removeEventListener('mousemove', mover);
+        document.removeEventListener('mouseup', soltar);
+        handle.classList.remove('arrastrando');
+        guardarAncho(key, Math.round(col.getBoundingClientRect().width));
+      };
+      document.addEventListener('mousemove', mover);
+      document.addEventListener('mouseup', soltar);
+    });
+  });
+}
+
 (async function(){
+  aplicarAnchosColumnas();
+  iniciarRedimensionColumnas();
   await cargarMeta(); await cargarCatalogos(); await cargarTecnicos();
   await cargarResumen(); await cargarTabla();
 })();
