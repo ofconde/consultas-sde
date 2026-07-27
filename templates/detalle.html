@@ -102,8 +102,14 @@ async function cargarCat(){
 }
 
 async function cargarTecnicos(sel, cur){
-  const d = await (await fetch('/api/consultas')).json();
-  const set = [...new Set(d.consultas.map(x=>x.tecnico).filter(Boolean))].sort();
+  // Usuarios activos registrados + nombres viejos ya presentes en consultas
+  // (ver nota igual en panel.html) — así un técnico recién creado aparece acá
+  // aunque todavía no tenga ninguna consulta asignada.
+  const [usuarios, d] = await Promise.all([
+    fetch('/api/usuarios/tecnicos').then(r=>r.json()),
+    fetch('/api/consultas').then(r=>r.json()),
+  ]);
+  const set = [...new Set([...usuarios, ...d.consultas.map(x=>x.tecnico).filter(Boolean)])].sort();
   // asegurar que el actual esté aunque no exista en otras
   if(cur && !set.includes(cur)) set.push(cur);
   set.forEach(v => sel.add(new Option(v, v, false, v===cur)));

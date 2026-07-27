@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 from db import engine
 from auth import require_login, require_coordinador, autenticar, hash_password
-from constantes import ROL_COORDINADOR, ROL_TECNICO
+from constantes import ROL_COORDINADOR, ROL_TECNICO, _norm
 
 router = APIRouter(prefix="/api/usuarios", tags=["usuarios"])
 log = logging.getLogger("consultas_sde.usuarios")
@@ -24,6 +24,19 @@ def cambiar_password(actual: str = Body(...), nueva: str = Body(...),
             UPDATE sde_usuarios SET password_hash = :p WHERE username = :u
         """), {"p": hash_password(nueva), "u": usuario["username"]})
     return {"ok": True}
+
+
+@router.get("/tecnicos")
+def tecnicos(_=Depends(require_login)):
+    """Nombres de usuarios activos, normalizados igual que los valores ya guardados
+    en sde_consultas.tecnico (sin acentos, mayúsculas — ver _norm en constantes.py).
+    Es la lista que alimenta los combos de "Técnico responsable" en panel/detalle/
+    alta manual: a diferencia de derivar los nombres de las consultas existentes,
+    esto hace que un usuario recién creado en /admin ya aparezca ahí, aunque
+    todavía no tenga ninguna consulta asignada."""
+    with engine.connect() as conn:
+        rows = conn.execute(text("SELECT nombre FROM sde_usuarios WHERE activo")).all()
+    return sorted({_norm(r[0]) for r in rows})
 
 
 @router.get("")

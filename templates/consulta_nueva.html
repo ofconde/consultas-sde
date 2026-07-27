@@ -87,11 +87,16 @@ async function cargarOpciones(){
   const sectoresReales = (info.sectores||[]).map(s=>s.clave).filter(s=>s && !s.startsWith('(sin')).sort();
   fill($('#sector'), sectoresReales, '');
 
-  // técnicos: listado real + a mí mismo preseleccionado si soy técnico (match
-  // normalizado, sin acentos/mayúsculas: en los datos figura "VICTOR SUAREZ",
-  // en la sesión "Víctor Suárez" — no coinciden como string exacto)
-  const d = await (await fetch('/api/consultas')).json();
-  const set = [...new Set(d.consultas.map(x=>x.tecnico).filter(Boolean))].sort();
+  // técnicos: usuarios activos registrados + nombres viejos ya presentes en
+  // consultas (ver nota igual en panel.html), más a mí mismo preseleccionado
+  // si soy técnico (match normalizado, sin acentos/mayúsculas: en los datos
+  // figura "VICTOR SUAREZ", en la sesión "Víctor Suárez" — no coinciden como
+  // string exacto)
+  const [usuarios, d] = await Promise.all([
+    fetch('/api/usuarios/tecnicos').then(r=>r.json()),
+    fetch('/api/consultas').then(r=>r.json()),
+  ]);
+  const set = [...new Set([...usuarios, ...d.consultas.map(x=>x.tecnico).filter(Boolean)])].sort();
   let cur = '';
   if(ROL === 'tecnico'){
     cur = set.find(v => normalizar(v) === normalizar(NOMBRE_USUARIO)) || '';

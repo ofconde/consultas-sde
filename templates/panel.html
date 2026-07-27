@@ -176,9 +176,15 @@ function pintarKpis(){
 }
 
 async function cargarTecnicos(){
-  // técnicos presentes en las consultas
-  const r = await fetch('/api/consultas'); const d = await r.json();
-  const set = [...new Set(d.consultas.map(x=>x.tecnico).filter(Boolean))].sort();
+  // Usuarios activos registrados + cualquier nombre viejo que ya esté en las
+  // consultas (ej. "OTRO", un valor histórico del Excel que no es un usuario
+  // real) — así un técnico recién creado en /admin aparece en el filtro aunque
+  // todavía no tenga ninguna consulta asignada.
+  const [usuarios, consultas] = await Promise.all([
+    fetch('/api/usuarios/tecnicos').then(r=>r.json()),
+    fetch('/api/consultas').then(r=>r.json()),
+  ]);
+  const set = [...new Set([...usuarios, ...consultas.consultas.map(x=>x.tecnico).filter(Boolean)])].sort();
   const sel = $('#f-tecnico');
   set.forEach(v => sel.add(new Option(v, v)));
 }
