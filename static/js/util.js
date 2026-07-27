@@ -68,3 +68,20 @@ function montoAutoFormato(sel) {
   const el = typeof sel === "string" ? document.querySelector(sel) : sel;
   if (el) el.addEventListener("blur", () => { el.value = montoFmt(el.value); });
 }
+
+// Mapea la situación 1-6 de la Central de Deudores del BCRA al mismo grupo de
+// color que ya usan los badges de estado (g-EN_SEDE verde, g-INICIAL azul,
+// g-INACTIVAS gris) — normal = verde, seguimiento especial = azul, de 3 en
+// adelante ya es un problema para otorgar crédito.
+function bcraGrupo(situacionMax) {
+  if (situacionMax <= 1) return "EN_SEDE";
+  if (situacionMax === 2) return "INICIAL";
+  return "INACTIVAS";
+}
+
+// Arma el badge compacto de situación BCRA para una celda de tabla — mismo
+// dato que el bloque completo del detalle, versión de una sola línea.
+function bcraBadgeMini(d) {
+  if (!d || d.sin_datos) return '<span class="muted">sin registro</span>';
+  return `<span class="badge g-${bcraGrupo(d.situacion_max)}">${d.situacion_max} · ${escapeHtml(d.situacion_label)}</span>`;
+}

@@ -46,7 +46,7 @@
             <th data-col="estado">Estado<span class="th-rz"></span></th>
             <th data-col="ultima_accion">Última acción<span class="th-rz"></span></th>
             <th data-col="arca">ARCA confirmado<span class="th-rz"></span></th>
-            <th data-col="bcra">Situación BCRA<span class="th-rz"></span></th>
+            <th data-col="bcra" title="Consulta a demanda a la Central de Deudores del BCRA — hace clic en el botón de cada fila">Situación BCRA<span class="th-rz"></span></th>
             <th data-col="destino">Destino<span class="th-rz"></span></th>
             {% if usuario.rol == 'coordinador' %}<th data-col="acciones"></th>{% endif %}
           </tr></thead>
@@ -237,7 +237,9 @@ function filaHTML(c, numeroFila){
       <td>${badge(c.grupo,c.estado)}</td>
       <td>${acc}</td>
       <td>${escapeHtml(c.arca_confirmado)||'—'}</td>
-      <td>${escapeHtml(c.situacion_bcra)||'—'}</td>
+      <td id="bcra-${c.id}">${c.cuit
+        ? `<button class="btn sm" onclick="event.stopPropagation();verBcra(${c.id})">Ver BCRA</button>`
+        : '<span class="muted">—</span>'}</td>
       <td>${escapeHtml(c.destino)||'—'}</td>
       ${borrar}
     </tr>`;
@@ -256,14 +258,41 @@ async function borrarConsulta(id, btn){
   else alert('No se pudo eliminar (requiere rol coordinador).');
 }
 
+// Situación BCRA a demanda: se probó en vivo pedirla automática para las 60
+// filas de la página, incluso de a una con pausa entre pedidos — igual agota
+// el límite del BCRA (41 de 60 volvieron con 429 en la prueba). El límite no
+// es por ráfaga, es una cuota acumulada; ninguna pausa razonable lo evita si
+// hay que hacer 60 pedidos. Por eso queda a pedido: un botón por fila, que el
+// propio ritmo de un clic humano nunca se acerca a romper. Cacheado 7 días
+// del lado del servidor, así que reconsultar la misma no vuelve a pedirle
+// nada al BCRA.
+async function verBcra(id){
+  const celda = document.getElementById('bcra-'+id);
+  const c = ROWS.find(r => r.id === id);
+  if(!celda || !c || !c.cuit) return;
+  celda.innerHTML = '<span class="muted">consultando…</span>';
+  try{
+    const r = await fetch('/api/bcra/'+encodeURIComponent(c.cuit));
+    if(r.ok){
+      celda.innerHTML = bcraBadgeMini(await r.json());
+    } else if(r.status === 429){
+      celda.innerHTML = '<span class="muted">límite alcanzado, reintentá en un rato</span>';
+    } else {
+      celda.innerHTML = '<span class="muted">no disponible</span>';
+    }
+  } catch(e){
+    celda.innerHTML = '<span class="muted">no disponible</span>';
+  }
+}
+
 function renderPagina(){
   const total = ROWS.length;
   $('#empty').style.display = total ? 'none':'block';
   const pages = Math.max(1, Math.ceil(total/PAGE_SIZE));
   if(state.pagina > pages) state.pagina = pages;
   const start = (state.pagina-1)*PAGE_SIZE;
-  $('#tbody').innerHTML = ROWS.slice(start, start+PAGE_SIZE)
-    .map((c,i) => filaHTML(c, start+i+1)).join('');
+  const filasPagina = ROWS.slice(start, start+PAGE_SIZE);
+  $('#tbody').innerHTML = filasPagina.map((c,i) => filaHTML(c, start+i+1)).join('');
   const pg = $('#pager');
   if(total > PAGE_SIZE){
     pg.style.display = 'flex';

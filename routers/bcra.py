@@ -1,6 +1,7 @@
 """API de situación crediticia (Central de Deudores del BCRA), con caché."""
 import json
 import logging
+import urllib.error
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
@@ -33,6 +34,17 @@ def situacion(cuit: str, _=Depends(require_login)):
 
     try:
         data = bcra.consultar(limpio)
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            # El BCRA rate-limitea agresivamente por IP (confirmado: ráfagas de
+            # ~10 consultas casi simultáneas ya lo disparan). El panel pide esto
+            # en secuencia con pausa entre pedidos por esto mismo — si aun así
+            # llega acá, es que hay demasiadas consultas juntas en este momento
+            # (varios usuarios a la vez, o una ráfaga real).
+            log.warning("BCRA rate-limit (429) para %s", limpio)
+            raise HTTPException(429, "Límite de consultas al BCRA alcanzado. Probá de nuevo en un momento.")
+        log.warning("BCRA no disponible para %s: HTTP %s", limpio, e.code)
+        raise HTTPException(502, "El BCRA no respondió. Probá de nuevo en un rato.")
     except Exception as e:
         # Que el BCRA esté caído no puede romper la pantalla de la consulta.
         log.warning("BCRA no disponible para %s: %s: %s", limpio, type(e).__name__, e)

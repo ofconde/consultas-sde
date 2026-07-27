@@ -29,7 +29,6 @@ def _fila_resumen(r):
         "cuit": r["cuit"],
         "situacion_arca": r["arca_confirmado"] or r["situacion_arca"],
         "arca_confirmado": r["arca_confirmado"],
-        "situacion_bcra": r["situacion_bcra"],
         "localidad": r["localidad_confirmada"] or r["localidad"],
         "departamento": r["departamento"],
         "sector": r["sector"],

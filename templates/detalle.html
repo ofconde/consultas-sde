@@ -160,8 +160,7 @@ async function cargarBcra(cuit){
     el.textContent = 'Sin registro en la Central de Deudores';
     return;
   }
-  const g = d.situacion_max <= 1 ? 'EN_SEDE' : (d.situacion_max === 2 ? 'INICIAL' : 'INACTIVAS');
-  const partes = [`<span class="badge g-${g}">${d.situacion_max} · ${escapeHtml(d.situacion_label)}</span>`];
+  const partes = [`<span class="badge g-${bcraGrupo(d.situacion_max)}">${d.situacion_max} · ${escapeHtml(d.situacion_label)}</span>`];
   if(d.periodo) partes.push(`<span class="cod">período ${escapeHtml(d.periodo)}</span>`);
   if(d.entidades?.length) partes.push(`<span class="cod">${d.entidades.length} entidad(es)</span>`);
   if(d.cheques?.length) partes.push(`<span class="dup">${d.cheques.length} cheque(s) rechazado(s)</span>`);
