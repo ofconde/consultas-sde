@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 
 from db import engine, cuits_duplicados
-from auth import require_coordinador
+from auth import require_login
 from formatos import _monto, _dmy
 from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS
 
@@ -39,7 +39,7 @@ router = APIRouter(prefix="/api/informe", tags=["informe"])
 
 
 @router.get("")
-def informe(_=Depends(require_coordinador)):
+def informe(_=Depends(require_login)):
     with engine.connect() as conn:
         total = conn.execute(text("SELECT COUNT(*) FROM sde_consultas")).scalar() or 0
 
