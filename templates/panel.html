@@ -13,7 +13,7 @@
     <div class="estado-btns" id="ebtns"></div>
 
     <div class="filtros">
-      <input type="search" id="q" placeholder="Buscar por nombre o CUIT…">
+      <input type="search" id="q" placeholder="Buscar por nombre, CUIT, mail, teléfono, localidad, destino…">
       <select id="f-tecnico"><option value="">Todos los técnicos</option><option value="__sin__">— Sin asignar</option></select>
       <select id="f-estado"><option value="">Todos los estados</option></select>
       <select id="f-accion"><option value="">Última acción (todas)</option></select>
@@ -191,7 +191,9 @@ async function cargarTecnicos(){
 
 function badge(g, estado){ return `<span class="badge g-${g}">${escapeHtml(estado)||'—'}</span>`; }
 
-async function cargarTabla(){
+// Los filtros armados acá viven tanto en la URL (para que "atrás" del navegador
+// los recupere) como en el pedido al servidor — una sola función arma los dos.
+function construirQuery(){
   const p = new URLSearchParams();
   if($('#q').value) p.set('q',$('#q').value);
   if(state.estado) p.set('estado',state.estado);
@@ -205,6 +207,39 @@ async function cargarTabla(){
   if($('#f-programa').value) p.set('programa',$('#f-programa').value);
   if($('#f-sector').value) p.set('sector',$('#f-sector').value);
   if($('#f-arca').value) p.set('situacion_arca',$('#f-arca').value);
+  return p;
+}
+
+// Vuelca los filtros de vuelta a la barra de direcciones, sin agregar una
+// entrada nueva al historial (replaceState, no pushState) — así el volver
+// atrás desde el detalle de una consulta trae de vuelta esta misma URL, con
+// los mismos filtros, en vez de un panel recién abierto y sin nada marcado.
+function sincronizarURL(p){
+  const qs = p.toString();
+  history.replaceState(null, '', location.pathname + (qs ? '?'+qs : ''));
+}
+
+// Al abrir la página (incluido "atrás" del navegador) toma los filtros que
+// hubiera en la URL y los aplica a los controles, antes del primer pedido.
+function restaurarDesdeURL(){
+  const p = new URLSearchParams(location.search);
+  if(p.has('q')) $('#q').value = p.get('q');
+  if(p.has('estado')){ state.estado = p.get('estado'); $('#f-estado').value = state.estado; }
+  if(p.has('tecnico')) $('#f-tecnico').value = p.get('tecnico');
+  if(p.get('mios')==='1') state.mios = true;
+  if(p.get('dups')==='1') state.dups = true;
+  if(p.get('sin_acciones')==='1') state.sinAcciones = true;
+  if(p.has('tipo_accion')) $('#f-accion').value = p.get('tipo_accion');
+  if(p.has('departamento')) $('#f-departamento').value = p.get('departamento');
+  if(p.has('linea')) $('#f-linea').value = p.get('linea');
+  if(p.has('programa')) $('#f-programa').value = p.get('programa');
+  if(p.has('sector')) $('#f-sector').value = p.get('sector');
+  if(p.has('situacion_arca')) $('#f-arca').value = p.get('situacion_arca');
+}
+
+async function cargarTabla(){
+  const p = construirQuery();
+  sincronizarURL(p);
   const r = await fetch('/api/consultas?'+p); const d = await r.json();
   ROWS = d.consultas;
   state.pagina = 1;
@@ -390,7 +425,12 @@ function iniciarRedimensionColumnas(){
   aplicarAnchosColumnas();
   iniciarRedimensionColumnas();
   await cargarMeta(); await cargarCatalogos(); await cargarTecnicos();
-  await cargarResumen(); await cargarTabla();
+  await cargarResumen();
+  // recién acá, con los <select> ya poblados, tiene sentido asignarles un value
+  // restaurado — antes de esto, seteás un valor que ninguna <option> tiene todavía.
+  restaurarDesdeURL();
+  pintarBotones(); pintarKpis();
+  await cargarTabla();
 })();
 </script>
 {% endblock %}

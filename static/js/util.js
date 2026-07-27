@@ -69,6 +69,21 @@ function montoAutoFormato(sel) {
   if (el) el.addEventListener("blur", () => { el.value = montoFmt(el.value); });
 }
 
+// Mide la altura real del topbar (varía según el contenido y la escala de la
+// página) y la deja en --topbar-h. Un elemento sticky fuera de cualquier caja
+// con overflow propio (ej. la barra de filtros del panel) se ancla debajo de
+// él con `top:var(--topbar-h)`, en vez de competir por el mismo top:0 y
+// quedar tapado (el topbar también es sticky, con más z-index).
+function _fijarAlturaTopbar() {
+  const tb = document.querySelector(".topbar");
+  if (tb) document.documentElement.style.setProperty("--topbar-h", tb.getBoundingClientRect().height + "px");
+}
+document.addEventListener("DOMContentLoaded", () => {
+  _fijarAlturaTopbar();
+  let t;
+  window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(_fijarAlturaTopbar, 150); });
+});
+
 // Mapea la situación 1-6 de la Central de Deudores del BCRA al mismo grupo de
 // color que ya usan los badges de estado (g-EN_SEDE verde, g-INICIAL azul,
 // g-INACTIVAS gris) — normal = verde, seguimiento especial = azul, de 3 en

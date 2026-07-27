@@ -19,6 +19,16 @@ _GESTION_COLS = [
     "estado", "observaciones", "informacion_extra", "genero",
 ]
 
+# columnas de texto donde busca el buscador del panel — todos los campos de
+# texto libre o identificador de la consulta, del solicitante y de la gestión.
+_CAMPOS_BUSQUEDA = [
+    "codigo", "nombre", "cuit", "mail", "telefono",
+    "localidad", "localidad_confirmada", "destino", "actividad_economica",
+    "como_se_entero", "observaciones", "informacion_extra",
+    "departamento", "sector", "linea", "programa", "garantia",
+    "tecnico", "estado", "situacion_arca", "arca_confirmado", "situacion_bcra",
+]
+
 
 def _fila_resumen(r):
     return {
@@ -52,7 +62,10 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
            departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
            situacion_arca: str = "", tipo_accion: str = "", sin_acciones: bool = False,
            usuario=Depends(require_login)):
-    """Lista consultas con filtros. `q` busca por nombre o CUIT.
+    """Lista consultas con filtros. `q` busca en todos los campos de texto (nombre,
+    CUIT, código, mail, teléfono, localidad, destino, observaciones, etc. — ver
+    _CAMPOS_BUSQUEDA), así una consulta se encuentra sin saber en qué campo puntual
+    quedó el dato que se recuerda.
     `mios=1` filtra las asignadas al técnico logueado (match sin acentos/mayúsculas).
     `dups=1` muestra solo consultas con CUIT duplicado, agrupadas por CUIT.
     `tipo_accion` filtra por el tipo de la ÚLTIMA acción registrada (no cualquiera del
@@ -67,7 +80,8 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         else:
             where.append("c.tecnico = :tecnico"); params["tecnico"] = tecnico
     if q:
-        where.append("(c.nombre ILIKE :q OR c.cuit ILIKE :q)"); params["q"] = f"%{q}%"
+        where.append("(" + " OR ".join(f"c.{col} ILIKE :q" for col in _CAMPOS_BUSQUEDA) + ")")
+        params["q"] = f"%{q}%"
     if departamento:
         where.append("c.departamento = :departamento"); params["departamento"] = departamento
     if linea:

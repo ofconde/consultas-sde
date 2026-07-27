@@ -87,7 +87,14 @@ h3{font-size:1.125rem}
 .copy-btn.destacado:hover{background:var(--celeste);color:#fff;border-color:var(--celeste)}
 
 /* Filtros */
-.filtros{display:flex;flex-wrap:wrap;gap:0.625rem;align-items:center;margin-bottom:1.125rem}
+/* Sticky debajo del topbar: sin overflow-x:auto en ningún ancestro entre esto
+   y el viewport, así que el sticky sí se ancla a la ventana (a diferencia de
+   la cabecera de la tabla, que necesitó su propia caja de scroll — ver
+   .tabla-scroll). Fondo opaco + sombra para separarse de las filas que
+   quedan debajo al scrollear. */
+.filtros{display:flex;flex-wrap:wrap;gap:0.625rem;align-items:center;margin-bottom:1.125rem;
+  position:sticky;top:var(--topbar-h,0px);z-index:6;background:var(--bg);
+  padding:0.625rem 0;box-shadow:0 0.125rem 0.25rem rgba(28,36,67,.05)}
 .filtros input,.filtros select{padding:0.5625rem 0.75rem;border:1px solid var(--border);border-radius:0.625rem;font-size:0.875rem;font-family:inherit;background:#fff}
 .filtros input{min-width:13.75rem}
 
