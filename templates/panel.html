@@ -21,6 +21,7 @@
       <select id="f-linea"><option value="">Todas las líneas</option></select>
       <select id="f-programa"><option value="">Todos los programas</option></select>
       <select id="f-sector"><option value="">Todos los sectores</option></select>
+      <select id="f-arca"><option value="">Toda situación ARCA</option></select>
       <span class="muted" id="cont"></span>
     </div>
 
@@ -63,6 +64,10 @@ async function cargarCatalogos(){
   llenar($('#f-departamento'), CAT.DEPARTAMENTO||[], 'Todos los departamentos');
   llenar($('#f-linea'), CAT.LINEA||[], 'Todas las líneas');
   llenar($('#f-programa'), CAT.PROGRAMA||[], 'Todos los programas');
+  // ARCA sí se llena desde el catálogo: a diferencia de sector, estos valores son un
+  // listado fijo (RESPONSABLE INSCRIPTO, MONOTRIBUTO A-K, etc.) y coinciden con los
+  // que realmente están guardados — verificado contra la base, no supuesto.
+  llenar($('#f-arca'), CAT.SITUACION_AFIP||[], 'Toda situación ARCA');
   // sector NO se llena desde CAT.SECTOR: ese catálogo de referencia (25 rubros detallados)
   // no coincide con los valores reales guardados en los datos (COMERCIAL/SERVICIOS/etc,
   // que vienen tal cual del Excel). Se llena en cargarResumen() con los valores reales.
@@ -87,7 +92,7 @@ async function cargarResumen(){
     Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false });
     $('#q').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
     $('#f-accion').value=''; $('#f-departamento').value=''; $('#f-linea').value='';
-    $('#f-programa').value=''; $('#f-sector').value='';
+    $('#f-programa').value=''; $('#f-sector').value=''; $('#f-arca').value='';
     pintarBotones(); pintarKpis(); cargarTabla();
   });
   $('#kpi-sin-asignar').addEventListener('click', () => {
@@ -174,6 +179,7 @@ async function cargarTabla(){
   if($('#f-linea').value) p.set('linea',$('#f-linea').value);
   if($('#f-programa').value) p.set('programa',$('#f-programa').value);
   if($('#f-sector').value) p.set('sector',$('#f-sector').value);
+  if($('#f-arca').value) p.set('situacion_arca',$('#f-arca').value);
   const r = await fetch('/api/consultas?'+p); const d = await r.json();
   ROWS = d.consultas;
   state.pagina = 1;
@@ -255,6 +261,7 @@ $('#f-departamento').addEventListener('change', cargarTabla);
 $('#f-linea').addEventListener('change', cargarTabla);
 $('#f-programa').addEventListener('change', cargarTabla);
 $('#f-sector').addEventListener('change', cargarTabla);
+$('#f-arca').addEventListener('change', cargarTabla);
 $('#f-estado').addEventListener('change', () => {
   state.estado = $('#f-estado').value; state.dups = false;
   pintarBotones(); cargarTabla();

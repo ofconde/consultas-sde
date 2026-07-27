@@ -119,10 +119,13 @@
       </div>
     </div>
 
+    <h3 style="margin:1.625rem 0 0.75rem">Promedio diario de consultas</h3>
+    <div class="kpis" id="kpis-promedio"></div>
+
     <h3 style="margin:1.625rem 0 0.75rem">Montos solicitados</h3>
     <div class="kpis" id="kpis-montos"></div>
 
-    <div class="grid3">
+    <div class="grid4">
       <div class="card" style="padding:1.375rem">
         <h3>Por sector productivo</h3>
         <div class="tabla-wrap"><table><thead><tr><th>Sector</th><th style="text-align:right">Cant.</th><th style="text-align:right">Monto solicitado</th></tr></thead>
@@ -137,6 +140,11 @@
         <h3>Por programa</h3>
         <div class="tabla-wrap"><table><thead><tr><th>Programa</th><th style="text-align:right">Cant.</th><th style="text-align:right">Monto solicitado</th></tr></thead>
         <tbody id="programas"></tbody></table></div>
+      </div>
+      <div class="card" style="padding:1.375rem">
+        <h3>Por situación ARCA</h3>
+        <div class="tabla-wrap"><table><thead><tr><th>Situación</th><th style="text-align:right">Cant.</th><th style="text-align:right">Monto solicitado</th></tr></thead>
+        <tbody id="arca-tabla"></tbody></table></div>
       </div>
     </div>
   </div>
@@ -157,10 +165,19 @@ function ticksLindos(max){
   return { tope, valores: Array.from({length: tope/paso + 1}, (_,i) => i*paso) };
 }
 
+let RANGO_ACTUAL = 60;
+
 function dibujarGrafico(dias){
+  RANGO_ACTUAL = dias;
   const datos = POR_DIA.slice(-dias);
   const cont = $('#graf-dia');
-  const W = 1000, H = 260, ML = 34, MR = 8, MT = 12, MB = 34;
+  // El viewBox se mide en píxeles reales del contenedor (no un ancho fijo
+  // arbitrario): así "24px de barra" o "9px de fuente" son ese tamaño de
+  // verdad en pantalla, sin importar cuán ancho sea el monitor. Con un ancho
+  // fijo de 1000 unidades estirado al 100% de un monitor grande, todo el
+  // gráfico terminaba dibujado casi al doble de su tamaño de diseño.
+  const W = Math.round(cont.clientWidth) || 1000;
+  const H = 150, ML = 32, MR = 8, MT = 10, MB = 26;
   const pw = W - ML - MR, ph = H - MT - MB;
   const maxN = Math.max(1, ...datos.map(x=>x.n));
   const { tope, valores } = ticksLindos(maxN);
@@ -234,6 +251,15 @@ function dibujarGrafico(dias){
   });
 }
 
+// Como el viewBox se mide en px reales del contenedor, si la ventana cambia
+// de ancho hay que volver a medir y redibujar — si no, queda con el tamaño
+// de la medición vieja.
+let _resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => { if(POR_DIA.length) dibujarGrafico(RANGO_ACTUAL); }, 150);
+});
+
 document.querySelectorAll('.rbtn').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.rbtn').forEach(o => o.classList.toggle('active', o === b));
   dibujarGrafico(+b.dataset.dias);
@@ -291,6 +317,12 @@ document.querySelectorAll('.rbtn').forEach(b => b.addEventListener('click', () =
   $('#mv-acc').textContent = d.acciones_semana;
   $('#mv-apc').textContent = d.acciones_por_consulta;
 
+  const pd = d.promedio_diario;
+  $('#kpis-promedio').innerHTML = `
+    <div class="kpi card kpi-blue"><div class="n">${pd.historico}</div><div class="l">Todo el período (${pd.dias_historico} días)</div></div>
+    <div class="kpi card kpi-violet"><div class="n">${pd.ultimos_30}</div><div class="l">Últimos 30 días</div></div>
+    <div class="kpi card kpi-green"><div class="n">${pd.ultimos_7}</div><div class="l">Últimos 7 días</div></div>`;
+
   const mn = d.montos;
   $('#kpis-montos').innerHTML = `
     <div class="kpi card"><div class="n" style="font-size:1.5rem">${mn.total_fmt}</div><div class="l">Total solicitado (${mn.con_monto} consultas)</div></div>
@@ -304,6 +336,7 @@ document.querySelectorAll('.rbtn').forEach(b => b.addEventListener('click', () =
   $('#sectores').innerHTML = filas(d.sectores);
   $('#lineas').innerHTML = filas(d.lineas);
   $('#programas').innerHTML = filas(d.programas);
+  $('#arca-tabla').innerHTML = filas(d.situacion_arca);
 })();
 </script>
 {% endblock %}

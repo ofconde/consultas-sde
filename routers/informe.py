@@ -1,4 +1,6 @@
 """Informe de gestión (el de los viernes) — KPIs computados server-side."""
+from datetime import date
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 
@@ -81,6 +83,14 @@ def informe(_=Depends(require_coordinador)):
         por_sector = _breakdown(conn, "sector", "(sin sector)")
         por_linea = _breakdown(conn, "linea", "(sin línea)")
         por_programa = _breakdown(conn, "programa", "(sin programa)")
+        # situación ARCA: gestión confirmada por el técnico si existe, si no lo que
+        # declaró el solicitante — mismo criterio que se muestra en el panel.
+        por_arca = _breakdown(conn, "COALESCE(NULLIF(arca_confirmado, ''), situacion_arca)",
+                               "(sin dato)")
+
+        primera_fecha = conn.execute(text(
+            "SELECT MIN(fecha_recepcion)::date FROM sde_consultas WHERE fecha_recepcion IS NOT NULL"
+        )).scalar()
 
         # movimiento de la semana (últimos 7 días)
         # nuevas = por fecha de recepción (cuándo llegó la consulta), no por fecha de carga
@@ -126,6 +136,19 @@ def informe(_=Depends(require_coordinador)):
         grupos_cnt[g] = grupos_cnt.get(g, 0) + r["n"]
         estados_out.append({"estado": r["estado"], "n": r["n"], "grupo": g})
 
+    # promedio diario en 3 ventanas: todo el período (desde la primera consulta
+    # cargada) y dos recortes recientes, reusando el mismo por_dia del gráfico
+    # para no repetir la consulta.
+    dias_historico = max(1, (date.today() - primera_fecha).days + 1) if primera_fecha else 1
+    n_ultimos_30 = sum(r["n"] for r in por_dia[-30:])
+    n_ultimos_7 = sum(r["n"] for r in por_dia[-7:])
+    promedio_diario = {
+        "historico": round(total / dias_historico, 1),
+        "ultimos_30": round(n_ultimos_30 / 30, 1),
+        "ultimos_7": round(n_ultimos_7 / 7, 1),
+        "dias_historico": dias_historico,
+    }
+
     activas = sum(v for k, v in grupos_cnt.items() if k in GRUPOS_ACTIVOS)
     grupos_out = [{"clave": k, "label": lbl, "n": grupos_cnt.get(k, 0)} for k, lbl in GRUPOS]
 
@@ -158,6 +181,8 @@ def informe(_=Depends(require_coordinador)):
         "sectores": por_sector,
         "lineas": por_linea,
         "programas": por_programa,
+        "situacion_arca": por_arca,
+        "promedio_diario": promedio_diario,
         "situacion": situacion,
         "por_dia": [{"dia": r["dia"].isoformat(), "dia_fmt": _dmy(r["dia"]), "n": r["n"]}
                     for r in por_dia],

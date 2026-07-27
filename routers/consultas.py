@@ -48,7 +48,7 @@ def _fila_resumen(r):
 def listar(request: Request, estado: str = "", tecnico: str = "",
            grupo: str = "", q: str = "", mios: bool = False, dups: bool = False,
            departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
-           tipo_accion: str = "", sin_acciones: bool = False,
+           situacion_arca: str = "", tipo_accion: str = "", sin_acciones: bool = False,
            usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca por nombre o CUIT.
     `mios=1` filtra las asignadas al técnico logueado (match sin acentos/mayúsculas).
@@ -74,6 +74,11 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         where.append("c.programa = :programa"); params["programa"] = programa
     if sector:
         where.append("c.sector = :sector"); params["sector"] = sector
+    if situacion_arca:
+        # mismo criterio que se muestra en el panel: gestión confirmada si existe,
+        # si no lo que declaró el solicitante.
+        where.append("COALESCE(NULLIF(c.arca_confirmado, ''), c.situacion_arca) = :situacion_arca")
+        params["situacion_arca"] = situacion_arca
     if sin_acciones:
         where.append("NOT EXISTS (SELECT 1 FROM sde_acciones a WHERE a.consulta_id = c.id)")
     if tipo_accion:
