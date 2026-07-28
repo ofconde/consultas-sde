@@ -268,8 +268,10 @@ function filaHTML(c, numeroFila){
     <tr onclick="location.href='/consulta/${c.id}'">
       <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">#${numeroFila}</div></td>
       <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>
-        <div class="cod">${escapeHtml(c.cuit)}${dup}${
-          c.situacion_arca ? ` · ${escapeHtml(c.situacion_arca)}` : ''}</div></td>
+        <div class="cod">${escapeHtml(c.cuit)}${c.cuit
+          ? `<button class="copy-btn" data-cuit="${escapeHtml(c.cuit)}"
+               onclick="event.stopPropagation();copiar(this.dataset.cuit,this)" title="Copiar CUIT">copiar</button>`
+          : ''}${dup}${c.situacion_arca ? ` · ${escapeHtml(c.situacion_arca)}` : ''}</div></td>
       <td>${escapeHtml(c.localidad)||'—'}</td>
       <td>${c.sector?`<span class="chip">${escapeHtml(c.sector)}</span>`:'—'}</td>
       <td>${escapeHtml(c.monto)}</td>
