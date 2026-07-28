@@ -22,6 +22,12 @@
       <select id="f-programa"><option value="">Todos los programas</option></select>
       <select id="f-sector"><option value="">Todos los sectores</option></select>
       <select id="f-arca"><option value="">Toda situación ARCA</option></select>
+      <span class="filtro-dia">
+        <button class="btn sm" id="dia-prev" title="Día anterior">◀</button>
+        <input type="date" id="f-fecha" title="Filtrar por día de recepción">
+        <button class="btn sm" id="dia-next" title="Día siguiente">▶</button>
+        <button class="btn sm" id="dia-limpiar" title="Quitar el filtro de día" style="display:none">✕</button>
+      </span>
       <span class="muted" id="cont"></span>
     </div>
 
@@ -112,6 +118,7 @@ async function cargarResumen(){
     $('#q').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
     $('#f-accion').value=''; $('#f-departamento').value=''; $('#f-linea').value='';
     $('#f-programa').value=''; $('#f-sector').value=''; $('#f-arca').value='';
+    $('#f-fecha').value=''; $('#dia-limpiar').style.display = 'none';
     pintarBotones(); pintarKpis(); cargarTabla();
   });
   $('#kpi-sin-asignar').addEventListener('click', () => {
@@ -207,6 +214,7 @@ function construirQuery(){
   if($('#f-programa').value) p.set('programa',$('#f-programa').value);
   if($('#f-sector').value) p.set('sector',$('#f-sector').value);
   if($('#f-arca').value) p.set('situacion_arca',$('#f-arca').value);
+  if($('#f-fecha').value) p.set('fecha',$('#f-fecha').value);
   return p;
 }
 
@@ -235,6 +243,7 @@ function restaurarDesdeURL(){
   if(p.has('programa')) $('#f-programa').value = p.get('programa');
   if(p.has('sector')) $('#f-sector').value = p.get('sector');
   if(p.has('situacion_arca')) $('#f-arca').value = p.get('situacion_arca');
+  if(p.has('fecha')){ $('#f-fecha').value = p.get('fecha'); $('#dia-limpiar').style.display = ''; }
 }
 
 async function cargarTabla(){
@@ -361,6 +370,33 @@ $('#f-linea').addEventListener('change', cargarTabla);
 $('#f-programa').addEventListener('change', cargarTabla);
 $('#f-sector').addEventListener('change', cargarTabla);
 $('#f-arca').addEventListener('change', cargarTabla);
+
+// Filtro por día de recepción — para ir revisando/depurando la base día por día.
+// sumarDias() arma la fecha con año/mes/día locales (Date(y,m-1,d)), nunca
+// parseando el string "YYYY-MM-DD" directo con `new Date()`: eso lo toma como
+// medianoche UTC y sumar/restar días puede correr un día — mismo patrón de bug
+// que ya se corrigió en la ingesta (ver feedback_bug_horario_utc en la memoria).
+function sumarDias(fechaISO, delta){
+  const [y,m,d] = fechaISO.split('-').map(Number);
+  const fecha = new Date(y, m-1, d);
+  fecha.setDate(fecha.getDate() + delta);
+  const p = n => String(n).padStart(2,'0');
+  return `${fecha.getFullYear()}-${p(fecha.getMonth()+1)}-${p(fecha.getDate())}`;
+}
+function irADia(fechaISO){
+  $('#f-fecha').value = fechaISO;
+  $('#dia-limpiar').style.display = '';
+  cargarTabla();
+}
+$('#f-fecha').addEventListener('change', () => {
+  $('#dia-limpiar').style.display = $('#f-fecha').value ? '' : 'none';
+  cargarTabla();
+});
+$('#dia-prev').addEventListener('click', () => irADia(sumarDias($('#f-fecha').value || hoyISO(), -1)));
+$('#dia-next').addEventListener('click', () => irADia(sumarDias($('#f-fecha').value || hoyISO(), 1)));
+$('#dia-limpiar').addEventListener('click', () => {
+  $('#f-fecha').value = ''; $('#dia-limpiar').style.display = 'none'; cargarTabla();
+});
 $('#f-estado').addEventListener('change', () => {
   state.estado = $('#f-estado').value; state.dups = false;
   pintarBotones(); cargarTabla();

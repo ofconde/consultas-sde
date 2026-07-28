@@ -61,7 +61,7 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
            grupo: str = "", q: str = "", mios: bool = False, dups: bool = False,
            departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
            situacion_arca: str = "", tipo_accion: str = "", sin_acciones: bool = False,
-           usuario=Depends(require_login)):
+           fecha: str = "", usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca en todos los campos de texto (nombre,
     CUIT, código, mail, teléfono, localidad, destino, observaciones, etc. — ver
     _CAMPOS_BUSQUEDA), así una consulta se encuentra sin saber en qué campo puntual
@@ -69,11 +69,15 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     `mios=1` filtra las asignadas al técnico logueado (match sin acentos/mayúsculas).
     `dups=1` muestra solo consultas con CUIT duplicado, agrupadas por CUIT.
     `tipo_accion` filtra por el tipo de la ÚLTIMA acción registrada (no cualquiera del
-    historial). `sin_acciones=1` filtra las que todavía no tienen ninguna acción cargada."""
+    historial). `sin_acciones=1` filtra las que todavía no tienen ninguna acción cargada.
+    `fecha` (YYYY-MM-DD) filtra por día de recepción — para ir revisando/depurando
+    la base día por día."""
     where = ["1=1"]
     params = {}
     if estado:
         where.append("c.estado = :estado"); params["estado"] = estado
+    if fecha:
+        where.append("c.fecha_recepcion::date = :fecha"); params["fecha"] = fecha
     if tecnico:
         if tecnico == "__sin__":
             where.append("(c.tecnico IS NULL OR c.tecnico = '')")
