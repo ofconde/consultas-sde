@@ -271,9 +271,15 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
     # esté la consulta asignada a quien esté — pero solo si es lo único que se toca.
     if set(campos) != {"monto"} and not puede_editar(usuario, actual["tecnico"]):
         raise HTTPException(403, "Esta consulta está asignada a otro técnico")
-    if usuario["rol"] != ROL_COORDINADOR:
-        # solo el coordinador reasigna: un técnico no cambia el campo `tecnico`
-        campos.pop("tecnico", None)
+    if usuario["rol"] != ROL_COORDINADOR and "tecnico" in campos:
+        # Un técnico puede auto-asignarse una consulta (tomar un caso sin asignar,
+        # o simplemente reconfirmar que es suyo al guardar el resto de la gestión).
+        # Lo que no puede es reasignarla a un técnico DISTINTO — eso sigue siendo
+        # privilegio del coordinador. Antes se descartaba el campo entero sin
+        # avisar, así que un técnico que se autoasignaba un caso guardaba bien el
+        # resto del formulario pero la asignación nunca quedaba, en silencio.
+        if _norm(campos["tecnico"]) != _norm(usuario["nombre"]):
+            campos.pop("tecnico")
     sets, params = [], {"id": cid}
     for col in _GESTION_COLS:
         if col in campos:
