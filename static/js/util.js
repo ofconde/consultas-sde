@@ -84,6 +84,16 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(_fijarAlturaTopbar, 150); });
 });
 
+// Los "← Volver al panel" de detalle/consulta_nueva/password son <a href="/panel">
+// fijos — a diferencia del botón "atrás" del navegador, no recuperan solos los
+// filtros activos. El panel guarda su última URL filtrada en sessionStorage
+// (ver sincronizarURL en panel.html); acá se la inyectamos al link antes del click.
+document.addEventListener("DOMContentLoaded", () => {
+  const destino = sessionStorage.getItem("sdePanelUrl");
+  if (!destino) return;
+  document.querySelectorAll('a[href="/panel"]').forEach(a => { a.href = destino; });
+});
+
 // Mapea la situación 1-6 de la Central de Deudores del BCRA al mismo grupo de
 // color que ya usan los badges de estado (g-EN_SEDE verde, g-INICIAL azul,
 // g-INACTIVAS gris) — normal = verde, seguimiento especial = azul, de 3 en

@@ -231,7 +231,12 @@ function construirQuery(){
 // los mismos filtros, en vez de un panel recién abierto y sin nada marcado.
 function sincronizarURL(p){
   const qs = p.toString();
-  history.replaceState(null, '', location.pathname + (qs ? '?'+qs : ''));
+  const url = location.pathname + (qs ? '?'+qs : '');
+  history.replaceState(null, '', url);
+  // Además del historial, se guarda en sessionStorage: el "← Volver al panel"
+  // de detalle/consulta_nueva/password es un <a href="/panel"> normal (no un
+  // "atrás" del navegador), así que sin esto siempre perdía el filtro.
+  sessionStorage.setItem('sdePanelUrl', url);
 }
 
 // Al abrir la página (incluido "atrás" del navegador) toma los filtros que
