@@ -70,7 +70,7 @@ const $ = s => document.querySelector(s);
 const ROL = "{{ usuario.rol }}";
 let TIMER = null;
 const PAGE_SIZE = 60;
-const state = { estado: '', mios: false, dups: false, sinAcciones: false, pagina: 1 };
+const state = { estado: '', mios: false, dups: false, sinAcciones: false, generoF: false, pagina: 1 };
 let ROWS = [];
 let META = { grupo_color: {} };
 let CAT = {};
@@ -114,7 +114,7 @@ async function cargarResumen(){
     <div class="kpi card kpi-violet"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
 
   $('#kpi-total').addEventListener('click', () => {
-    Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false });
+    Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false, generoF:false });
     $('#q').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
     $('#f-accion').value=''; $('#f-departamento').value=''; $('#f-linea').value='';
     $('#f-programa').value=''; $('#f-sector').value=''; $('#f-arca').value='';
@@ -141,6 +141,8 @@ async function cargarResumen(){
   });
   botones += `<button class="ebtn mios" id="btn-mios">Mis casos</button>`;
   botones += `<button class="ebtn sinacc" id="btn-sinacc">Sin acciones <span class="cnt">${d.sin_acciones}</span></button>`;
+  botones += `<button class="ebtn mujeres" id="btn-mujeres" title="Estimado por CUIT/nombre — no reemplaza confirmar el encuadre"
+    >♀ Posibles Mujeres <span class="cnt">${d.posibles_mujeres}</span></button>`;
   if(d.duplicados > 0)
     botones += `<button class="ebtn dups" id="btn-dups">⚠ Duplicados <span class="cnt">${d.duplicados}</span></button>`;
   $('#ebtns').innerHTML = botones;
@@ -159,6 +161,9 @@ async function cargarResumen(){
     state.sinAcciones = !state.sinAcciones; state.dups = false;
     pintarBotones(); pintarKpis(); cargarTabla();
   });
+  $('#btn-mujeres').addEventListener('click', () => {
+    state.generoF = !state.generoF; pintarBotones(); cargarTabla();
+  });
   const bd = $('#btn-dups');
   if(bd) bd.addEventListener('click', () => {
     state.dups = !state.dups; state.estado = ''; state.mios = false;
@@ -175,6 +180,7 @@ function pintarBotones(){
   const m = $('#btn-mios'); if(m) m.classList.toggle('active', state.mios);
   const bd = $('#btn-dups'); if(bd) bd.classList.toggle('active', state.dups);
   const sa = $('#btn-sinacc'); if(sa) sa.classList.toggle('active', state.sinAcciones);
+  const mj = $('#btn-mujeres'); if(mj) mj.classList.toggle('active', state.generoF);
 }
 
 function pintarKpis(){
@@ -215,6 +221,7 @@ function construirQuery(){
   if($('#f-sector').value) p.set('sector',$('#f-sector').value);
   if($('#f-arca').value) p.set('situacion_arca',$('#f-arca').value);
   if($('#f-fecha').value) p.set('fecha',$('#f-fecha').value);
+  if(state.generoF) p.set('genero','F');
   return p;
 }
 
@@ -244,6 +251,7 @@ function restaurarDesdeURL(){
   if(p.has('sector')) $('#f-sector').value = p.get('sector');
   if(p.has('situacion_arca')) $('#f-arca').value = p.get('situacion_arca');
   if(p.has('fecha')){ $('#f-fecha').value = p.get('fecha'); $('#dia-limpiar').style.display = ''; }
+  if(p.get('genero')==='F') state.generoF = true;
 }
 
 async function cargarTabla(){
@@ -276,7 +284,8 @@ function filaHTML(c, numeroFila){
   return `
     <tr onclick="location.href='/consulta/${c.id}'">
       <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">#${numeroFila}</div></td>
-      <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>
+      <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>${
+          c.genero_estimado==='F' ? '<span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : ''}
         <div class="cod">${escapeHtml(c.cuit)}${c.cuit
           ? `<button class="copy-btn" data-cuit="${escapeHtml(c.cuit)}"
                onclick="event.stopPropagation();copiar(this.dataset.cuit,this)" title="Copiar CUIT">copiar</button>`

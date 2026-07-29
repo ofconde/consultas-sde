@@ -8,6 +8,7 @@ from auth import require_login, require_coordinador, puede_editar
 from models import GestionIn, ConsultaManualIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto, _parse_fecha
 from constantes import grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS
+import genero as genero_mod
 
 router = APIRouter(prefix="/api/consultas", tags=["consultas"])
 log = logging.getLogger("consultas_sde.consultas")
@@ -53,6 +54,14 @@ def _fila_resumen(r):
         "n_acciones": r["n_acciones"],
         "ultima_accion": r["ultima_accion"],
         "ultima_accion_fecha": _dmy(r["ultima_accion_fecha"]),
+        # 'F'/'M'/None — heurística para priorizar candidatas a la línea Mujeres,
+        # no un dato confirmado (ver genero.py). Si el campo genero llegara a
+        # cargarse alguna vez a mano, ese manda por sobre la estimación.
+        "genero_estimado": (
+            "F" if (r["genero"] or "").strip().upper().startswith("F")
+            else "M" if (r["genero"] or "").strip().upper().startswith("M")
+            else genero_mod.estimar_genero(r["nombre"], r["cuit"])
+        ),
     }
 
 
@@ -61,7 +70,7 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
            grupo: str = "", q: str = "", mios: bool = False, dups: bool = False,
            departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
            situacion_arca: str = "", tipo_accion: str = "", sin_acciones: bool = False,
-           fecha: str = "", usuario=Depends(require_login)):
+           fecha: str = "", genero: str = "", usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca en todos los campos de texto (nombre,
     CUIT, código, mail, teléfono, localidad, destino, observaciones, etc. — ver
     _CAMPOS_BUSQUEDA), así una consulta se encuentra sin saber en qué campo puntual
@@ -137,6 +146,8 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     if mios:
         yo = _norm(usuario["nombre"])
         data = [d for d in data if _norm(d["tecnico"]) == yo]
+    if genero:
+        data = [d for d in data if d["genero_estimado"] == genero]
     return {"total": len(data), "consultas": data}
 
 
@@ -171,13 +182,22 @@ def resumen(_=Depends(require_login)):
             SELECT DISTINCT sector FROM sde_consultas
             WHERE sector IS NOT NULL AND sector <> '' ORDER BY sector
         """)).all()
+        # candidatas a la línea Mujeres — mismo cálculo que el filtro del panel
+        # (ver genero.py), acá solo para el contador del botón.
+        personas = conn.execute(text("SELECT nombre, cuit, genero FROM sde_consultas")).all()
 
     estados_out = [{"estado": r["estado"], "n": r["n"], "grupo": grupo_de(r["estado"])} for r in por_estado]
     activas = sum(r["n"] for r in estados_out if r["grupo"] in GRUPOS_ACTIVOS)
+    posibles_mujeres = sum(
+        1 for nombre, cuit, g in personas
+        if (g or "").strip().upper().startswith("F")
+        or (not g and genero_mod.estimar_genero(nombre, cuit) == "F")
+    )
 
     return {
         "total": total, "activas": activas, "sin_asignar": sin_asignar,
         "sin_acciones": sin_acciones, "nuevas_semana": nuevas_semana, "duplicados": duplicados,
+        "posibles_mujeres": posibles_mujeres,
         "estados": estados_out,
         "sectores": [{"clave": r[0]} for r in sectores],
     }
