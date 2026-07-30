@@ -100,6 +100,20 @@ h3{font-size:1.125rem}
 .filtro-dia input[type=date]{min-width:0}
 .filtros input{min-width:13.75rem}
 
+/* Barra de acciones en lote — aparece solo con selección activa (ver
+   actualizarBulkBar() en panel.html). Mismo tono que .filtros pero con borde
+   celeste: se distingue de la barra de filtros de arriba aunque comparta layout. */
+.bulkbar{display:flex;flex-wrap:wrap;gap:0.625rem;align-items:center;margin-bottom:1.125rem;
+  padding:0.75rem 1rem;background:#eaf7ff;border:1px solid #bfe4f5;border-radius:0.75rem}
+.bulkbar .info{font-size:0.875rem;color:var(--navy)}
+.bulkbar select,.bulkbar input[type=date],.bulkbar input[type=text]{
+  padding:0.5rem 0.6875rem;border:1px solid var(--border);border-radius:0.625rem;
+  font-size:0.8125rem;font-family:inherit;background:#fff}
+.bulkbar input[type=text]{min-width:11.25rem}
+.bulkbar-sep{width:1px;align-self:stretch;background:#bfe4f5;margin:0 0.125rem}
+.chk-fila,#chk-todos{width:1rem;height:1rem;cursor:pointer}
+#tabla th[data-col="check"],#tabla td:first-child{text-align:center}
+
 /* Tabla */
 .tabla-wrap{overflow-x:auto;border-radius:var(--radius)}
 table{width:100%;border-collapse:collapse;background:#fff;font-size:0.875rem}

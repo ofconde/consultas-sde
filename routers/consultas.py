@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 from db import engine, proximo_codigo, cuits_duplicados
 from auth import require_login, require_coordinador, puede_editar
-from models import GestionIn, ConsultaManualIn
+from models import GestionIn, ConsultaManualIn, BulkGestionIn, BulkAccionIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto, _parse_fecha
 from constantes import grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS
 import genero as genero_mod
@@ -201,6 +201,75 @@ def resumen(_=Depends(require_login)):
         "estados": estados_out,
         "sectores": [{"clave": r[0]} for r in sectores],
     }
+
+
+def _filas_permitidas(conn, usuario, ids):
+    """Trae {id: tecnico} de los ids pedidos y separa cuáles puede tocar este
+    usuario (misma regla que la edición fila por fila: coordinador todo, técnico
+    solo lo suyo o sin asignar). Devuelve (ids_permitidos, ids_omitidos) — un
+    técnico que selecciona casos de otro no rompe el lote entero, esas filas
+    simplemente se listan como omitidas para que el panel se lo muestre."""
+    filas = conn.execute(text("SELECT id, tecnico FROM sde_consultas WHERE id = ANY(:ids)"),
+                          {"ids": ids}).mappings().all()
+    encontrados = {r["id"]: r["tecnico"] for r in filas}
+    permitidos = [i for i, tec in encontrados.items() if puede_editar(usuario, tec)]
+    omitidos = [i for i in ids if i not in encontrados or i not in permitidos]
+    return permitidos, omitidos
+
+
+# IMPORTANTE: estas dos rutas van antes de "/{cid}" — si quedaran después,
+# "bulk" haría match del path pattern de {cid} (que es int) y fallaría con 422
+# en vez de llegar acá (mismo motivo por el que "/resumen" ya está antes).
+@router.patch("/bulk")
+def editar_gestion_bulk(body: BulkGestionIn, usuario=Depends(require_login)):
+    """Asigna técnico y/o estado a un lote de consultas de una sola vez — para
+    cuando entran varios casos parecidos juntos (ej. N consultas sin ARCA activo
+    que se descartan todas con el mismo estado) y cargarlos de a uno es ruido."""
+    campos = {}
+    if body.tecnico is not None:
+        campos["tecnico"] = body.tecnico
+    if body.estado is not None:
+        campos["estado"] = body.estado
+    if not campos:
+        raise HTTPException(422, "Nada para actualizar")
+    # Reasignar a otro técnico sigue siendo privilegio del coordinador — mismo
+    # criterio que editar_gestion(), acá aplicado a todo el lote de una vez
+    # (el valor de "tecnico" es el mismo para las N filas, no hay por-fila).
+    if usuario["rol"] != ROL_COORDINADOR and "tecnico" in campos:
+        if _norm(campos["tecnico"]) != _norm(usuario["nombre"]):
+            campos.pop("tecnico")
+    if not campos:
+        raise HTTPException(403, "Un técnico solo puede autoasignarse consultas")
+
+    with engine.begin() as conn:
+        aplicar_ids, omitidos = _filas_permitidas(conn, usuario, body.ids)
+        if aplicar_ids:
+            sets = ", ".join(f"{c} = :{c}" for c in campos)
+            conn.execute(text(f"""
+                UPDATE sde_consultas SET {sets}, updated_at = NOW() WHERE id = ANY(:ids)
+            """), {**campos, "ids": aplicar_ids})
+    log.info("Edición en lote: ids=%s campos=%s por=%s", aplicar_ids, list(campos), usuario["username"])
+    return {"ok": True, "aplicados": len(aplicar_ids), "omitidos": omitidos}
+
+
+@router.post("/bulk/acciones")
+def crear_accion_bulk(body: BulkAccionIn, usuario=Depends(require_login)):
+    """Carga la misma acción de seguimiento en un lote de consultas de una sola vez."""
+    if not body.accion or not body.accion.strip():
+        raise HTTPException(422, "La acción es obligatoria")
+    fecha = _parse_fecha(body.fecha)
+    detalle = (body.detalle or "").strip()
+    accion = body.accion.strip()
+    with engine.begin() as conn:
+        aplicar_ids, omitidos = _filas_permitidas(conn, usuario, body.ids)
+        for cid in aplicar_ids:
+            conn.execute(text("""
+                INSERT INTO sde_acciones (consulta_id, fecha, accion, detalle, creado_por)
+                VALUES (:cid, :fecha, :accion, :detalle, :por)
+            """), {"cid": cid, "fecha": fecha, "accion": accion,
+                   "detalle": detalle, "por": usuario["nombre"]})
+    log.info("Acción en lote: ids=%s accion=%s por=%s", aplicar_ids, accion, usuario["username"])
+    return {"ok": True, "aplicados": len(aplicar_ids), "omitidos": omitidos}
 
 
 @router.post("")

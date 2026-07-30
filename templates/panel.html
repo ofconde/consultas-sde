@@ -31,10 +31,26 @@
       <span class="muted" id="cont"></span>
     </div>
 
+    <div class="bulkbar" id="bulkbar" style="display:none">
+      <span class="info"><strong id="bulk-n">0</strong> seleccionada(s)</span>
+      <button class="btn sm" id="bulk-todas">Seleccionar todo lo filtrado (<span id="bulk-total-filtrado">0</span>)</button>
+      <span class="bulkbar-sep"></span>
+      <select id="bulk-tecnico"><option value="">Asignar a técnico…</option></select>
+      <button class="btn sm primary" id="bulk-asignar">Asignar</button>
+      <span class="bulkbar-sep"></span>
+      <select id="bulk-accion-tipo"><option value="">Tipo de acción…</option></select>
+      <input type="date" id="bulk-accion-fecha" title="Fecha de la acción (por defecto hoy)">
+      <input type="text" id="bulk-accion-detalle" placeholder="Detalle (opcional)">
+      <button class="btn sm primary" id="bulk-agregar-accion">Agregar acción a todas</button>
+      <span class="bulkbar-sep"></span>
+      <button class="btn sm" id="bulk-cancelar">Cancelar selección</button>
+    </div>
+
     <div class="tabla-wrap card">
       <div class="tabla-scroll">
         <table id="tabla" class="tabla-resizable">
           <colgroup>
+            <col data-col="check">
             <col data-col="recepcion"><col data-col="solicitante"><col data-col="localidad">
             <col data-col="sector"><col data-col="monto"><col data-col="linea">
             <col data-col="tecnico"><col data-col="estado"><col data-col="ultima_accion">
@@ -42,6 +58,7 @@
             {% if usuario.rol == 'coordinador' %}<col data-col="acciones">{% endif %}
           </colgroup>
           <thead><tr>
+            <th data-col="check"><input type="checkbox" id="chk-todos" title="Seleccionar todo en esta página"></th>
             <th data-col="recepcion">Recepción<span class="th-rz"></span></th>
             <th data-col="solicitante">Solicitante<span class="th-rz"></span></th>
             <th data-col="localidad">Localidad<span class="th-rz"></span></th>
@@ -70,7 +87,7 @@ const $ = s => document.querySelector(s);
 const ROL = "{{ usuario.rol }}";
 let TIMER = null;
 const PAGE_SIZE = 60;
-const state = { estado: '', mios: false, dups: false, sinAcciones: false, generoF: false, pagina: 1 };
+const state = { estado: '', mios: false, dups: false, sinAcciones: false, generoF: false, pagina: 1, seleccion: new Set() };
 let ROWS = [];
 let META = { grupo_color: {} };
 let CAT = {};
@@ -89,6 +106,7 @@ async function cargarCatalogos(){
   llenar($('#f-departamento'), CAT.DEPARTAMENTO||[], 'Todos los departamentos');
   llenar($('#f-linea'), CAT.LINEA||[], 'Todas las líneas');
   llenar($('#f-programa'), CAT.PROGRAMA||[], 'Todos los programas');
+  llenar($('#bulk-accion-tipo'), CAT.ACCION||[], 'Tipo de acción…');
   // ARCA sí se llena desde el catálogo: a diferencia de sector, estos valores son un
   // listado fijo (RESPONSABLE INSCRIPTO, MONOTRIBUTO A-K, etc.) y coinciden con los
   // que realmente están guardados — verificado contra la base, no supuesto.
@@ -200,6 +218,7 @@ async function cargarTecnicos(){
   const set = [...new Set([...usuarios, ...consultas.consultas.map(x=>x.tecnico).filter(Boolean)])].sort();
   const sel = $('#f-tecnico');
   set.forEach(v => sel.add(new Option(v, v)));
+  set.forEach(v => $('#bulk-tecnico').add(new Option(v, v)));
 }
 
 function badge(g, estado){ return `<span class="badge g-${g}">${escapeHtml(estado)||'—'}</span>`; }
@@ -265,6 +284,9 @@ async function cargarTabla(){
   const r = await fetch('/api/consultas?'+p); const d = await r.json();
   ROWS = d.consultas;
   state.pagina = 1;
+  // Un cambio de filtro puede sacar de la vista filas que estaban tildadas —
+  // se limpia la selección para no arrastrar ids que ya no se ven.
+  state.seleccion.clear();
   $('#cont').textContent = d.total + ' consulta' + (d.total===1?'':'s');
   renderPagina();
 }
@@ -288,6 +310,8 @@ function filaHTML(c, numeroFila){
     : '';
   return `
     <tr onclick="location.href='/consulta/${c.id}'">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="chk-fila" data-id="${c.id}"
+        ${state.seleccion.has(c.id)?'checked':''} onchange="toggleSeleccion(${c.id}, this.checked)"></td>
       <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">#${numeroFila}</div></td>
       <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>${
           c.genero_estimado==='F' ? '<span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : ''}
@@ -374,7 +398,94 @@ function renderPagina(){
   } else {
     pg.style.display = 'none';
   }
+  const chkTodos = $('#chk-todos');
+  chkTodos.checked = filasPagina.length > 0 && filasPagina.every(c => state.seleccion.has(c.id));
+  actualizarBulkBar();
 }
+
+// ── Selección en lote ────────────────────────────────────────────────────
+// Guarda ids (no filas) porque ROWS puede repaginarse; el Set sobrevive a
+// cambiar de página dentro del mismo filtro (se limpia solo al refiltrar,
+// en cargarTabla()) — así se puede tildar de a poco cruzando páginas.
+function toggleSeleccion(id, marcado){
+  if(marcado) state.seleccion.add(id); else state.seleccion.delete(id);
+  actualizarBulkBar();
+}
+
+function actualizarBulkBar(){
+  const n = state.seleccion.size;
+  $('#bulkbar').style.display = n > 0 ? 'flex' : 'none';
+  $('#bulk-n').textContent = n;
+  $('#bulk-total-filtrado').textContent = ROWS.length;
+}
+
+$('#chk-todos').addEventListener('change', () => {
+  const marcado = $('#chk-todos').checked;
+  const start = (state.pagina-1)*PAGE_SIZE;
+  ROWS.slice(start, start+PAGE_SIZE).forEach(c => {
+    if(marcado) state.seleccion.add(c.id); else state.seleccion.delete(c.id);
+  });
+  document.querySelectorAll('#tbody .chk-fila').forEach(chk => { chk.checked = marcado; });
+  actualizarBulkBar();
+});
+
+$('#bulk-todas').addEventListener('click', () => {
+  ROWS.forEach(c => state.seleccion.add(c.id));
+  document.querySelectorAll('#tbody .chk-fila').forEach(chk => { chk.checked = true; });
+  $('#chk-todos').checked = true;
+  actualizarBulkBar();
+});
+
+$('#bulk-cancelar').addEventListener('click', () => {
+  state.seleccion.clear();
+  document.querySelectorAll('#tbody .chk-fila').forEach(chk => { chk.checked = false; });
+  $('#chk-todos').checked = false;
+  actualizarBulkBar();
+});
+
+function avisoOmitidos(omitidos){
+  if(!omitidos || !omitidos.length) return '';
+  return `\n\n${omitidos.length} quedaron sin tocar (asignadas a otro técnico, o ya no existen).`;
+}
+
+$('#bulk-asignar').addEventListener('click', async () => {
+  const tecnico = $('#bulk-tecnico').value;
+  if(!tecnico){ alert('Elegí a qué técnico asignar.'); return; }
+  const ids = [...state.seleccion];
+  const btn = $('#bulk-asignar'); btn.disabled = true;
+  try{
+    const r = await fetch('/api/consultas/bulk', {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ids, tecnico }),
+    });
+    const d = await r.json();
+    if(!r.ok){ alert(d.detail || 'No se pudo asignar.'); return; }
+    alert(`${d.aplicados} consulta(s) asignada(s) a ${tecnico}.${avisoOmitidos(d.omitidos)}`);
+    state.seleccion.clear();
+    await cargarResumen(); await cargarTabla();
+  } finally { btn.disabled = false; }
+});
+
+$('#bulk-agregar-accion').addEventListener('click', async () => {
+  const accion = $('#bulk-accion-tipo').value;
+  if(!accion){ alert('Elegí el tipo de acción.'); return; }
+  const ids = [...state.seleccion];
+  const fecha = $('#bulk-accion-fecha').value;
+  const detalle = $('#bulk-accion-detalle').value;
+  const btn = $('#bulk-agregar-accion'); btn.disabled = true;
+  try{
+    const r = await fetch('/api/consultas/bulk/acciones', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ids, accion, fecha, detalle }),
+    });
+    const d = await r.json();
+    if(!r.ok){ alert(d.detail || 'No se pudo agregar la acción.'); return; }
+    alert(`Acción agregada a ${d.aplicados} consulta(s).${avisoOmitidos(d.omitidos)}`);
+    state.seleccion.clear();
+    $('#bulk-accion-detalle').value = '';
+    await cargarResumen(); await cargarTabla();
+  } finally { btn.disabled = false; }
+});
 
 $('#q').addEventListener('input', ()=>{clearTimeout(TIMER);TIMER=setTimeout(cargarTabla,250)});
 $('#f-tecnico').addEventListener('change', ()=>{ pintarKpis(); cargarTabla(); });
@@ -426,6 +537,7 @@ $('#btn-refrescar').addEventListener('click', async () => {
 // es lo que hace que el navegador respete el ancho de cada <col> en vez de
 // recalcularlo por contenido.
 const ANCHOS_COL_DEFECTO = {
+  check: 36,
   recepcion: 96, solicitante: 190, localidad: 110, sector: 100, monto: 100,
   linea: 150, tecnico: 120, estado: 120, ultima_accion: 160,
   arca: 130, bcra: 130, destino: 160, acciones: 90,
@@ -476,6 +588,7 @@ function iniciarRedimensionColumnas(){
 (async function(){
   aplicarAnchosColumnas();
   iniciarRedimensionColumnas();
+  $('#bulk-accion-fecha').value = hoyISO();
   await cargarMeta(); await cargarCatalogos(); await cargarTecnicos();
   await cargarResumen();
   // recién acá, con los <select> ya poblados, tiene sentido asignarles un value
