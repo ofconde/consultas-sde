@@ -34,6 +34,7 @@
     <div class="bulkbar" id="bulkbar" style="display:none">
       <span class="info"><strong id="bulk-n">0</strong> seleccionada(s)</span>
       <button class="btn sm" id="bulk-todas">Seleccionar todo lo filtrado (<span id="bulk-total-filtrado">0</span>)</button>
+      <button class="btn sm" id="bulk-copiar-mails">Copiar mails</button>
       <span class="bulkbar-sep"></span>
       <select id="bulk-tecnico"><option value="">Asignar a técnico…</option></select>
       <button class="btn sm primary" id="bulk-asignar">Asignar</button>
@@ -434,6 +435,17 @@ $('#bulk-todas').addEventListener('click', () => {
   document.querySelectorAll('#tbody .chk-fila').forEach(chk => { chk.checked = true; });
   $('#chk-todos').checked = true;
   actualizarBulkBar();
+});
+
+$('#bulk-copiar-mails').addEventListener('click', function(){
+  const mails = [...state.seleccion]
+    .map(id => ROWS.find(c => c.id === id))
+    .map(c => (c && c.mail || '').trim())
+    .filter(Boolean);
+  if(!mails.length){ alert('Ninguna de las consultas seleccionadas tiene mail cargado.'); return; }
+  copiar(mails.join('; '), this);
+  const faltantes = state.seleccion.size - mails.length;
+  if(faltantes > 0) setTimeout(() => alert(`Se copiaron ${mails.length} mail(s). ${faltantes} consulta(s) seleccionada(s) no tenían mail.`), 50);
 });
 
 $('#bulk-cancelar').addEventListener('click', () => {
