@@ -233,11 +233,15 @@ function resumenEjecutivo(d, cmp, gc, porGrupo){
   })() : '';
   frases.push(`Durante el período se recibieron <strong>${d.total} consulta${d.total===1?'':'s'}</strong>${variacion}, a un ritmo de ${d.promedio_diario.periodo} por día.`);
 
+  // La derivación a CFI Sede solo se menciona si hubo alguna — "0 ya fueron
+  // derivadas" es ruido, no un dato (y sede es un subconjunto de "activas", no
+  // algo aparte, así que decirlo con 0 al lado del % activo quedaba incongruente).
   const sede = porGrupo.EN_SEDE || 0;
   const inactivas = porGrupo.INACTIVAS || 0;
-  frases.push(`El <strong>${d.situacion.activas_pct}%</strong> está en gestión activa, ${sede} ya fueron derivadas a CFI Sede y ${inactivas} no prosperaron (no financiables o desisten).`);
+  const clauseSede = sede > 0 ? `, ${sede} ya derivadas a CFI Sede,` : ',';
+  frases.push(`El <strong>${d.situacion.activas_pct}%</strong> está en gestión activa${clauseSede} y ${inactivas} no prosperaron (no financiables o desisten).`);
 
-  frases.push(`El monto solicitado suma <strong>${escapeHtml(d.montos.total_fmt)}</strong>, con un promedio de ${escapeHtml(d.montos.promedio_fmt)} por consulta${d.montos.fuera_de_tope>0?` (${d.montos.fuera_de_tope} consulta(s) declaran un monto por encima del tope de línea y están pendientes de revisión)`:''}.`);
+  frases.push(`El promedio solicitado por consulta es de <strong>${escapeHtml(d.montos.promedio_fmt)}</strong>.`);
 
   const topSector = [...d.sectores].sort((a,b)=>b.n-a.n)[0];
   const topOrigen = [...d.origenes].sort((a,b)=>b.n-a.n)[0];
@@ -259,7 +263,7 @@ function resumenEjecutivo(d, cmp, gc, porGrupo){
   }
 
   const conLinea = d.total - (d.lineas.find(x=>x.clave===ESPERA)||{n:0}).n;
-  frases.push(`Al día de emisión, ${conLinea} de ${d.total} consultas (${Math.round(conLinea/d.total*100)}%) ya tienen línea de crédito asignada por la UEP.`);
+  frases.push(`Al día de emisión, ${conLinea} de ${d.total} consultas (${Math.round(conLinea/d.total*100)}%) ya tienen una posible línea de crédito asignada por la UEP.`);
 
   return frases.join(' ');
 }
