@@ -394,20 +394,11 @@ function render(d){
     ${barrasHorizontales(d.montos.tramos.filter(t=>t.n>0).map(t=>({clave:t.label, n:t.n})), '#1a9e57')}
   </div>`);
 
-  // 7 · Canal de difusión — 100% de cobertura, viene del formulario. Dice qué
-  // canal está trayendo las consultas, que es lo accionable para la Casa.
-  s.push(`<div class="sec">
-    <h2 class="sec-title">7 · Cómo llegaron las consultas</h2>
-    ${barrasHorizontales(d.origenes, '#00A7E1')}
-    <div class="sec-nota">Canal por el que el solicitante conoció la línea, declarado en el
-      formulario. Cubre el 100% de las consultas del período.</div>
-  </div>`);
-
-  // 8 · Líneas y programas — parcial, se aclara con el dato exacto de avance
+  // 7 · Líneas y programas — parcial, se aclara con el dato exacto de avance
   const pend = c => (c.find(x=>x.clave===ESPERA)||{n:0}).n;
   const pctHecho = n => d.total ? Math.round((d.total-n)/d.total*100) : 0;
   s.push(`<div class="sec">
-    <h2 class="sec-title">8 · Encuadre en líneas y programas</h2>
+    <h2 class="sec-title">7 · Encuadre en líneas y programas</h2>
     <div class="grid2">
       <div>${tablaBreakdown(d.lineas, 'Línea de crédito')}</div>
       <div>${tablaBreakdown(d.programas, 'Programa')}</div>
