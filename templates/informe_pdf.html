@@ -190,8 +190,14 @@ function barrasHorizontales(filas, color, maxFilas){
 
 // Variación vs. el período anterior de igual largo. Sin período anterior con qué
 // comparar (ej. "todo el histórico") no muestra nada, en vez de forzar un 0%.
+// Con una base muy chica (sistema recién arrancando) el % explota sin decir nada
+// real — ej. previo=1 y actual=145 da "14400% más", que no es una tendencia, es
+// ruido de arranque. Por debajo de BASE_MINIMA se omite en vez de mostrar un
+// número absurdo.
+const BASE_MINIMA_VARIACION = 10;
 function variacion(actual, previo){
   if(previo === 0) return actual > 0 ? '<span class="delta up">nuevo</span>' : '';
+  if(previo < BASE_MINIMA_VARIACION) return '';
   const pct = Math.round((actual - previo) / previo * 100);
   const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
   const flecha = pct > 0 ? '▲' : pct < 0 ? '▼' : '—';
@@ -216,8 +222,11 @@ function tablaBreakdown(filas, encabezado, maxFilas){
 function resumenEjecutivo(d, cmp, gc, porGrupo){
   const frases = [];
 
+  // Mismo piso que variacion() de arriba: con una base muy chica en el período
+  // anterior el % sale disparatado (sistema recién arrancando) y no aporta nada.
   const variacion = cmp.disponible ? (() => {
     if(cmp.total === 0) return d.total > 0 ? ', sin antecedente en el período anterior' : '';
+    if(cmp.total < BASE_MINIMA_VARIACION) return '';
     const pct = Math.round((d.total - cmp.total) / cmp.total * 100);
     if(pct === 0) return ', el mismo volumen que en el período anterior';
     return `, ${pct > 0 ? 'un ' + pct + '% más' : 'un ' + Math.abs(pct) + '% menos'} que en el período anterior`;
@@ -298,7 +307,7 @@ function render(d){
     <h2 class="sec-title">1 · Resumen general</h2>
     <div class="kpi-row">
       <div class="kpi c-navy"><div class="n">${d.total}</div><div class="l">Consultas recibidas</div>
-        <div class="sub">${d.promedio_diario.periodo} por día${cmp.disponible?' · '+variacion(d.total, cmp.total):''}</div></div>
+        <div class="sub">${d.promedio_diario.periodo} por día${(cmp.disponible && variacion(d.total, cmp.total))?' · '+variacion(d.total, cmp.total):''}</div></div>
       <div class="kpi c-green"><div class="n">${d.activas}</div><div class="l">En gestión activa</div>
         <div class="sub">${d.situacion.activas_pct}% del total</div></div>
       <div class="kpi c-blue"><div class="n">${porGrupo.EN_SEDE||0}</div><div class="l">Derivadas a CFI Sede</div>
