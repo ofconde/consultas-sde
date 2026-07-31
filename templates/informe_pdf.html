@@ -58,6 +58,14 @@
     <span class="dias" id="p-dias"></span>
   </div>
 
+  {# Síntesis en prosa para quien no va a leer las 8 secciones — un funcionario quiere el
+     mensaje completo en 30 segundos, no ir a buscarlo en tarjetas y tablas. Se arma en JS
+     con datos que /api/informe ya devuelve, sin pedir nada nuevo al backend. #}
+  <div class="doc-resumen-ejec">
+    <div class="sec-title" style="margin-bottom:6px">Resumen ejecutivo</div>
+    <p id="resumen-ejecutivo"></p>
+  </div>
+
   {# Va impresa: sin esta aclaración, quien lee el informe interpreta como "faltante"
      lo que en realidad es una etapa del circuito todavía en curso. #}
   <div class="doc-metodo">
@@ -201,6 +209,39 @@ function tablaBreakdown(filas, encabezado, maxFilas){
         <td class="money">${escapeHtml(f.monto_fmt)}</td></tr>`).join('')}</tbody></table>`;
 }
 
+// Síntesis en prosa para el lector que no va a abrir las 8 secciones. Cada frase
+// aporta un dato distinto (volumen+tendencia, situación, plata, de dónde viene la
+// demanda, avance del encuadre) — nada que no esté ya en el resto del documento,
+// solo puesto en palabras en vez de en tarjetas.
+function resumenEjecutivo(d, cmp, gc, porGrupo){
+  const frases = [];
+
+  const variacion = cmp.disponible ? (() => {
+    if(cmp.total === 0) return d.total > 0 ? ', sin antecedente en el período anterior' : '';
+    const pct = Math.round((d.total - cmp.total) / cmp.total * 100);
+    if(pct === 0) return ', el mismo volumen que en el período anterior';
+    return `, ${pct > 0 ? 'un ' + pct + '% más' : 'un ' + Math.abs(pct) + '% menos'} que en el período anterior`;
+  })() : '';
+  frases.push(`Durante el período se recibieron <strong>${d.total} consulta${d.total===1?'':'s'}</strong>${variacion}, a un ritmo de ${d.promedio_diario.periodo} por día.`);
+
+  const sede = porGrupo.EN_SEDE || 0;
+  const inactivas = porGrupo.INACTIVAS || 0;
+  frases.push(`El <strong>${d.situacion.activas_pct}%</strong> está en gestión activa, ${sede} ya fueron derivadas a CFI Sede y ${inactivas} no prosperaron (no financiables o desisten).`);
+
+  frases.push(`El monto solicitado suma <strong>${escapeHtml(d.montos.total_fmt)}</strong>, con una mediana de ${escapeHtml(d.montos.mediana_fmt)} por consulta${d.montos.fuera_de_tope>0?` (${d.montos.fuera_de_tope} consulta(s) declaran un monto por encima del tope de línea y están pendientes de revisión)`:''}.`);
+
+  const topSector = [...d.sectores].sort((a,b)=>b.n-a.n)[0];
+  const topOrigen = [...d.origenes].sort((a,b)=>b.n-a.n)[0];
+  if(topSector && topOrigen){
+    frases.push(`El sector <strong>${escapeHtml(topSector.clave)}</strong> concentra la mayor demanda (${Math.round(topSector.n/d.total*100)}%), y el principal canal de acceso fue <strong>${escapeHtml(topOrigen.clave.toLowerCase())}</strong> (${Math.round(topOrigen.n/d.total*100)}%).`);
+  }
+
+  const conLinea = d.total - (d.lineas.find(x=>x.clave===ESPERA)||{n:0}).n;
+  frases.push(`Al día de emisión, ${conLinea} de ${d.total} consultas (${Math.round(conLinea/d.total*100)}%) ya tienen línea de crédito asignada por la UEP.`);
+
+  return frases.join(' ');
+}
+
 /* ── Armado del documento ────────────────────────────────────────────────── */
 function render(d){
   const gc = META.grupo_color;
@@ -223,18 +264,23 @@ function render(d){
     : '';
 
   if(!d.total){
+    $('#resumen-ejecutivo').textContent = 'No se recibieron consultas en el período seleccionado.';
     $('#secciones').innerHTML = '<div class="vacio" style="padding:60px">No se recibieron consultas en el período seleccionado.</div>';
     return;
   }
 
+  // La comparación no tiene sentido para "todo el histórico": el "período anterior"
+  // caería antes de que existiera el sistema. Se apaga cuando el rango elegido
+  // coincide con el default (desde la primera consulta, hasta hoy). Se calcula acá
+  // (antes del resumen ejecutivo y de la sección 1) porque ambos la necesitan.
+  const esTodoHistorico = d.periodo.desde === PRIMERA && d.periodo.hasta === hoyISO();
+  const cmp = esTodoHistorico ? {disponible:false} : d.comparacion;
+
+  $('#resumen-ejecutivo').innerHTML = resumenEjecutivo(d, cmp, gc, porGrupo);
+
   const s = [];
 
   // 1 · Resumen general
-  // La comparación no tiene sentido para "todo el histórico": el "período anterior"
-  // caería antes de que existiera el sistema. Se apaga cuando el rango elegido
-  // coincide con el default (desde la primera consulta, hasta hoy).
-  const esTodoHistorico = d.periodo.desde === PRIMERA && d.periodo.hasta === hoyISO();
-  const cmp = esTodoHistorico ? {disponible:false} : d.comparacion;
   s.push(`<div class="sec">
     <h2 class="sec-title">1 · Resumen general</h2>
     <div class="kpi-row">

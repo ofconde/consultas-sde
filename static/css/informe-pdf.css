@@ -92,6 +92,15 @@ body{
 .doc-periodo .rango{font-weight:700;font-size:12.5px}
 .doc-periodo .dias{opacity:.75}
 
+/* Resumen ejecutivo — síntesis en prosa, primera cosa que lee un funcionario */
+.doc-resumen-ejec{
+  background:#f6f8fc;border:1px solid var(--border);border-radius:8px;
+  padding:13px 15px;margin-bottom:14px;break-inside:avoid;page-break-inside:avoid;
+}
+.doc-resumen-ejec .sec-title{border-bottom:none;padding-bottom:0;margin:0}
+.doc-resumen-ejec p{margin:0;font-size:10.5px;line-height:1.65;color:var(--text)}
+.doc-resumen-ejec p strong{color:var(--navy)}
+
 /* Nota metodológica — sí se imprime: aclara que los cortes de gestión son parciales */
 .doc-metodo{
   background:#f6f8fc;border:1px solid var(--border);border-left:3px solid var(--celeste);
