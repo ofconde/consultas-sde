@@ -11,6 +11,9 @@
       {% endif %}
     </nav>
     <div class="spacer"></div>
+    {# Acción, no navegación: abre el informe institucional en una pestaña aparte
+       para no perder el contexto de trabajo (ej. el panel con sus filtros puestos). #}
+    <a href="/informe/pdf" target="_blank" class="btn-informe" title="Informe institucional imprimible">Informe PDF</a>
     <div class="user">
       <span>{{ usuario.nombre }}</span>
       <span class="rol">{{ 'admin' if usuario.rol == 'coordinador' else usuario.rol }}</span>

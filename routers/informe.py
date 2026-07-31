@@ -1,12 +1,22 @@
-"""Informe de gestión (el de los viernes) — KPIs computados server-side."""
-from datetime import date
+"""Informe de gestión — KPIs computados server-side.
 
-from fastapi import APIRouter, Depends
+Alimenta dos consumidores con distinto recorte del mismo JSON:
+- `/informe` (pantalla de Estadísticas): lo llama sin parámetros y usa todo,
+  incluidas las secciones por técnico.
+- `/informe/pdf` (informe institucional imprimible): lo llama con `desde`/`hasta`
+  e ignora las secciones por técnico — es un informe de la demanda, no del equipo.
+
+Sin `desde`/`hasta` el endpoint se comporta exactamente como antes de que existiera
+el informe PDF: todo el histórico, y la serie diaria acotada a los últimos 90 días.
+"""
+from datetime import date, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 
 from db import engine, cuits_duplicados
 from auth import require_login
-from formatos import _monto, _dmy
+from formatos import _monto, _dmy, _parse_fecha
 from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS
 
 # "Situación de consultas" — desglose fino por estado (equivalente a la hoja
@@ -24,76 +34,153 @@ _SITUACION_MAP = {
                          "DERIVADO A MERCADO DE CAPITALES", "DERIVADO A OTRA PROVINCIA"},
 }
 
+# Tope de las líneas de crédito CFI. No se usa para filtrar montos (los importes
+# fuera de tope se corrigen a mano en la consulta), pero sí para contarlos y avisar:
+# el formulario público no valida el monto que declara el solicitante, y una carga
+# equivocada de más puede multiplicar el total del informe sin que se note.
+TOPE_LINEA = 500_000_000
 
-def _breakdown(conn, columna, etiqueta_vacia):
-    """Cantidad + monto solicitado agrupado por una columna, ordenado por cantidad."""
-    rows = conn.execute(text(f"""
-        SELECT COALESCE(NULLIF({columna}, ''), :vacia) AS clave,
-               COUNT(*) AS n, COALESCE(SUM(monto), 0) AS monto
-        FROM sde_consultas GROUP BY 1 ORDER BY n DESC
-    """), {"vacia": etiqueta_vacia}).mappings().all()
-    return [{"clave": r["clave"], "n": r["n"],
-             "monto": int(r["monto"]), "monto_fmt": _monto(r["monto"])} for r in rows]
+# Cortes del histograma de montos, alineados a los tramos reales de las líneas CFI.
+_TRAMOS_MONTO = [
+    ("Hasta $10 M",      None,         10_000_000),
+    ("$10 M a $50 M",    10_000_000,   50_000_000),
+    ("$50 M a $100 M",   50_000_000,   100_000_000),
+    ("$100 M a $500 M",  100_000_000,  500_000_000),
+    ("Más de $500 M",    500_000_000,  None),
+]
+
+# A partir de acá una serie diaria son barras de 1px ilegibles: se agrupa por semana.
+_DIAS_MAX_SERIE_DIARIA = 120
 
 router = APIRouter(prefix="/api/informe", tags=["informe"])
 
 
+def _condiciones_rango(desde, hasta, alias=""):
+    """Condiciones SQL para acotar por fecha de recepción. Lista vacía si no hay rango."""
+    p = f"{alias}." if alias else ""
+    cond = []
+    if desde:
+        cond.append(f"{p}fecha_recepcion::date >= :desde")
+    if hasta:
+        cond.append(f"{p}fecha_recepcion::date <= :hasta")
+    return cond
+
+
+def _where(*condiciones):
+    """Arma el WHERE a partir de condiciones sueltas, ignorando las vacías."""
+    partes = [c for c in condiciones if c]
+    return ("WHERE " + " AND ".join(partes)) if partes else ""
+
+
+def _breakdown(conn, columna, etiqueta_vacia, rango, params):
+    """Cantidad + monto solicitado agrupado por una columna, ordenado por cantidad."""
+    rows = conn.execute(text(f"""
+        SELECT COALESCE(NULLIF({columna}, ''), :vacia) AS clave,
+               COUNT(*) AS n, COALESCE(SUM(monto), 0) AS monto
+        FROM sde_consultas
+        {_where(*rango)}
+        GROUP BY 1 ORDER BY n DESC
+    """), {**params, "vacia": etiqueta_vacia}).mappings().all()
+    return [{"clave": r["clave"], "n": r["n"],
+             "monto": int(r["monto"]), "monto_fmt": _monto(r["monto"])} for r in rows]
+
+
 @router.get("")
-def informe(_=Depends(require_login)):
+def informe(desde: str = "", hasta: str = "", _=Depends(require_login)):
+    """KPIs del informe. `desde`/`hasta` (YYYY-MM-DD o DD-MM-YYYY) acotan por fecha
+    de recepción; sin ellos se toma todo el histórico."""
+    d = _parse_fecha(desde)
+    h = _parse_fecha(hasta)
+    if d and h and d > h:
+        raise HTTPException(422, "La fecha 'desde' es posterior a la fecha 'hasta'")
+
+    rango = _condiciones_rango(d, h)
+    rango_c = _condiciones_rango(d, h, alias="c")
+    params = {}
+    if d:
+        params["desde"] = d
+    if h:
+        params["hasta"] = h
+
     with engine.connect() as conn:
-        total = conn.execute(text("SELECT COUNT(*) FROM sde_consultas")).scalar() or 0
+        total = conn.execute(text(f"""
+            SELECT COUNT(*) FROM sde_consultas {_where(*rango)}
+        """), params).scalar() or 0
 
-        por_estado = conn.execute(text("""
+        por_estado = conn.execute(text(f"""
             SELECT COALESCE(estado, 'SIN ESTADO') AS estado, COUNT(*) AS n
-            FROM sde_consultas GROUP BY estado ORDER BY n DESC
-        """)).mappings().all()
+            FROM sde_consultas {_where(*rango)} GROUP BY estado ORDER BY n DESC
+        """), params).mappings().all()
 
-        por_tecnico = conn.execute(text("""
+        por_tecnico = conn.execute(text(f"""
             SELECT COALESCE(NULLIF(tecnico, ''), '— Sin asignar') AS tecnico, COUNT(*) AS n
-            FROM sde_consultas GROUP BY 1 ORDER BY n DESC
-        """)).mappings().all()
+            FROM sde_consultas {_where(*rango)} GROUP BY 1 ORDER BY n DESC
+        """), params).mappings().all()
 
-        sin_asignar = conn.execute(text("""
-            SELECT COUNT(*) FROM sde_consultas WHERE tecnico IS NULL OR tecnico = ''
-        """)).scalar() or 0
+        sin_asignar = conn.execute(text(f"""
+            SELECT COUNT(*) FROM sde_consultas
+            {_where("(tecnico IS NULL OR tecnico = '')", *rango)}
+        """), params).scalar() or 0
 
-        sin_acciones = conn.execute(text("""
+        sin_acciones = conn.execute(text(f"""
             SELECT COUNT(*) FROM sde_consultas c
-            WHERE NOT EXISTS (SELECT 1 FROM sde_acciones a WHERE a.consulta_id = c.id)
-        """)).scalar() or 0
+            {_where("NOT EXISTS (SELECT 1 FROM sde_acciones a WHERE a.consulta_id = c.id)", *rango_c)}
+        """), params).scalar() or 0
 
-        total_acciones = conn.execute(text("SELECT COUNT(*) FROM sde_acciones")).scalar() or 0
+        # Las acciones se acotan por la consulta a la que pertenecen, no por su propia
+        # fecha: el informe mide la actividad sobre las consultas del período.
+        total_acciones = conn.execute(text(f"""
+            SELECT COUNT(*) FROM sde_acciones a
+            WHERE EXISTS (SELECT 1 FROM sde_consultas c
+                          {_where("c.id = a.consulta_id", *rango_c)})
+        """), params).scalar() or 0
 
         # consultas involucradas en un CUIT duplicado
         dup_cuits = cuits_duplicados(conn)
         duplicados = 0
         if dup_cuits:
-            duplicados = conn.execute(text("""
-                SELECT COUNT(*) FROM sde_consultas WHERE cuit = ANY(:dcuits)
-            """), {"dcuits": list(dup_cuits)}).scalar() or 0
+            duplicados = conn.execute(text(f"""
+                SELECT COUNT(*) FROM sde_consultas
+                {_where("cuit = ANY(:dcuits)", *rango)}
+            """), {**params, "dcuits": list(dup_cuits)}).scalar() or 0
 
-        # montos solicitados
-        m = conn.execute(text("""
+        # montos solicitados. La mediana va además del promedio porque es el
+        # estadístico honesto acá: una sola carga alta corre el promedio de lugar.
+        m = conn.execute(text(f"""
             SELECT COALESCE(SUM(monto),0) total, COALESCE(ROUND(AVG(monto)),0) prom,
-                   COALESCE(MAX(monto),0) maximo, COUNT(monto) con_monto
-            FROM sde_consultas
-        """)).mappings().first()
+                   COALESCE(MAX(monto),0) maximo, COUNT(monto) con_monto,
+                   COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY monto),0) mediana,
+                   COUNT(*) FILTER (WHERE monto > {TOPE_LINEA}) fuera_de_tope
+            FROM sde_consultas {_where(*rango)}
+        """), params).mappings().first()
+
+        filtros_tramo = ", ".join(
+            f"COUNT(*) FILTER (WHERE {' AND '.join(filter(None, [f'monto > {lo}' if lo else None, f'monto <= {hi}' if hi else None]))}) AS t{i}"
+            for i, (_lbl, lo, hi) in enumerate(_TRAMOS_MONTO)
+        )
+        tr = conn.execute(text(f"""
+            SELECT {filtros_tramo} FROM sde_consultas
+            {_where("monto IS NOT NULL", *rango)}
+        """), params).mappings().first()
 
         # breakdowns por sector / línea / programa (de la pestaña INFORME del Excel)
-        por_sector = _breakdown(conn, "sector", "(sin sector)")
-        por_linea = _breakdown(conn, "linea", "(sin línea)")
-        por_programa = _breakdown(conn, "programa", "(sin programa)")
+        por_sector = _breakdown(conn, "sector", "(sin sector)", rango, params)
+        por_linea = _breakdown(conn, "linea", "(sin línea)", rango, params)
+        por_programa = _breakdown(conn, "programa", "(sin programa)", rango, params)
         # situación ARCA: gestión confirmada por el técnico si existe, si no lo que
         # declaró el solicitante — mismo criterio que se muestra en el panel.
         por_arca = _breakdown(conn, "COALESCE(NULLIF(arca_confirmado, ''), situacion_arca)",
-                               "(sin dato)")
+                               "(sin dato)", rango, params)
+        por_departamento = _breakdown(conn, "departamento", "(sin departamento)", rango, params)
+        por_origen = _breakdown(conn, "como_se_entero", "(sin dato)", rango, params)
 
         primera_fecha = conn.execute(text(
             "SELECT MIN(fecha_recepcion)::date FROM sde_consultas WHERE fecha_recepcion IS NOT NULL"
         )).scalar()
 
-        # movimiento de la semana (últimos 7 días)
-        # nuevas = por fecha de recepción (cuándo llegó la consulta), no por fecha de carga
+        # movimiento de la semana (últimos 7 días). Relativo a NOW(), así que no
+        # acompaña el rango elegido: lo usa la pantalla de Estadísticas, el informe
+        # PDF muestra en su lugar el promedio diario del período.
         nuevas_semana = conn.execute(text("""
             SELECT COUNT(*) FROM sde_consultas
             WHERE fecha_recepcion >= NOW() - INTERVAL '7 days'
@@ -103,30 +190,48 @@ def informe(_=Depends(require_login)):
             WHERE created_at >= NOW() - INTERVAL '7 days'
         """)).scalar() or 0
 
-        # consultas por día, últimos 90 días. Se rellenan con generate_series los días
-        # sin consultas: si se devolvieran solo los días con datos, el gráfico
-        # comprimiría los huecos y un fin de semana muerto se vería como actividad.
-        por_dia = conn.execute(text("""
-            SELECT d::date AS dia, COUNT(c.id) AS n
-            FROM generate_series(CURRENT_DATE - INTERVAL '89 days', CURRENT_DATE, '1 day') d
-            LEFT JOIN sde_consultas c ON c.fecha_recepcion::date = d::date
-            GROUP BY 1 ORDER BY 1
-        """)).mappings().all()
+        # Serie temporal. Se rellenan con generate_series los períodos sin consultas:
+        # si se devolvieran solo los que tienen datos, el gráfico comprimiría los
+        # huecos y un fin de semana muerto se vería como actividad.
+        serie_desde = d or (date.today() - timedelta(days=89))
+        serie_hasta = h or date.today()
+        dias_serie = (serie_hasta - serie_desde).days + 1
+        granularidad = "semana" if dias_serie > _DIAS_MAX_SERIE_DIARIA else "dia"
+        p_serie = {"sdesde": serie_desde, "shasta": serie_hasta}
+        # CAST(:x AS date) y no :x::date — SQLAlchemy no sabe parsear un bindparam
+        # pegado al operador :: de Postgres y lo toma como parte del nombre.
+        if granularidad == "dia":
+            por_dia = conn.execute(text("""
+                SELECT d::date AS dia, COUNT(c.id) AS n
+                FROM generate_series(CAST(:sdesde AS date), CAST(:shasta AS date), '1 day') d
+                LEFT JOIN sde_consultas c ON c.fecha_recepcion::date = d::date
+                GROUP BY 1 ORDER BY 1
+            """), p_serie).mappings().all()
+        else:
+            por_dia = conn.execute(text("""
+                SELECT d::date AS dia, COUNT(c.id) AS n
+                FROM generate_series(date_trunc('week', CAST(:sdesde AS date)),
+                                     CAST(:shasta AS date), '7 days') d
+                LEFT JOIN sde_consultas c
+                  ON date_trunc('week', c.fecha_recepcion)::date = d::date
+                 AND c.fecha_recepcion::date BETWEEN CAST(:sdesde AS date) AND CAST(:shasta AS date)
+                GROUP BY 1 ORDER BY 1
+            """), p_serie).mappings().all()
 
         # backlog de "consulta inicial" (sin trabajar todavía) por técnico
-        inicial_por_tecnico = conn.execute(text("""
+        inicial_por_tecnico = conn.execute(text(f"""
             SELECT COALESCE(NULLIF(tecnico, ''), '— Sin asignar') AS tecnico, COUNT(*) AS n
-            FROM sde_consultas WHERE estado = 'CONSULTA INICIAL'
+            FROM sde_consultas {_where("estado = 'CONSULTA INICIAL'", *rango)}
             GROUP BY 1 ORDER BY n DESC
-        """)).mappings().all()
+        """), params).mappings().all()
 
         # consultas sin ninguna acción cargada, por técnico (a quién pertenecen)
-        sin_acciones_por_tecnico = conn.execute(text("""
+        sin_acciones_por_tecnico = conn.execute(text(f"""
             SELECT COALESCE(NULLIF(c.tecnico, ''), '— Sin asignar') AS tecnico, COUNT(*) AS n
             FROM sde_consultas c
-            WHERE NOT EXISTS (SELECT 1 FROM sde_acciones a WHERE a.consulta_id = c.id)
+            {_where("NOT EXISTS (SELECT 1 FROM sde_acciones a WHERE a.consulta_id = c.id)", *rango_c)}
             GROUP BY 1 ORDER BY n DESC
-        """)).mappings().all()
+        """), params).mappings().all()
 
     # agrupar estados en grupos
     grupos_cnt = {g[0]: 0 for g in GRUPOS}
@@ -147,6 +252,8 @@ def informe(_=Depends(require_login)):
         "ultimos_30": round(n_ultimos_30 / 30, 1),
         "ultimos_7": round(n_ultimos_7 / 7, 1),
         "dias_historico": dias_historico,
+        # el único que sigue el rango elegido — es el que muestra el informe PDF
+        "periodo": round(total / max(1, dias_serie), 1),
     }
 
     activas = sum(v for k, v in grupos_cnt.items() if k in GRUPOS_ACTIVOS)
@@ -176,14 +283,29 @@ def informe(_=Depends(require_login)):
         "montos": {
             "total": int(m["total"]), "total_fmt": _monto(m["total"]),
             "promedio_fmt": _monto(m["prom"]), "maximo_fmt": _monto(m["maximo"]),
+            "mediana": int(m["mediana"]), "mediana_fmt": _monto(m["mediana"]),
             "con_monto": m["con_monto"],
+            "fuera_de_tope": m["fuera_de_tope"],
+            "tope_linea_fmt": _monto(TOPE_LINEA),
+            "tramos": [{"label": lbl, "n": tr[f"t{i}"]}
+                       for i, (lbl, _lo, _hi) in enumerate(_TRAMOS_MONTO)],
         },
         "sectores": por_sector,
         "lineas": por_linea,
         "programas": por_programa,
         "situacion_arca": por_arca,
+        "departamentos": por_departamento,
+        "origenes": por_origen,
         "promedio_diario": promedio_diario,
         "situacion": situacion,
+        "periodo": {
+            "desde": serie_desde.isoformat(), "hasta": serie_hasta.isoformat(),
+            "desde_fmt": _dmy(serie_desde), "hasta_fmt": _dmy(serie_hasta),
+            "dias": dias_serie,
+            "acotado": bool(d or h),
+            "primera_consulta": primera_fecha.isoformat() if primera_fecha else None,
+        },
+        "granularidad": granularidad,
         "por_dia": [{"dia": r["dia"].isoformat(), "dia_fmt": _dmy(r["dia"]), "n": r["n"]}
                     for r in por_dia],
         "inicial_por_tecnico": [{"tecnico": r["tecnico"], "n": r["n"]} for r in inicial_por_tecnico],

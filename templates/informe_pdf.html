@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="es">
+{# Documento imprimible. NO extiende base.html a propósito: base trae panel.css con
+   html{font-size:61.2%} y el topbar, que acá habría que pelear con overrides. Al no
+   haber nada que ocultar, el bug de "hoja en blanco en Safari" no puede ocurrir. #}
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/img/favicon.png">
+<title>Informe de consultas · Consultas SDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Raleway:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/informe-pdf.css">
+<script src="/static/js/util.js"></script>
+</head>
+<body>
+
+<div class="toolbar">
+  <img class="tl-logo" src="/static/img/logo-cfi.png" alt="CFI">
+  <span class="tl-tit">Informe de consultas</span>
+  <label for="f-desde">Desde</label>
+  <input type="date" id="f-desde">
+  <label for="f-hasta">Hasta</label>
+  <input type="date" id="f-hasta">
+  <button class="tbtn" id="btn-aplicar">Aplicar</button>
+  <button class="tbtn" id="btn-todo" title="Volver al histórico completo">Todo el histórico</button>
+  <span class="spacer"></span>
+  <button class="tbtn primary" id="btn-imprimir">Imprimir / Guardar PDF</button>
+</div>
+
+<div id="aviso"></div>
+
+<div id="doc">
+  <div class="doc-head">
+    <img class="doc-escudo" src="/static/img/escudo-sde.svg" alt="Escudo de la Provincia de Santiago del Estero">
+    <div class="doc-head-txt">
+      <div class="doc-gob">Gobierno de la Provincia<br>de Santiago del Estero</div>
+      <h1 class="doc-titulo brand-font">Informe de consultas de financiamiento</h1>
+      <div class="doc-sub">Unidad de Enlace Provincial — Santiago del Estero</div>
+    </div>
+    <div class="doc-cfi">
+      <img src="/static/img/logo-cfi.png" alt="Consejo Federal de Inversiones">
+      <div class="emitido" id="emitido"></div>
+    </div>
+  </div>
+
+  <div class="doc-periodo">
+    <span>Período del informe</span>
+    <span class="rango" id="p-rango">—</span>
+    <span class="dias" id="p-dias"></span>
+  </div>
+
+  <div id="secciones"></div>
+
+  <div class="doc-foot">
+    <span>Consejo Federal de Inversiones · UEP Santiago del Estero</span>
+    <span id="foot-emitido"></span>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let META = { grupo_color: {} };
+
+/* ── Gráficos ─────────────────────────────────────────────────────────────
+   SVG dibujado a mano, sin librerías (el proyecto no tiene dependencias de
+   frontend, y para papel el vector es lo correcto: escala sin pixelarse).
+
+   A diferencia de dibujarGrafico() de informe.html, acá el viewBox es FIJO y no
+   se mide clientWidth: en impresión no hay garantía de que un listener de resize
+   dispare antes del render, así que un gráfico que depende del ancho medido
+   puede salir con la geometría de pantalla. Con viewBox fijo + width:100% el
+   navegador escala el vector al ancho de la hoja, sin recalcular nada. */
+
+// Escalones redondos para el eje Y — mismo criterio que la pantalla de Estadísticas.
+function ticksLindos(max){
+  const pasos = [1,2,5,10,20,25,50,100,200,500,1000];
+  for(const p of pasos){ if(max/p <= 5) return {paso:p, tope:Math.ceil(max/p)*p || p}; }
+  const p = Math.ceil(max/5/1000)*1000;
+  return {paso:p, tope:p*5};
+}
+
+function graficoBarras(datos, color){
+  if(!datos.length) return '<div class="vacio">Sin datos en el período.</div>';
+  const W=900, H=250, ML=38, MR=10, MT=12, MB=34;
+  const iw=W-ML-MR, ih=H-MT-MB;
+  const max=Math.max(1,...datos.map(d=>d.n));
+  const {paso,tope}=ticksLindos(max);
+  const banda=iw/datos.length;
+  const bw=Math.max(1.5, Math.min(26, banda*0.72));
+  const y=v=>MT+ih-(v/tope)*ih;
+
+  let g='';
+  for(let v=0; v<=tope; v+=paso){
+    g+=`<line x1="${ML}" y1="${y(v)}" x2="${W-MR}" y2="${y(v)}" stroke="#e6eaf2" stroke-width="1"/>`
+      +`<text x="${ML-7}" y="${y(v)+3.5}" text-anchor="end" font-size="10" fill="#8891a8">${v}</text>`;
+  }
+  const barras=datos.map((d,i)=>{
+    if(!d.n) return '';
+    const x=ML+banda*i+(banda-bw)/2, alto=Math.max(1.5, MT+ih-y(d.n));
+    const r=Math.min(2.5, bw/2);
+    return `<path d="M${x},${MT+ih} L${x},${y(d.n)+r} Q${x},${y(d.n)} ${x+r},${y(d.n)} `
+         + `L${x+bw-r},${y(d.n)} Q${x+bw},${y(d.n)} ${x+bw},${y(d.n)+r} L${x+bw},${MT+ih} Z" fill="${color}"/>`;
+  }).join('');
+
+  // ~9 etiquetas de fecha como máximo, siempre incluyendo la última
+  const cada=Math.max(1, Math.ceil(datos.length/9));
+  const ejeX=datos.map((d,i)=>{
+    const ultima = i===datos.length-1;
+    if(i%cada!==0 && !ultima) return '';
+    if(ultima && (datos.length-1)%cada!==0 && (datos.length-1)%cada < cada*0.4) return '';
+    const x=ML+banda*i+banda/2;
+    return `<text x="${x}" y="${H-12}" text-anchor="middle" font-size="9.5" fill="#8891a8">${d.dia_fmt.slice(0,5)}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img">
+    ${g}<line x1="${ML}" y1="${MT+ih}" x2="${W-MR}" y2="${MT+ih}" stroke="#c7d0e0" stroke-width="1"/>
+    ${barras}${ejeX}</svg>`;
+}
+
+function graficoDonut(segmentos){
+  const total=segmentos.reduce((a,s)=>a+s.n,0);
+  if(!total) return '<div class="vacio">Sin datos en el período.</div>';
+  const R=42, C=2*Math.PI*R;
+  let acc=0;
+  const arcos=segmentos.filter(s=>s.n>0).map(s=>{
+    const len=(s.n/total)*C;
+    const el=`<circle cx="50" cy="50" r="${R}" fill="none" stroke="${s.color}" stroke-width="14"
+      stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-acc).toFixed(2)}"/>`;
+    acc+=len;
+    return el;
+  }).join('');
+  return `<svg viewBox="0 0 100 100" role="img">
+    <g transform="rotate(-90 50 50)">
+      <circle cx="50" cy="50" r="${R}" fill="none" stroke="#eef1f7" stroke-width="14"/>
+      ${arcos}
+    </g>
+    <text x="50" y="48" text-anchor="middle" font-size="15" font-weight="800" fill="#1C2443">${total}</text>
+    <text x="50" y="60" text-anchor="middle" font-size="6.5" fill="#6b7590">CONSULTAS</text>
+  </svg>`;
+}
+
+// Barras horizontales con divs: más simple que SVG y ya probado en impresión.
+function barrasHorizontales(filas, color, maxFilas){
+  if(!filas.length) return '<div class="vacio">Sin datos en el período.</div>';
+  let datos=filas;
+  if(maxFilas && filas.length>maxFilas){
+    const resto=filas.slice(maxFilas).reduce((a,f)=>a+f.n,0);
+    datos=filas.slice(0,maxFilas);
+    if(resto) datos=datos.concat([{clave:`Otros (${filas.length-maxFilas})`, n:resto}]);
+  }
+  const total=filas.reduce((a,f)=>a+f.n,0);
+  const max=Math.max(1,...datos.map(f=>f.n));
+  return '<div class="bars">'+datos.map(f=>`
+    <div class="bar-row">
+      <span class="bar-lbl" title="${escapeHtml(f.clave)}">${escapeHtml(f.clave)}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${Math.round(f.n/max*100)}%;background:${color}"></span></span>
+      <span class="bar-val"><b>${f.n}</b> <span>${total?Math.round(f.n/total*100):0}%</span></span>
+    </div>`).join('')+'</div>';
+}
+
+function tablaBreakdown(filas, encabezado, maxFilas){
+  if(!filas.length) return '<div class="vacio">Sin datos en el período.</div>';
+  const datos = maxFilas ? filas.slice(0, maxFilas) : filas;
+  return `<table><thead><tr>
+      <th>${escapeHtml(encabezado)}</th><th style="text-align:right">Consultas</th><th style="text-align:right">Monto solicitado</th>
+    </tr></thead><tbody>${datos.map(f=>`
+      <tr><td>${escapeHtml(f.clave)}</td>
+        <td class="num">${f.n}</td>
+        <td class="money">${escapeHtml(f.monto_fmt)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+/* ── Armado del documento ────────────────────────────────────────────────── */
+function render(d){
+  const gc = META.grupo_color;
+  const porGrupo = Object.fromEntries(d.grupos.map(g=>[g.clave,g.n]));
+
+  $('#p-rango').textContent = `${d.periodo.desde_fmt} al ${d.periodo.hasta_fmt}`;
+  $('#p-dias').textContent = `${d.periodo.dias} día${d.periodo.dias===1?'':'s'}`;
+
+  // Aviso de montos fuera de tope — fuera de #doc, así que nunca se imprime.
+  $('#aviso').innerHTML = d.montos.fuera_de_tope > 0
+    ? `<div class="aviso"><strong>Revisar antes de publicar:</strong>
+        ${d.montos.fuera_de_tope} consulta(s) del período declaran un monto mayor al tope de
+        ${escapeHtml(d.montos.tope_linea_fmt)} de las líneas CFI. Una carga equivocada de más
+        infla el total del informe. El formulario público no valida ese campo.</div>`
+    : '';
+
+  if(!d.total){
+    $('#secciones').innerHTML = '<div class="vacio" style="padding:60px">No se recibieron consultas en el período seleccionado.</div>';
+    return;
+  }
+
+  const s = [];
+
+  // 1 · Resumen general
+  s.push(`<div class="sec">
+    <h2 class="sec-title">1 · Resumen general</h2>
+    <div class="kpi-row">
+      <div class="kpi c-navy"><div class="n">${d.total}</div><div class="l">Consultas recibidas</div>
+        <div class="sub">${d.promedio_diario.periodo} por día</div></div>
+      <div class="kpi c-green"><div class="n">${d.activas}</div><div class="l">En gestión activa</div>
+        <div class="sub">${d.situacion.activas_pct}% del total</div></div>
+      <div class="kpi c-blue"><div class="n">${porGrupo.EN_SEDE||0}</div><div class="l">Derivadas a CFI Sede</div>
+        <div class="sub">ingresadas al circuito</div></div>
+      <div class="kpi c-gray"><div class="n">${porGrupo.INACTIVAS||0}</div><div class="l">No prosperaron</div>
+        <div class="sub">no financiables, desisten o repetidas</div></div>
+    </div>
+  </div>`);
+
+  // 2 · Evolución
+  const unidad = d.granularidad==='semana' ? 'semana' : 'día';
+  s.push(`<div class="sec">
+    <h2 class="sec-title">2 · Evolución de las consultas recibidas</h2>
+    <div class="grafico">${graficoBarras(d.por_dia, '#00A7E1')}
+      <div class="g-resumen">Consultas por ${unidad} · ${d.total} en ${d.periodo.dias} días
+        · promedio de ${d.promedio_diario.periodo} por día</div></div>
+  </div>`);
+
+  // 3 · Situación
+  const segs = d.grupos.map(g=>({...g, color: gc[g.clave]||'#8891a8'}));
+  s.push(`<div class="sec">
+    <h2 class="sec-title">3 · Situación de las consultas</h2>
+    <div class="donut-wrap">
+      ${graficoDonut(segs)}
+      <div class="donut-leg">${segs.map(g=>`
+        <div class="leg-row">
+          <span class="leg-dot" style="background:${g.color}"></span>
+          <span class="leg-lbl">${escapeHtml(g.label)}</span>
+          <span class="leg-n">${g.n}</span>
+          <span class="leg-pct">${d.total?Math.round(g.n/d.total*100):0}%</span>
+        </div>`).join('')}</div>
+    </div>
+    <div style="margin-top:11px">
+      <table><thead><tr><th>Estado</th><th style="text-align:right">Consultas</th><th style="text-align:right">%</th></tr></thead>
+      <tbody>${d.estados.map(e=>`
+        <tr><td><span class="t-grupo" style="background:${gc[e.grupo]||'#8891a8'}"></span>${escapeHtml(e.estado)}</td>
+          <td class="num">${e.n}</td>
+          <td class="money">${d.total?Math.round(e.n/d.total*100):0}%</td></tr>`).join('')}</tbody></table>
+    </div>
+  </div>`);
+
+  // 4 · Sector
+  s.push(`<div class="sec">
+    <h2 class="sec-title">4 · Perfil económico de la demanda</h2>
+    ${barrasHorizontales(d.sectores, '#6c4bd0')}
+    <div class="sec-nota">Sector de actividad declarado por el solicitante en el formulario.</div>
+  </div>`);
+
+  // 5 · ARCA
+  s.push(`<div class="sec">
+    <h2 class="sec-title">5 · Condición fiscal de los solicitantes</h2>
+    ${barrasHorizontales(d.situacion_arca, '#2f6fd0', 8)}
+    <div class="sec-nota">Situación ante ARCA confirmada por el equipo técnico; si no fue verificada, la declarada por el solicitante.</div>
+  </div>`);
+
+  // 6 · Montos
+  s.push(`<div class="sec">
+    <h2 class="sec-title">6 · Montos solicitados</h2>
+    <div class="kpi-row k3" style="margin-bottom:11px">
+      <div class="kpi c-green"><div class="n" style="font-size:17px">${escapeHtml(d.montos.total_fmt)}</div>
+        <div class="l">Total solicitado</div><div class="sub">${d.montos.con_monto} consultas con monto</div></div>
+      <div class="kpi c-navy"><div class="n" style="font-size:17px">${escapeHtml(d.montos.mediana_fmt)}</div>
+        <div class="l">Monto mediano</div><div class="sub">la mitad pide menos que esto</div></div>
+      <div class="kpi c-amber"><div class="n" style="font-size:17px">${escapeHtml(d.montos.maximo_fmt)}</div>
+        <div class="l">Monto máximo</div><div class="sub">consulta individual más alta</div></div>
+    </div>
+    ${barrasHorizontales(d.montos.tramos.map(t=>({clave:t.label, n:t.n})), '#1a9e57')}
+    <div class="sec-nota">Se informa la mediana y no el promedio: una sola solicitud de monto alto
+      desplaza el promedio y deja de representar lo que pide la mayoría.</div>
+  </div>`);
+
+  // 7 · Líneas y programas
+  s.push(`<div class="sec">
+    <h2 class="sec-title">7 · Encuadre en líneas y programas</h2>
+    <div class="grid2">
+      <div>${tablaBreakdown(d.lineas, 'Línea de crédito')}</div>
+      <div>${tablaBreakdown(d.programas, 'Programa')}</div>
+    </div>
+    <div class="sec-nota">El encuadre se confirma durante la gestión: las consultas sin línea o programa
+      asignado son las que todavía no completaron esa instancia.</div>
+  </div>`);
+
+  // 8 · Territorio
+  const conDepto = d.departamentos.filter(x=>!x.clave.startsWith('(sin'));
+  const sinDepto = (d.departamentos.find(x=>x.clave.startsWith('(sin'))||{n:0}).n;
+  s.push(`<div class="sec">
+    <h2 class="sec-title">8 · Alcance territorial</h2>
+    ${conDepto.length
+      ? tablaBreakdown(conDepto, 'Departamento', 12)
+      : '<div class="vacio">Todavía no hay departamentos confirmados en el período.</div>'}
+    <div class="sec-nota">El departamento se confirma durante la gestión de cada consulta.
+      En este período ${sinDepto} de ${d.total} consultas (${d.total?Math.round(sinDepto/d.total*100):0}%)
+      aún no lo tienen cargado, por lo que la distribución territorial es parcial.</div>
+  </div>`);
+
+  $('#secciones').innerHTML = s.join('');
+}
+
+/* ── Rango y carga ───────────────────────────────────────────────────────── */
+const PRIMERA = "{{ primera_consulta }}";
+
+function rangoDeURL(){
+  const p = new URLSearchParams(location.search);
+  return { desde: p.get('desde') || PRIMERA || '', hasta: p.get('hasta') || hoyISO() };
+}
+
+async function cargar(){
+  const desde = $('#f-desde').value, hasta = $('#f-hasta').value;
+  if(desde && hasta && desde > hasta){ alert('La fecha "desde" no puede ser posterior a "hasta".'); return; }
+  const p = new URLSearchParams();
+  if(desde) p.set('desde', desde);
+  if(hasta) p.set('hasta', hasta);
+  // el rango queda en la URL: el informe se puede recargar y compartir tal cual
+  history.replaceState(null, '', location.pathname + (p.toString() ? '?'+p : ''));
+  const r = await fetch('/api/informe?'+p);
+  if(!r.ok){
+    const e = await r.json().catch(()=>({}));
+    alert(e.detail || 'No se pudo generar el informe.');
+    return;
+  }
+  render(await r.json());
+}
+
+$('#btn-aplicar').addEventListener('click', cargar);
+$('#btn-imprimir').addEventListener('click', () => window.print());
+$('#btn-todo').addEventListener('click', () => {
+  $('#f-desde').value = PRIMERA; $('#f-hasta').value = hoyISO(); cargar();
+});
+[$('#f-desde'), $('#f-hasta')].forEach(el =>
+  el.addEventListener('keydown', e => { if(e.key === 'Enter') cargar(); }));
+
+(async function(){
+  // hoyISO() da YYYY-MM-DD con cero a la izquierda; darlo vuelta garantiza el
+  // DD-MM-YYYY del proyecto. toLocaleDateString('es-AR') devuelve "30/7/2026",
+  // sin padding en el mes.
+  const [a,me,di] = hoyISO().split('-');
+  const emitido = `Emitido el ${di}-${me}-${a}`;
+  $('#emitido').textContent = emitido;
+  $('#foot-emitido').textContent = emitido;
+  const r = rangoDeURL();
+  $('#f-desde').value = r.desde;
+  $('#f-hasta').value = r.hasta;
+  META = await (await fetch('/api/catalogos/estado-grupo')).json();
+  await cargar();
+})();
+</script>
+</body>
+</html>

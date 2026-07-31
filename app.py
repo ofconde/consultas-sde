@@ -9,7 +9,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from db import init_db
+from sqlalchemy import text
+
+from db import init_db, engine
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
                   SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
 from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra
@@ -122,6 +124,24 @@ def informe_page(request: Request):
     if not u:
         return RedirectResponse("/login")
     return templates.TemplateResponse("informe.html", {"request": request, "usuario": u, "activo": "informe"})
+
+
+@app.get("/informe/pdf", response_class=HTMLResponse)
+def informe_pdf_page(request: Request):
+    """Informe institucional imprimible. La fecha de la consulta más antigua va
+    server-side para que la página abra ya mostrando todo el histórico, sin un
+    primer pedido a ciegas solo para averiguar dónde empieza el rango."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    with engine.connect() as conn:
+        primera = conn.execute(text(
+            "SELECT MIN(fecha_recepcion)::date FROM sde_consultas WHERE fecha_recepcion IS NOT NULL"
+        )).scalar()
+    return templates.TemplateResponse("informe_pdf.html", {
+        "request": request, "usuario": u,
+        "primera_consulta": primera.isoformat() if primera else "",
+    })
 
 
 @app.get("/admin", response_class=HTMLResponse)

@@ -1,0 +1,186 @@
+/* Informe institucional imprimible — Consultas SDE.
+   Hoja aparte de panel.css a propósito: este documento no extiende base.html, así
+   que no hereda el html{font-size:61.2%} de la app ni el topbar. Un documento
+   paginado tiene necesidades distintas de una pantalla operativa. */
+
+:root{
+  --navy:#1C2443; --celeste:#00A7E1; --lightblue:#D6E6ED;
+  --bg:#eef1f6; --card:#fff; --border:#dfe4ee; --text:#1f2740; --muted:#6b7590;
+  --green:#1a9e57; --amber:#d98a00; --red:#d0402c; --violet:#6c4bd0;
+  --blue:#2f6fd0; --gray:#8891a8;
+  --hoja:186mm;               /* A4 (210mm) menos los márgenes de @page */
+}
+html{font-size:100%}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-size:11px; line-height:1.5;
+}
+.brand-font{font-family:'Raleway',Inter,system-ui,sans-serif}
+
+/* ── Barra de herramientas (nunca se imprime) ───────────────────────────── */
+.toolbar{
+  position:sticky; top:0; z-index:10;
+  display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+  background:var(--navy); color:#fff; padding:12px 20px;
+}
+.toolbar .tl-logo{height:22px;width:auto;filter:brightness(0) invert(1);opacity:.92}
+.toolbar .tl-tit{font-weight:700;font-size:13px;margin-right:6px}
+.toolbar label{font-size:11px;opacity:.8;margin-left:6px}
+.toolbar input[type=date]{
+  padding:6px 8px;border:1px solid rgba(255,255,255,.25);border-radius:7px;
+  background:rgba(255,255,255,.1);color:#fff;font-family:inherit;font-size:11px;
+}
+.toolbar .spacer{flex:1}
+.tbtn{
+  padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.3);
+  background:transparent;color:#fff;font-weight:600;font-size:11px;cursor:pointer;
+  font-family:inherit;transition:background .15s,border-color .15s;
+}
+.tbtn:hover{background:rgba(255,255,255,.14)}
+.tbtn.primary{background:var(--celeste);border-color:var(--celeste)}
+.tbtn.primary:hover{filter:brightness(1.08)}
+
+/* Aviso de montos fuera de tope — solo pantalla, ver informe_pdf.html */
+.aviso{
+  margin:14px auto 0;max-width:var(--hoja);
+  background:#fdf4e3;border:1px solid #f0d9a8;border-left:4px solid var(--amber);
+  border-radius:8px;padding:11px 14px;font-size:11.5px;color:#7a5200;
+}
+.aviso strong{color:#5c3d00}
+
+/* ── La hoja ─────────────────────────────────────────────────────────────── */
+#doc{
+  max-width:var(--hoja); margin:16px auto; background:#fff;
+  padding:16mm 14mm; box-shadow:0 2px 18px rgba(28,36,67,.12); border-radius:3px;
+}
+
+/* Encabezado institucional: escudo provincial + logo CFI */
+.doc-head{
+  display:flex;align-items:center;gap:16px;
+  padding-bottom:14px;margin-bottom:18px;border-bottom:2px solid var(--navy);
+}
+.doc-escudo{height:64px;width:auto;flex:0 0 auto}
+.doc-head-txt{flex:1;min-width:0}
+.doc-gob{
+  font-size:9.5px;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.09em;line-height:1.4;
+}
+.doc-titulo{font-size:19px;font-weight:800;color:var(--navy);margin:3px 0 2px;letter-spacing:-.01em}
+.doc-sub{font-size:11px;color:var(--muted)}
+.doc-cfi{flex:0 0 auto;text-align:right}
+.doc-cfi img{height:34px;width:auto;display:block;margin-left:auto}
+.doc-cfi .emitido{font-size:8.5px;color:var(--muted);margin-top:6px;letter-spacing:.03em}
+
+/* Franja de período */
+.doc-periodo{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  background:var(--navy);color:#fff;border-radius:7px;
+  padding:9px 14px;margin-bottom:18px;font-size:11px;
+}
+.doc-periodo .rango{font-weight:700;font-size:12.5px}
+.doc-periodo .dias{opacity:.75}
+
+/* ── Secciones ───────────────────────────────────────────────────────────── */
+.sec{margin-bottom:20px}
+.sec-title{
+  font-size:11px;font-weight:800;color:var(--navy);
+  text-transform:uppercase;letter-spacing:.08em;
+  padding-bottom:5px;margin:0 0 11px;border-bottom:1.5px solid var(--lightblue);
+}
+.sec-nota{font-size:9.5px;color:var(--muted);margin-top:7px;font-style:italic}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.kpi-row.k3{grid-template-columns:repeat(3,1fr)}
+.kpi{border:1px solid var(--border);border-radius:8px;padding:11px 13px;border-top:3px solid var(--gray)}
+.kpi .n{font-size:22px;font-weight:800;color:var(--navy);line-height:1.1}
+.kpi .l{font-size:9.5px;color:var(--muted);font-weight:600;margin-top:3px;text-transform:uppercase;letter-spacing:.04em}
+.kpi .sub{font-size:9px;color:var(--muted);margin-top:2px}
+.kpi.c-blue{border-top-color:var(--celeste)} .kpi.c-blue .n{color:var(--celeste)}
+.kpi.c-green{border-top-color:var(--green)} .kpi.c-green .n{color:var(--green)}
+.kpi.c-violet{border-top-color:var(--violet)} .kpi.c-violet .n{color:var(--violet)}
+.kpi.c-gray{border-top-color:var(--gray)} .kpi.c-gray .n{color:var(--gray)}
+.kpi.c-navy{border-top-color:var(--navy)}
+.kpi.c-amber{border-top-color:var(--amber)} .kpi.c-amber .n{color:var(--amber)}
+
+/* Gráficos */
+.grafico{border:1px solid var(--border);border-radius:8px;padding:12px}
+.grafico svg{display:block;width:100%;height:auto}
+.g-resumen{font-size:10px;color:var(--muted);margin-top:7px;text-align:center}
+
+/* Donut + leyenda lado a lado */
+.donut-wrap{display:flex;align-items:center;gap:22px;border:1px solid var(--border);border-radius:8px;padding:14px}
+.donut-wrap svg{flex:0 0 auto;width:132px;height:132px}
+.donut-leg{flex:1;min-width:0}
+.leg-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px}
+.leg-dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+.leg-lbl{flex:1;color:var(--text)}
+.leg-n{font-weight:700;color:var(--navy)}
+.leg-pct{color:var(--muted);min-width:38px;text-align:right;font-size:10px}
+
+/* Barras horizontales */
+.bars{border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+.bar-row{display:grid;grid-template-columns:150px 1fr 78px;gap:10px;align-items:center;margin:5px 0}
+.bar-lbl{font-size:10.5px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* display:block en ambos: son <span>, y un inline ignora width/height — sin esto
+   la barra queda invisible y solo se ve el track. */
+.bar-track{display:block;background:#eef1f7;border-radius:99px;height:15px;overflow:hidden}
+.bar-fill{display:block;height:100%;border-radius:99px;min-width:2px}
+.bar-val{text-align:right;font-size:10.5px}
+.bar-val b{color:var(--navy);font-weight:700}
+.bar-val span{color:var(--muted);font-size:9.5px}
+
+/* Tablas */
+table{width:100%;border-collapse:collapse;font-size:10.5px}
+thead th{
+  background:var(--navy);color:#fff;text-align:left;padding:6px 9px;
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+}
+thead th:first-child{border-radius:6px 0 0 0}
+thead th:last-child{border-radius:0 6px 0 0}
+tbody td{padding:5px 9px;border-bottom:1px solid var(--border)}
+tbody tr:nth-child(even){background:#f8fafd}
+/* nowrap: en las tablas angostas del grid2 un monto largo se partía en dos
+   líneas, dejando el "$" solo arriba del número. */
+td.num{text-align:right;font-weight:700;color:var(--navy);white-space:nowrap}
+td.money{text-align:right;white-space:nowrap}
+thead th{white-space:nowrap}
+.t-grupo{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.vacio{padding:26px;text-align:center;color:var(--muted);font-style:italic;border:1px dashed var(--border);border-radius:8px}
+
+/* Pie */
+.doc-foot{
+  margin-top:22px;padding-top:10px;border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:8.5px;color:var(--muted);
+}
+
+/* ── Impresión ───────────────────────────────────────────────────────────── */
+@media print{
+  @page{size:A4 portrait;margin:12mm 14mm}
+  html,body{background:#fff !important;margin:0 !important;padding:0 !important}
+
+  /* Selector negativo en vez de una lista de clases a ocultar: si mañana se
+     agrega un elemento al body no reaparece una hoja en blanco por haberlo
+     olvidado. Es el fix del bug de Safari ya probado en el Portal FP. */
+  body > *:not(#doc){display:none !important}
+  #doc{
+    display:block !important;
+    max-width:100%;margin:0;padding:0;box-shadow:none;border-radius:0;
+  }
+
+  /* Sin esto Chrome y Safari descartan los background: las barras, el donut y
+     las cabeceras de tabla salen en blanco. Es la regla que más se olvida. */
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+
+  .sec-title{break-after:avoid;page-break-after:avoid}
+  .sec,.kpi-row,.grafico,.donut-wrap,.bars,.doc-head,.doc-periodo{
+    break-inside:avoid;page-break-inside:avoid;
+  }
+  .bar-row,tbody tr,.leg-row{break-inside:avoid;page-break-inside:avoid}
+  thead{display:table-header-group}   /* cabecera repetida si la tabla se parte */
+}
