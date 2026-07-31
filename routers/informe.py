@@ -18,6 +18,7 @@ from db import engine, cuits_duplicados
 from auth import require_login
 from formatos import _monto, _dmy, _parse_fecha
 from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS, TOPE_LINEA
+import genero as genero_mod
 
 # "Situación de consultas" — desglose fino por estado (equivalente a la hoja
 # `indicadores` del Excel viejo, sin la dimensión de rama/línea de formulario
@@ -171,6 +172,18 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
             WHERE EXISTS (SELECT 1 FROM sde_consultas c
                           {_where("c.id = a.consulta_id", *rango_c)})
         """), params).scalar() or 0
+
+        # Candidatas a la línea Mujeres — mismo cálculo que el filtro del panel
+        # (ver genero.py): el campo genero explícito manda si está cargado, si no
+        # se cae a la heurística por CUIT/nombre. Acotado al rango del informe.
+        personas = conn.execute(text(f"""
+            SELECT nombre, cuit, genero FROM sde_consultas {_where(*rango)}
+        """), params).all()
+        posibles_mujeres = sum(
+            1 for nombre, cuit, g in personas
+            if (g or "").strip().upper().startswith("F")
+            or (not g and genero_mod.estimar_genero(nombre, cuit) == "F")
+        )
 
         # consultas involucradas en un CUIT duplicado
         dup_cuits = cuits_duplicados(conn)
@@ -336,6 +349,7 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         "sin_asignar": sin_asignar,
         "sin_acciones": sin_acciones,
         "duplicados": duplicados,
+        "posibles_mujeres": posibles_mujeres,
         "repetidas_excluidas": repetidas_excluidas,
         "comparacion": comparacion,
         "total_acciones": total_acciones,

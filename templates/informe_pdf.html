@@ -228,12 +228,25 @@ function resumenEjecutivo(d, cmp, gc, porGrupo){
   const inactivas = porGrupo.INACTIVAS || 0;
   frases.push(`El <strong>${d.situacion.activas_pct}%</strong> está en gestión activa, ${sede} ya fueron derivadas a CFI Sede y ${inactivas} no prosperaron (no financiables o desisten).`);
 
-  frases.push(`El monto solicitado suma <strong>${escapeHtml(d.montos.total_fmt)}</strong>, con una mediana de ${escapeHtml(d.montos.mediana_fmt)} por consulta${d.montos.fuera_de_tope>0?` (${d.montos.fuera_de_tope} consulta(s) declaran un monto por encima del tope de línea y están pendientes de revisión)`:''}.`);
+  frases.push(`El monto solicitado suma <strong>${escapeHtml(d.montos.total_fmt)}</strong>, con un promedio de ${escapeHtml(d.montos.promedio_fmt)} por consulta${d.montos.fuera_de_tope>0?` (${d.montos.fuera_de_tope} consulta(s) declaran un monto por encima del tope de línea y están pendientes de revisión)`:''}.`);
 
   const topSector = [...d.sectores].sort((a,b)=>b.n-a.n)[0];
   const topOrigen = [...d.origenes].sort((a,b)=>b.n-a.n)[0];
   if(topSector && topOrigen){
     frases.push(`El sector <strong>${escapeHtml(topSector.clave)}</strong> concentra la mayor demanda (${Math.round(topSector.n/d.total*100)}%), y el principal canal de acceso fue <strong>${escapeHtml(topOrigen.clave.toLowerCase())}</strong> (${Math.round(topOrigen.n/d.total*100)}%).`);
+  }
+
+  // Condición fiscal: se destaca la más frecuente, agrupando ARCA/monotributo como
+  // "regularizada" vs. lo que necesita revisión (no inscripto / no se pudo verificar).
+  const topArca = [...d.situacion_arca].sort((a,b)=>b.n-a.n)[0];
+  if(topArca){
+    frases.push(`En cuanto a condición fiscal, <strong>${escapeHtml(topArca.clave.toLowerCase())}</strong> es la situación más frecuente (${Math.round(topArca.n/d.total*100)}%).`);
+  }
+
+  // Posibles Mujeres: heurística por CUIT/nombre (ver genero.py) — se aclara que no
+  // reemplaza confirmar el encuadre real, mismo criterio que el badge del panel.
+  if(d.posibles_mujeres > 0){
+    frases.push(`Un <strong>${Math.round(d.posibles_mujeres/d.total*100)}%</strong> de las consultas (${d.posibles_mujeres} de ${d.total}) son candidatas estimadas al Programa Mujeres, a confirmar durante la gestión.`);
   }
 
   const conLinea = d.total - (d.lineas.find(x=>x.clave===ESPERA)||{n:0}).n;
