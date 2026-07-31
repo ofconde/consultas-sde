@@ -7,7 +7,7 @@ from db import engine, proximo_codigo, cuits_duplicados
 from auth import require_login, require_coordinador, puede_editar
 from models import GestionIn, ConsultaManualIn, BulkGestionIn, BulkAccionIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto, _parse_fecha
-from constantes import grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS
+from constantes import grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS, TOPE_LINEA, excede_tope
 import genero as genero_mod
 
 router = APIRouter(prefix="/api/consultas", tags=["consultas"])
@@ -46,6 +46,9 @@ def _fila_resumen(r):
         "sector": r["sector"],
         "monto": _monto(r["monto_confirmado"] or r["monto"]),
         "monto_num": r["monto_confirmado"] or r["monto"] or 0,
+        # El formulario público no valida el monto: una carga de más pasa derecho.
+        # Se marca en el listado para que el técnico lo revise, no se corrige solo.
+        "monto_excede": excede_tope(r["monto_confirmado"] or r["monto"]),
         "linea": r["linea"],
         "programa": r["programa"],
         "destino": r["destino"],
@@ -71,7 +74,8 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
            grupo: str = "", q: str = "", mios: bool = False, dups: bool = False,
            departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
            situacion_arca: str = "", tipo_accion: str = "", sin_acciones: bool = False,
-           fecha: str = "", genero: str = "", usuario=Depends(require_login)):
+           fecha: str = "", genero: str = "", monto_excedido: bool = False,
+           usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca en todos los campos de texto (nombre,
     CUIT, código, mail, teléfono, localidad, destino, observaciones, etc. — ver
     _CAMPOS_BUSQUEDA), así una consulta se encuentra sin saber en qué campo puntual
@@ -111,6 +115,10 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         params["situacion_arca"] = situacion_arca
     if sin_acciones:
         where.append("NOT EXISTS (SELECT 1 FROM sde_acciones a WHERE a.consulta_id = c.id)")
+    if monto_excedido:
+        # mismo monto efectivo que se muestra en la columna Monto del panel
+        where.append("COALESCE(NULLIF(c.monto_confirmado, 0), c.monto) > :tope")
+        params["tope"] = TOPE_LINEA
     if tipo_accion:
         where.append("ua.accion = :tipo_accion"); params["tipo_accion"] = tipo_accion
 
@@ -179,6 +187,10 @@ def resumen(_=Depends(require_login)):
             duplicados = conn.execute(text("""
                 SELECT COUNT(*) FROM sde_consultas WHERE cuit = ANY(:dcuits)
             """), {"dcuits": list(dup_cuits)}).scalar() or 0
+        montos_excedidos = conn.execute(text("""
+            SELECT COUNT(*) FROM sde_consultas
+            WHERE COALESCE(NULLIF(monto_confirmado, 0), monto) > :tope
+        """), {"tope": TOPE_LINEA}).scalar() or 0
         sectores = conn.execute(text("""
             SELECT DISTINCT sector FROM sde_consultas
             WHERE sector IS NOT NULL AND sector <> '' ORDER BY sector
@@ -199,6 +211,8 @@ def resumen(_=Depends(require_login)):
         "total": total, "activas": activas, "sin_asignar": sin_asignar,
         "sin_acciones": sin_acciones, "nuevas_semana": nuevas_semana, "duplicados": duplicados,
         "posibles_mujeres": posibles_mujeres,
+        "montos_excedidos": montos_excedidos,
+        "tope_linea_fmt": _monto(TOPE_LINEA),
         "estados": estados_out,
         "sectores": [{"clave": r[0]} for r in sectores],
     }

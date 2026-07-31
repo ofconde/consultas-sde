@@ -41,6 +41,19 @@ GRUPO_COLOR = {
 ROL_COORDINADOR = "coordinador"
 ROL_TECNICO = "tecnico"
 
+# Monto máximo financiable de las líneas de crédito CFI. No se usa para filtrar ni
+# corregir nada automáticamente: el formulario público no valida el monto que declara
+# el solicitante, así que una carga equivocada de más (o un pedido genuinamente fuera
+# de tope) tiene que ser visible para que el técnico lo revise. Lo consumen el panel
+# (marca la fila) y el informe (avisa antes de publicar un total inflado).
+TOPE_LINEA = 500_000_000
+
+
+def excede_tope(monto) -> bool:
+    """True si el monto supera el máximo financiable. Recibe el monto EFECTIVO
+    (confirmado si el técnico ya lo verificó, si no el declarado)."""
+    return bool(monto) and monto > TOPE_LINEA
+
 
 def grupo_de(estado: str) -> str:
     return ESTADO_GRUPO.get((estado or "").strip().upper(), "INICIAL")

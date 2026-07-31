@@ -17,7 +17,7 @@ from sqlalchemy import text
 from db import engine, cuits_duplicados
 from auth import require_login
 from formatos import _monto, _dmy, _parse_fecha
-from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS
+from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS, TOPE_LINEA
 
 # "Situación de consultas" — desglose fino por estado (equivalente a la hoja
 # `indicadores` del Excel viejo, sin la dimensión de rama/línea de formulario
@@ -34,11 +34,10 @@ _SITUACION_MAP = {
                          "DERIVADO A MERCADO DE CAPITALES", "DERIVADO A OTRA PROVINCIA"},
 }
 
-# Tope de las líneas de crédito CFI. No se usa para filtrar montos (los importes
-# fuera de tope se corrigen a mano en la consulta), pero sí para contarlos y avisar:
-# el formulario público no valida el monto que declara el solicitante, y una carga
-# equivocada de más puede multiplicar el total del informe sin que se note.
-TOPE_LINEA = 500_000_000
+# Monto efectivo: el confirmado por el técnico manda sobre el declarado por el
+# solicitante. Mismo criterio que muestra el panel — así el aviso de "fuera de tope"
+# del informe y la marca del listado señalan siempre las mismas consultas.
+_MONTO_EFECTIVO = "COALESCE(NULLIF(monto_confirmado, 0), monto)"
 
 # Cortes del histograma de montos, alineados a los tramos reales de las líneas CFI.
 _TRAMOS_MONTO = [
@@ -150,7 +149,7 @@ def informe(desde: str = "", hasta: str = "", _=Depends(require_login)):
             SELECT COALESCE(SUM(monto),0) total, COALESCE(ROUND(AVG(monto)),0) prom,
                    COALESCE(MAX(monto),0) maximo, COUNT(monto) con_monto,
                    COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY monto),0) mediana,
-                   COUNT(*) FILTER (WHERE monto > {TOPE_LINEA}) fuera_de_tope
+                   COUNT(*) FILTER (WHERE {_MONTO_EFECTIVO} > {TOPE_LINEA}) fuera_de_tope
             FROM sde_consultas {_where(*rango)}
         """), params).mappings().first()
 

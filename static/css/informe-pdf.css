@@ -56,22 +56,30 @@ body{
   padding:16mm 14mm; box-shadow:0 2px 18px rgba(28,36,67,.12); border-radius:3px;
 }
 
-/* Encabezado institucional: escudo provincial + logo CFI */
+/* Membrete institucional: escudo + Casa de Santiago del Estero + logo CFI */
 .doc-head{
   display:flex;align-items:center;gap:16px;
-  padding-bottom:14px;margin-bottom:18px;border-bottom:2px solid var(--navy);
+  padding-bottom:13px;border-bottom:2px solid var(--navy);
 }
-.doc-escudo{height:64px;width:auto;flex:0 0 auto}
+.doc-escudo{height:70px;width:auto;flex:0 0 auto}
 .doc-head-txt{flex:1;min-width:0}
 .doc-gob{
-  font-size:9.5px;font-weight:600;color:var(--muted);
+  font-size:9px;font-weight:600;color:var(--muted);
   text-transform:uppercase;letter-spacing:.09em;line-height:1.4;
 }
-.doc-titulo{font-size:19px;font-weight:800;color:var(--navy);margin:3px 0 2px;letter-spacing:-.01em}
-.doc-sub{font-size:11px;color:var(--muted)}
+.doc-casa{
+  font-size:13.5px;font-weight:800;color:var(--navy);
+  text-transform:uppercase;letter-spacing:.05em;margin:3px 0 2px;
+}
+.doc-casa-sub{font-size:9px;color:var(--muted);line-height:1.45;max-width:330px}
 .doc-cfi{flex:0 0 auto;text-align:right}
 .doc-cfi img{height:34px;width:auto;display:block;margin-left:auto}
 .doc-cfi .emitido{font-size:8.5px;color:var(--muted);margin-top:6px;letter-spacing:.03em}
+
+/* Título del documento — debajo del membrete, no dentro */
+.doc-titulo-wrap{margin:14px 0 16px}
+.doc-titulo{font-size:20px;font-weight:800;color:var(--navy);margin:0 0 2px;letter-spacing:-.01em}
+.doc-sub{font-size:11px;color:var(--muted)}
 
 /* Franja de período */
 .doc-periodo{
@@ -178,7 +186,7 @@ thead th{white-space:nowrap}
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
 
   .sec-title{break-after:avoid;page-break-after:avoid}
-  .sec,.kpi-row,.grafico,.donut-wrap,.bars,.doc-head,.doc-periodo{
+  .sec,.kpi-row,.grafico,.donut-wrap,.bars,.doc-head,.doc-titulo-wrap,.doc-periodo{
     break-inside:avoid;page-break-inside:avoid;
   }
   .bar-row,tbody tr,.leg-row{break-inside:avoid;page-break-inside:avoid}
