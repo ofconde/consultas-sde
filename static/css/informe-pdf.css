@@ -203,9 +203,20 @@ thead th{white-space:nowrap}
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
 
   .sec-title{break-after:avoid;page-break-after:avoid}
-  .sec,.kpi-row,.grafico,.donut-wrap,.bars,.doc-head,.doc-titulo-wrap,.doc-periodo{
+  /* OJO: ".sec" (la sección completa) queda afuera de esta lista a propósito.
+     Forzar "no partir" sobre un bloque que puede ser más alto que una página
+     (ej. la 3 con donut+tabla, o la 8 con dos tablas) hace que el navegador lo
+     empuje entero a la página siguiente en vez de partirlo — eso deja la página
+     anterior con un hueco grande y termina agregando una página de más al final.
+     Se avoid solo en unidades chicas, que nunca exceden el alto de una hoja. */
+  .kpi-row,.grafico,.donut-wrap,.doc-head,.doc-periodo{
     break-inside:avoid;page-break-inside:avoid;
   }
   .bar-row,tbody tr,.leg-row{break-inside:avoid;page-break-inside:avoid}
   thead{display:table-header-group}   /* cabecera repetida si la tabla se parte */
+  /* Última sección sin margen de arrastre: si el contenido termina justo al
+     borde de la hoja, ese margen sobrante es lo que genera la página en blanco
+     final. */
+  #secciones .sec:last-child{margin-bottom:0}
+  .doc-foot{break-inside:avoid;page-break-inside:avoid;margin-top:12px}
 }
