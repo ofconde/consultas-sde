@@ -263,7 +263,7 @@ function resumenEjecutivo(d, cmp, gc, porGrupo){
   }
 
   const conLinea = d.total - (d.lineas.find(x=>x.clave===ESPERA)||{n:0}).n;
-  frases.push(`Al día de emisión, ${conLinea} de ${d.total} consultas (${Math.round(conLinea/d.total*100)}%) ya tienen una posible línea de crédito asignada por la UEP.`);
+  frases.push(`Al día de emisión, ${conLinea} de ${d.total} consultas (${Math.round(conLinea/d.total*100)}%) cuentan con posible línea de crédito.`);
 
   return frases.join(' ');
 }
