@@ -219,8 +219,18 @@ function tablaBreakdown(filas, encabezado, maxFilas){
 // aporta un dato distinto (volumen+tendencia, situación, plata, de dónde viene la
 // demanda, avance del encuadre) — nada que no esté ya en el resto del documento,
 // solo puesto en palabras en vez de en tarjetas.
+// Fecha de la firma del convenio de relanzamiento de líneas en Santiago del Estero.
+// Cuando el informe arranca justo ahí, se aclara: sin esto se podría leer el volumen
+// de consultas como si fuera el ritmo normal del sistema, cuando en realidad es el
+// efecto del convenio recién firmado.
+const FECHA_CONVENIO = '2026-06-01';
+
 function resumenEjecutivo(d, cmp, gc, porGrupo){
   const frases = [];
+
+  if(d.periodo.desde === FECHA_CONVENIO){
+    frases.push(`Los datos corresponden al período posterior a la firma del convenio de relanzamiento de líneas (01-06-2026).`);
+  }
 
   // Mismo piso que variacion() de arriba: con una base muy chica en el período
   // anterior el % sale disparatado (sistema recién arrancando) y no aporta nada.
@@ -244,9 +254,8 @@ function resumenEjecutivo(d, cmp, gc, porGrupo){
   frases.push(`El promedio solicitado por consulta es de <strong>${escapeHtml(d.montos.promedio_fmt)}</strong>.`);
 
   const topSector = [...d.sectores].sort((a,b)=>b.n-a.n)[0];
-  const topOrigen = [...d.origenes].sort((a,b)=>b.n-a.n)[0];
-  if(topSector && topOrigen){
-    frases.push(`El sector <strong>${escapeHtml(topSector.clave)}</strong> concentra la mayor demanda (${Math.round(topSector.n/d.total*100)}%), y el principal canal de acceso fue <strong>${escapeHtml(topOrigen.clave.toLowerCase())}</strong> (${Math.round(topOrigen.n/d.total*100)}%).`);
+  if(topSector){
+    frases.push(`El sector <strong>${escapeHtml(topSector.clave)}</strong> concentra la mayor demanda (${Math.round(topSector.n/d.total*100)}%).`);
   }
 
   // Condición fiscal: se destaca la más frecuente, agrupando ARCA/monotributo como
@@ -263,7 +272,7 @@ function resumenEjecutivo(d, cmp, gc, porGrupo){
   }
 
   const conLinea = d.total - (d.lineas.find(x=>x.clave===ESPERA)||{n:0}).n;
-  frases.push(`Al día de emisión, ${conLinea} de ${d.total} consultas (${Math.round(conLinea/d.total*100)}%) cuentan con posible línea de crédito.`);
+  frases.push(`Al día de emisión, ${conLinea} de ${d.total} consultas (${Math.round(conLinea/d.total*100)}%) cuentan con posible línea de crédito: son elegibles y ya tienen confirmada su inscripción en ARCA. El resto todavía no fue analizado.`);
 
   return frases.join(' ');
 }
