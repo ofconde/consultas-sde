@@ -90,6 +90,14 @@ body{
 .doc-periodo .rango{font-weight:700;font-size:12.5px}
 .doc-periodo .dias{opacity:.75}
 
+/* Nota metodológica — sí se imprime: aclara que los cortes de gestión son parciales */
+.doc-metodo{
+  background:#f6f8fc;border:1px solid var(--border);border-left:3px solid var(--celeste);
+  border-radius:7px;padding:10px 13px;margin-bottom:18px;
+  font-size:9.5px;line-height:1.6;color:var(--muted);
+}
+.doc-metodo strong{color:var(--navy)}
+
 /* ── Secciones ───────────────────────────────────────────────────────────── */
 .sec{margin-bottom:20px}
 .sec-title{
@@ -130,8 +138,11 @@ body{
 
 /* Barras horizontales */
 .bars{border:1px solid var(--border);border-radius:8px;padding:12px 14px}
-.bar-row{display:grid;grid-template-columns:150px 1fr 78px;gap:10px;align-items:center;margin:5px 0}
-.bar-lbl{font-size:10.5px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-row{display:grid;grid-template-columns:168px 1fr 78px;gap:10px;align-items:center;margin:5px 0}
+/* La etiqueta envuelve en vez de cortarse con "…": en un informe institucional un
+   "REDES SOCIALES/MEDIOS …" truncado se lee como un descuido. El grid está
+   centrado verticalmente, así que una fila de dos líneas no desalinea su barra. */
+.bar-lbl{font-size:10.5px;color:var(--text);font-weight:600;line-height:1.25}
 /* display:block en ambos: son <span>, y un inline ignora width/height — sin esto
    la barra queda invisible y solo se ve el track. */
 .bar-track{display:block;background:#eef1f7;border-radius:99px;height:15px;overflow:hidden}

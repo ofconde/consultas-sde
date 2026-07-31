@@ -58,6 +58,20 @@
     <span class="dias" id="p-dias"></span>
   </div>
 
+  {# Va impresa: sin esta aclaración, quien lee el informe interpreta como "faltante"
+     lo que en realidad es una etapa del circuito todavía en curso. #}
+  <div class="doc-metodo">
+    <strong>Cómo leer este informe.</strong> Las consultas ingresan de forma continua y la
+    Unidad de Enlace Provincial confirma sus datos a medida que avanza cada gestión: primero
+    se recibe la consulta, después se asigna un responsable y recién al analizarla se confirman
+    el encuadre en línea y programa, el departamento y la condición fiscal. Por eso los cortes
+    por esas dimensiones son <strong>parciales por definición</strong> y reflejan el estado al
+    día de emisión: las consultas más recientes del período todavía no completaron esa
+    instancia y aparecen como <em>en espera de asignación</em>. En cambio los totales, la
+    evolución en el tiempo, el sector y los montos cubren el 100% de las consultas recibidas,
+    porque son datos que llegan con el formulario.
+  </div>
+
   <div id="secciones"></div>
 
   <div class="doc-foot">
@@ -69,6 +83,9 @@
 <script>
 const $ = s => document.querySelector(s);
 let META = { grupo_color: {} };
+// Debe coincidir con _PENDIENTE_UEP de routers/informe.py — es la etiqueta con la
+// que vuelven los campos que la UEP todavía no confirmó.
+const ESPERA = 'En espera de asignación';
 
 /* ── Gráficos ─────────────────────────────────────────────────────────────
    SVG dibujado a mano, sin librerías (el proyecto no tiene dependencias de
@@ -278,28 +295,43 @@ function render(d){
       desplaza el promedio y deja de representar lo que pide la mayoría.</div>
   </div>`);
 
-  // 7 · Líneas y programas
+  // 7 · Canal de difusión — 100% de cobertura, viene del formulario. Dice qué
+  // canal está trayendo las consultas, que es lo accionable para la Casa.
   s.push(`<div class="sec">
-    <h2 class="sec-title">7 · Encuadre en líneas y programas</h2>
+    <h2 class="sec-title">7 · Cómo llegaron las consultas</h2>
+    ${barrasHorizontales(d.origenes, '#00A7E1')}
+    <div class="sec-nota">Canal por el que el solicitante conoció la línea, declarado en el
+      formulario. Cubre el 100% de las consultas del período.</div>
+  </div>`);
+
+  // 8 · Líneas y programas — parcial, se aclara con el dato exacto de avance
+  const pend = c => (c.find(x=>x.clave===ESPERA)||{n:0}).n;
+  const pctHecho = n => d.total ? Math.round((d.total-n)/d.total*100) : 0;
+  s.push(`<div class="sec">
+    <h2 class="sec-title">8 · Encuadre en líneas y programas</h2>
     <div class="grid2">
       <div>${tablaBreakdown(d.lineas, 'Línea de crédito')}</div>
       <div>${tablaBreakdown(d.programas, 'Programa')}</div>
     </div>
-    <div class="sec-nota">El encuadre se confirma durante la gestión: las consultas sin línea o programa
-      asignado son las que todavía no completaron esa instancia.</div>
+    <div class="sec-nota">Encuadre confirmado por la UEP al analizar cada caso.
+      Al día de emisión tienen línea asignada ${d.total-pend(d.lineas)} de ${d.total} consultas
+      (${pctHecho(pend(d.lineas))}%) y programa ${d.total-pend(d.programas)} (${pctHecho(pend(d.programas))}%);
+      el resto está en gestión. No todas las consultas derivan en un programa: solo se asigna
+      cuando el proyecto encuadra en uno.</div>
   </div>`);
 
-  // 8 · Territorio
-  const conDepto = d.departamentos.filter(x=>!x.clave.startsWith('(sin'));
-  const sinDepto = (d.departamentos.find(x=>x.clave.startsWith('(sin'))||{n:0}).n;
+  // 9 · Territorio
+  const conDepto = d.departamentos.filter(x=>x.clave!==ESPERA);
+  const sinDepto = pend(d.departamentos);
   s.push(`<div class="sec">
-    <h2 class="sec-title">8 · Alcance territorial</h2>
+    <h2 class="sec-title">9 · Alcance territorial</h2>
     ${conDepto.length
       ? tablaBreakdown(conDepto, 'Departamento', 12)
       : '<div class="vacio">Todavía no hay departamentos confirmados en el período.</div>'}
-    <div class="sec-nota">El departamento se confirma durante la gestión de cada consulta.
-      En este período ${sinDepto} de ${d.total} consultas (${d.total?Math.round(sinDepto/d.total*100):0}%)
-      aún no lo tienen cargado, por lo que la distribución territorial es parcial.</div>
+    <div class="sec-nota">El departamento lo confirma la UEP al trabajar cada consulta, por eso
+      esta distribución es la más parcial del informe: al día de emisión
+      ${d.total-sinDepto} de ${d.total} consultas (${pctHecho(sinDepto)}%) lo tienen confirmado.
+      Los valores de arriba son reales, pero no representan todavía el reparto territorial del total.</div>
   </div>`);
 
   $('#secciones').innerHTML = s.join('');

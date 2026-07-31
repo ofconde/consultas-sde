@@ -51,6 +51,23 @@ _TRAMOS_MONTO = [
 # A partir de acá una serie diaria son barras de 1px ilegibles: se agrupa por semana.
 _DIAS_MAX_SERIE_DIARIA = 120
 
+# Etiqueta para los campos que confirma la UEP durante la gestión (línea, programa,
+# departamento). Una consulta reciente todavía sin encuadrar no es un dato faltante:
+# es una etapa del circuito, y el informe tiene que leerse en esos términos.
+_PENDIENTE_UEP = "En espera de asignación"
+
+# Situación ARCA a informar: manda la confirmada por el técnico sobre la declarada
+# por el solicitante (mismo criterio que el panel). EXENTO y NO INSCRIPTO van en un
+# solo renglón: para el encuadre crediticio son la misma situación —el solicitante no
+# tiene una inscripción activa que le permita facturar— y separados fragmentan la
+# lectura en dos ítems chicos que dicen lo mismo.
+_ARCA_EFECTIVA = "COALESCE(NULLIF(arca_confirmado, ''), situacion_arca)"
+_ARCA_AGRUPADA = f"""
+    CASE WHEN UPPER(TRIM({_ARCA_EFECTIVA})) IN ('EXENTO', 'NO INSCRIPTO')
+         THEN 'EXENTO / NO INSCRIPTO'
+         ELSE {_ARCA_EFECTIVA} END
+"""
+
 router = APIRouter(prefix="/api/informe", tags=["informe"])
 
 
@@ -164,13 +181,13 @@ def informe(desde: str = "", hasta: str = "", _=Depends(require_login)):
 
         # breakdowns por sector / línea / programa (de la pestaña INFORME del Excel)
         por_sector = _breakdown(conn, "sector", "(sin sector)", rango, params)
-        por_linea = _breakdown(conn, "linea", "(sin línea)", rango, params)
-        por_programa = _breakdown(conn, "programa", "(sin programa)", rango, params)
-        # situación ARCA: gestión confirmada por el técnico si existe, si no lo que
-        # declaró el solicitante — mismo criterio que se muestra en el panel.
-        por_arca = _breakdown(conn, "COALESCE(NULLIF(arca_confirmado, ''), situacion_arca)",
-                               "(sin dato)", rango, params)
-        por_departamento = _breakdown(conn, "departamento", "(sin departamento)", rango, params)
+        # Línea y programa los confirma la UEP durante la gestión, no vienen del
+        # formulario: una consulta sin encuadrar todavía no es un dato faltante,
+        # es una etapa del circuito. La etiqueta lo dice en esos términos.
+        por_linea = _breakdown(conn, "linea", _PENDIENTE_UEP, rango, params)
+        por_programa = _breakdown(conn, "programa", _PENDIENTE_UEP, rango, params)
+        por_arca = _breakdown(conn, _ARCA_AGRUPADA, "(sin dato)", rango, params)
+        por_departamento = _breakdown(conn, "departamento", _PENDIENTE_UEP, rango, params)
         por_origen = _breakdown(conn, "como_se_entero", "(sin dato)", rango, params)
 
         primera_fecha = conn.execute(text(
