@@ -63,15 +63,17 @@ body{
 }
 .doc-escudo{height:70px;width:auto;flex:0 0 auto}
 .doc-head-txt{flex:1;min-width:0}
+/* Jerarquía del membrete: manda el Gobierno de la Provincia; la Casa va un 30%
+   más chica (15px → 10.5px) y su descripción todavía menor. */
 .doc-gob{
-  font-size:9px;font-weight:600;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.09em;line-height:1.4;
+  font-size:15px;font-weight:800;color:var(--navy);
+  text-transform:uppercase;letter-spacing:.04em;line-height:1.25;
 }
 .doc-casa{
-  font-size:13.5px;font-weight:800;color:var(--navy);
-  text-transform:uppercase;letter-spacing:.05em;margin:3px 0 2px;
+  font-size:10.5px;font-weight:700;color:var(--navy);
+  text-transform:uppercase;letter-spacing:.05em;margin:5px 0 1px;
 }
-.doc-casa-sub{font-size:9px;color:var(--muted);line-height:1.45;max-width:330px}
+.doc-casa-sub{font-size:8.5px;color:var(--muted);line-height:1.45;max-width:320px}
 .doc-cfi{flex:0 0 auto;text-align:right}
 .doc-cfi img{height:34px;width:auto;display:block;margin-left:auto}
 .doc-cfi .emitido{font-size:8.5px;color:var(--muted);margin-top:6px;letter-spacing:.03em}
@@ -114,6 +116,10 @@ body{
 .kpi .n{font-size:22px;font-weight:800;color:var(--navy);line-height:1.1}
 .kpi .l{font-size:9.5px;color:var(--muted);font-weight:600;margin-top:3px;text-transform:uppercase;letter-spacing:.04em}
 .kpi .sub{font-size:9px;color:var(--muted);margin-top:2px}
+.delta{font-weight:700}
+.delta.up{color:var(--green)}
+.delta.down{color:var(--red)}
+.delta.flat{color:var(--muted)}
 .kpi.c-blue{border-top-color:var(--celeste)} .kpi.c-blue .n{color:var(--celeste)}
 .kpi.c-green{border-top-color:var(--green)} .kpi.c-green .n{color:var(--green)}
 .kpi.c-violet{border-top-color:var(--violet)} .kpi.c-violet .n{color:var(--violet)}

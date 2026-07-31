@@ -61,15 +61,11 @@
   {# Va impresa: sin esta aclaración, quien lee el informe interpreta como "faltante"
      lo que en realidad es una etapa del circuito todavía en curso. #}
   <div class="doc-metodo">
-    <strong>Cómo leer este informe.</strong> Las consultas ingresan de forma continua y la
-    Unidad de Enlace Provincial confirma sus datos a medida que avanza cada gestión: primero
-    se recibe la consulta, después se asigna un responsable y recién al analizarla se confirman
-    el encuadre en línea y programa, el departamento y la condición fiscal. Por eso los cortes
-    por esas dimensiones son <strong>parciales por definición</strong> y reflejan el estado al
-    día de emisión: las consultas más recientes del período todavía no completaron esa
-    instancia y aparecen como <em>en espera de asignación</em>. En cambio los totales, la
-    evolución en el tiempo, el sector y los montos cubren el 100% de las consultas recibidas,
-    porque son datos que llegan con el formulario.
+    <strong>Cómo leer este informe.</strong> Línea, programa, departamento y condición fiscal
+    se confirman durante la gestión, así que sus cortes son <strong>parciales por definición</strong>
+    (lo pendiente figura como <em>en espera de asignación</em>). Totales, evolución, sector y
+    montos llegan con el formulario y cubren el 100% de las consultas.
+    <span id="nota-repetidas"></span>
   </div>
 
   <div id="secciones"></div>
@@ -184,6 +180,16 @@ function barrasHorizontales(filas, color, maxFilas){
     </div>`).join('')+'</div>';
 }
 
+// Variación vs. el período anterior de igual largo. Sin período anterior con qué
+// comparar (ej. "todo el histórico") no muestra nada, en vez de forzar un 0%.
+function variacion(actual, previo){
+  if(previo === 0) return actual > 0 ? '<span class="delta up">nuevo</span>' : '';
+  const pct = Math.round((actual - previo) / previo * 100);
+  const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+  const flecha = pct > 0 ? '▲' : pct < 0 ? '▼' : '—';
+  return `<span class="delta ${cls}">${flecha} ${Math.abs(pct)}%</span>`;
+}
+
 function tablaBreakdown(filas, encabezado, maxFilas){
   if(!filas.length) return '<div class="vacio">Sin datos en el período.</div>';
   const datos = maxFilas ? filas.slice(0, maxFilas) : filas;
@@ -202,6 +208,11 @@ function render(d){
 
   $('#p-rango').textContent = `${d.periodo.desde_fmt} al ${d.periodo.hasta_fmt}`;
   $('#p-dias').textContent = `${d.periodo.dias} día${d.periodo.dias===1?'':'s'}`;
+  // El informe excluye del universo las consultas REPETIDO (mismo solicitante que
+  // ya había consultado) para no contar dos veces la misma demanda.
+  $('#nota-repetidas').textContent = d.repetidas_excluidas > 0
+    ? ` No incluye ${d.repetidas_excluidas} consulta(s) repetida(s) del mismo solicitante.`
+    : '';
 
   // Aviso de montos fuera de tope — fuera de #doc, así que nunca se imprime.
   $('#aviso').innerHTML = d.montos.fuera_de_tope > 0
@@ -219,18 +230,25 @@ function render(d){
   const s = [];
 
   // 1 · Resumen general
+  // La comparación no tiene sentido para "todo el histórico": el "período anterior"
+  // caería antes de que existiera el sistema. Se apaga cuando el rango elegido
+  // coincide con el default (desde la primera consulta, hasta hoy).
+  const esTodoHistorico = d.periodo.desde === PRIMERA && d.periodo.hasta === hoyISO();
+  const cmp = esTodoHistorico ? {disponible:false} : d.comparacion;
   s.push(`<div class="sec">
     <h2 class="sec-title">1 · Resumen general</h2>
     <div class="kpi-row">
       <div class="kpi c-navy"><div class="n">${d.total}</div><div class="l">Consultas recibidas</div>
-        <div class="sub">${d.promedio_diario.periodo} por día</div></div>
+        <div class="sub">${d.promedio_diario.periodo} por día${cmp.disponible?' · '+variacion(d.total, cmp.total):''}</div></div>
       <div class="kpi c-green"><div class="n">${d.activas}</div><div class="l">En gestión activa</div>
         <div class="sub">${d.situacion.activas_pct}% del total</div></div>
       <div class="kpi c-blue"><div class="n">${porGrupo.EN_SEDE||0}</div><div class="l">Derivadas a CFI Sede</div>
         <div class="sub">ingresadas al circuito</div></div>
       <div class="kpi c-gray"><div class="n">${porGrupo.INACTIVAS||0}</div><div class="l">No prosperaron</div>
-        <div class="sub">no financiables, desisten o repetidas</div></div>
+        <div class="sub">no financiables o desisten</div></div>
     </div>
+    ${cmp.disponible ? `<div class="sec-nota">Comparado con el período anterior de igual duración
+      (${escapeHtml(cmp.desde_fmt)} al ${escapeHtml(cmp.hasta_fmt)}, ${cmp.total} consultas).</div>` : ''}
   </div>`);
 
   // 2 · Evolución
@@ -353,6 +371,10 @@ async function cargar(){
   if(hasta) p.set('hasta', hasta);
   // el rango queda en la URL: el informe se puede recargar y compartir tal cual
   history.replaceState(null, '', location.pathname + (p.toString() ? '?'+p : ''));
+  // El institucional siempre excluye REPETIDO: contar dos veces al mismo
+  // solicitante infla la demanda informada. La pantalla de gestión (/informe)
+  // sí las muestra, ahí el técnico las necesita para trabajarlas.
+  p.set('excluir_repetidas', '1');
   const r = await fetch('/api/informe?'+p);
   if(!r.ok){
     const e = await r.json().catch(()=>({}));

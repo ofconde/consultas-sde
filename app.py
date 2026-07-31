@@ -134,6 +134,8 @@ def informe_pdf_page(request: Request):
     u = usuario_actual(request)
     if not u:
         return RedirectResponse("/login")
+    if u["rol"] != "coordinador":
+        return RedirectResponse("/panel")
     with engine.connect() as conn:
         primera = conn.execute(text(
             "SELECT MIN(fecha_recepcion)::date FROM sde_consultas WHERE fecha_recepcion IS NOT NULL"

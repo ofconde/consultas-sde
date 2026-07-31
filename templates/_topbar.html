@@ -12,8 +12,12 @@
     </nav>
     <div class="spacer"></div>
     {# Acción, no navegación: abre el informe institucional en una pestaña aparte
-       para no perder el contexto de trabajo (ej. el panel con sus filtros puestos). #}
+       para no perder el contexto de trabajo (ej. el panel con sus filtros puestos).
+       Solo coordinador: es el documento que se eleva a jefatura/la Casa, no una
+       herramienta de gestión que necesite el técnico. #}
+    {% if usuario.rol == 'coordinador' %}
     <a href="/informe/pdf" target="_blank" class="btn-informe" title="Informe institucional imprimible">Informe PDF</a>
+    {% endif %}
     <div class="user">
       <span>{{ usuario.nombre }}</span>
       <span class="rol">{{ 'admin' if usuario.rol == 'coordinador' else usuario.rol }}</span>

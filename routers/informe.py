@@ -61,6 +61,12 @@ _PENDIENTE_UEP = "En espera de asignación"
 # solo renglón: para el encuadre crediticio son la misma situación —el solicitante no
 # tiene una inscripción activa que le permita facturar— y separados fragmentan la
 # lectura en dos ítems chicos que dicen lo mismo.
+# Consultas REPETIDO: el mismo solicitante que ya había consultado antes. Se excluyen
+# del informe institucional para no contar dos veces la misma demanda (la pantalla de
+# gestión sí las muestra: ahí el técnico necesita verlas para trabajarlas).
+_NO_REPETIDA = "UPPER(TRIM(COALESCE(estado, ''))) <> 'REPETIDO'"
+_NO_REPETIDA_C = "UPPER(TRIM(COALESCE(c.estado, ''))) <> 'REPETIDO'"
+
 _ARCA_EFECTIVA = "COALESCE(NULLIF(arca_confirmado, ''), situacion_arca)"
 _ARCA_AGRUPADA = f"""
     CASE WHEN UPPER(TRIM({_ARCA_EFECTIVA})) IN ('EXENTO', 'NO INSCRIPTO')
@@ -102,9 +108,12 @@ def _breakdown(conn, columna, etiqueta_vacia, rango, params):
 
 
 @router.get("")
-def informe(desde: str = "", hasta: str = "", _=Depends(require_login)):
+def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
+            _=Depends(require_login)):
     """KPIs del informe. `desde`/`hasta` (YYYY-MM-DD o DD-MM-YYYY) acotan por fecha
-    de recepción; sin ellos se toma todo el histórico."""
+    de recepción; sin ellos se toma todo el histórico. `excluir_repetidas` saca del
+    universo las consultas marcadas REPETIDO — las usa el informe institucional,
+    donde contar dos veces al mismo solicitante infla la demanda informada."""
     d = _parse_fecha(desde)
     h = _parse_fecha(hasta)
     if d and h and d > h:
@@ -112,6 +121,9 @@ def informe(desde: str = "", hasta: str = "", _=Depends(require_login)):
 
     rango = _condiciones_rango(d, h)
     rango_c = _condiciones_rango(d, h, alias="c")
+    if excluir_repetidas:
+        rango.append(_NO_REPETIDA)
+        rango_c.append(_NO_REPETIDA_C)
     params = {}
     if d:
         params["desde"] = d
@@ -119,6 +131,15 @@ def informe(desde: str = "", hasta: str = "", _=Depends(require_login)):
         params["hasta"] = h
 
     with engine.connect() as conn:
+        # Cuántas se dejaron afuera — se informa al pie, no se esconde el recorte.
+        repetidas_excluidas = 0
+        if excluir_repetidas:
+            repetidas_excluidas = conn.execute(text(f"""
+                SELECT COUNT(*) FROM sde_consultas
+                {_where("UPPER(TRIM(COALESCE(estado, ''))) = 'REPETIDO'",
+                        *_condiciones_rango(d, h))}
+            """), params).scalar() or 0
+
         total = conn.execute(text(f"""
             SELECT COUNT(*) FROM sde_consultas {_where(*rango)}
         """), params).scalar() or 0
@@ -216,23 +237,49 @@ def informe(desde: str = "", hasta: str = "", _=Depends(require_login)):
         p_serie = {"sdesde": serie_desde, "shasta": serie_hasta}
         # CAST(:x AS date) y no :x::date — SQLAlchemy no sabe parsear un bindparam
         # pegado al operador :: de Postgres y lo toma como parte del nombre.
+        # La exclusión va en el ON y no en un WHERE: en el WHERE descartaría también
+        # las filas vacías del generate_series y el gráfico volvería a saltear días.
+        filtro_serie = f" AND {_NO_REPETIDA_C}" if excluir_repetidas else ""
         if granularidad == "dia":
-            por_dia = conn.execute(text("""
+            por_dia = conn.execute(text(f"""
                 SELECT d::date AS dia, COUNT(c.id) AS n
                 FROM generate_series(CAST(:sdesde AS date), CAST(:shasta AS date), '1 day') d
-                LEFT JOIN sde_consultas c ON c.fecha_recepcion::date = d::date
+                LEFT JOIN sde_consultas c ON c.fecha_recepcion::date = d::date{filtro_serie}
                 GROUP BY 1 ORDER BY 1
             """), p_serie).mappings().all()
         else:
-            por_dia = conn.execute(text("""
+            por_dia = conn.execute(text(f"""
                 SELECT d::date AS dia, COUNT(c.id) AS n
                 FROM generate_series(date_trunc('week', CAST(:sdesde AS date)),
                                      CAST(:shasta AS date), '7 days') d
                 LEFT JOIN sde_consultas c
                   ON date_trunc('week', c.fecha_recepcion)::date = d::date
                  AND c.fecha_recepcion::date BETWEEN CAST(:sdesde AS date) AND CAST(:shasta AS date)
+                 {filtro_serie}
                 GROUP BY 1 ORDER BY 1
             """), p_serie).mappings().all()
+
+        # Período anterior de igual largo, para leer el informe como tendencia y no
+        # como foto. Solo tiene sentido con un rango explícito: sobre todo el
+        # histórico no hay un "antes" contra el cual comparar.
+        comparacion = {"disponible": False}
+        if d and h:
+            prev_hasta = d - timedelta(days=1)
+            prev_desde = prev_hasta - timedelta(days=dias_serie - 1)
+            prev_cond = _condiciones_rango(prev_desde, prev_hasta)
+            if excluir_repetidas:
+                prev_cond.append(_NO_REPETIDA)
+            prev = conn.execute(text(f"""
+                SELECT COUNT(*) AS n, COALESCE(SUM(monto), 0) AS monto
+                FROM sde_consultas {_where(*prev_cond)}
+            """), {"desde": prev_desde, "hasta": prev_hasta}).mappings().first()
+            comparacion = {
+                "disponible": True,
+                "desde_fmt": _dmy(prev_desde), "hasta_fmt": _dmy(prev_hasta),
+                "dias": dias_serie,
+                "total": prev["n"],
+                "monto": int(prev["monto"]), "monto_fmt": _monto(prev["monto"]),
+            }
 
         # backlog de "consulta inicial" (sin trabajar todavía) por técnico
         inicial_por_tecnico = conn.execute(text(f"""
@@ -289,6 +336,8 @@ def informe(desde: str = "", hasta: str = "", _=Depends(require_login)):
         "sin_asignar": sin_asignar,
         "sin_acciones": sin_acciones,
         "duplicados": duplicados,
+        "repetidas_excluidas": repetidas_excluidas,
+        "comparacion": comparacion,
         "total_acciones": total_acciones,
         "acciones_por_consulta": round(total_acciones / total, 2) if total else 0,
         "nuevas_semana": nuevas_semana,
