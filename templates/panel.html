@@ -88,7 +88,7 @@ const $ = s => document.querySelector(s);
 const ROL = "{{ usuario.rol }}";
 let TIMER = null;
 const PAGE_SIZE = 60;
-const state = { estado: '', mios: false, dups: false, sinAcciones: false, generoF: false, tope: false, pagina: 1, seleccion: new Set() };
+const state = { estado: '', mios: false, dups: false, sinAcciones: false, generoF: false, tope: false, apartadas: false, pagina: 1, seleccion: new Set() };
 let ROWS = [];
 let TOPE_FMT = '$ 500.000.000';   // lo pisa /api/consultas/resumen con el valor real
 let META = { grupo_color: {} };
@@ -135,7 +135,7 @@ async function cargarResumen(){
     <div class="kpi card kpi-violet"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
 
   $('#kpi-total').addEventListener('click', () => {
-    Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false, generoF:false, tope:false });
+    Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false, generoF:false, tope:false, apartadas:false });
     $('#q').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
     $('#f-accion').value=''; $('#f-departamento').value=''; $('#f-linea').value='';
     $('#f-programa').value=''; $('#f-sector').value=''; $('#f-arca').value='';
@@ -153,9 +153,12 @@ async function cargarResumen(){
   });
   pintarKpis();
 
-  // botones dinámicos: uno por cada estado que exista en los datos (se crean solos)
+  // botones dinámicos: uno por cada estado que exista en los datos (se crean solos).
+  // NO ES FINANCIABLE queda afuera de esta fila — tiene su propio botón "Casos
+  // apartados" más abajo, porque por pedido de Omar esas consultas ya no aparecen
+  // en el listado por defecto y no tiene sentido que además convivan acá.
   let botones = `<button class="ebtn" data-estado=""><span>Todas</span><span class="cnt">${d.total}</span></button>`;
-  d.estados.forEach(e => {
+  d.estados.filter(e => e.estado !== 'NO ES FINANCIABLE').forEach(e => {
     botones += `<button class="ebtn" data-estado="${escapeHtml(e.estado)}">
       <span class="dot" style="background:${META.grupo_color[e.grupo]||'#8891a8'}"></span>
       <span>${escapeHtml(e.estado)}</span><span class="cnt">${e.n}</span></button>`;
@@ -172,11 +175,16 @@ async function cargarResumen(){
     botones += `<button class="ebtn tope" id="btn-tope"
       title="Consultas con un monto superior al tope de ${escapeHtml(TOPE_FMT)} de las líneas CFI"
       >⚠ Monto fuera de tope <span class="cnt">${d.montos_excedidos}</span></button>`;
+  const noFinanciables = (d.estados.find(e => e.estado === 'NO ES FINANCIABLE') || {n:0}).n;
+  if(noFinanciables > 0)
+    botones += `<button class="ebtn apartadas" id="btn-apartadas"
+      title="Consultas marcadas NO ES FINANCIABLE — apartadas del listado normal"
+      >🗂 Casos apartados <span class="cnt">${noFinanciables}</span></button>`;
   $('#ebtns').innerHTML = botones;
 
   $('#ebtns').querySelectorAll('.ebtn[data-estado]').forEach(b => {
     b.addEventListener('click', () => {
-      state.estado = b.dataset.estado; state.dups = false;
+      state.estado = b.dataset.estado; state.dups = false; state.apartadas = false;
       $('#f-estado').value = state.estado;
       pintarBotones(); cargarTabla();
     });
@@ -201,18 +209,27 @@ async function cargarResumen(){
     $('#f-estado').value = '';
     pintarBotones(); cargarTabla();
   });
+  const ba = $('#btn-apartadas');
+  if(ba) ba.addEventListener('click', () => {
+    // Vista exclusiva, mismo criterio que Duplicados: al activarla no tiene sentido
+    // combinarla con un estado puntual o con "mis casos".
+    state.apartadas = !state.apartadas; state.estado = ''; state.mios = false; state.dups = false;
+    $('#f-estado').value = '';
+    pintarBotones(); cargarTabla();
+  });
   pintarBotones();
 }
 
 function pintarBotones(){
   $('#ebtns').querySelectorAll('.ebtn[data-estado]').forEach(b => {
-    b.classList.toggle('active', b.dataset.estado === state.estado && !state.dups && !state.mios);
+    b.classList.toggle('active', b.dataset.estado === state.estado && !state.dups && !state.mios && !state.apartadas);
   });
   const m = $('#btn-mios'); if(m) m.classList.toggle('active', state.mios);
   const bd = $('#btn-dups'); if(bd) bd.classList.toggle('active', state.dups);
   const sa = $('#btn-sinacc'); if(sa) sa.classList.toggle('active', state.sinAcciones);
   const mj = $('#btn-mujeres'); if(mj) mj.classList.toggle('active', state.generoF);
   const bt = $('#btn-tope'); if(bt) bt.classList.toggle('active', state.tope);
+  const ba = $('#btn-apartadas'); if(ba) ba.classList.toggle('active', state.apartadas);
 }
 
 function pintarKpis(){
@@ -256,6 +273,7 @@ function construirQuery(){
   if($('#f-fecha').value) p.set('fecha',$('#f-fecha').value);
   if(state.generoF) p.set('genero','F');
   if(state.tope) p.set('monto_excedido','1');
+  if(state.apartadas) p.set('apartadas','1');
   return p;
 }
 
@@ -292,6 +310,7 @@ function restaurarDesdeURL(){
   if(p.has('fecha')){ $('#f-fecha').value = p.get('fecha'); $('#dia-limpiar').style.display = ''; }
   if(p.get('genero')==='F') state.generoF = true;
   if(p.get('monto_excedido')==='1') state.tope = true;
+  if(p.get('apartadas')==='1') state.apartadas = true;
 }
 
 async function cargarTabla(){
@@ -552,7 +571,7 @@ $('#dia-limpiar').addEventListener('click', () => {
   $('#f-fecha').value = ''; $('#dia-limpiar').style.display = 'none'; cargarTabla();
 });
 $('#f-estado').addEventListener('change', () => {
-  state.estado = $('#f-estado').value; state.dups = false;
+  state.estado = $('#f-estado').value; state.dups = false; state.apartadas = false;
   pintarBotones(); cargarTabla();
 });
 $('#btn-refrescar').addEventListener('click', async () => {

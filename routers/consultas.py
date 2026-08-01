@@ -75,7 +75,7 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
            departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
            situacion_arca: str = "", tipo_accion: str = "", sin_acciones: bool = False,
            fecha: str = "", genero: str = "", monto_excedido: bool = False,
-           usuario=Depends(require_login)):
+           apartadas: bool = False, usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca en todos los campos de texto (nombre,
     CUIT, código, mail, teléfono, localidad, destino, observaciones, etc. — ver
     _CAMPOS_BUSQUEDA), así una consulta se encuentra sin saber en qué campo puntual
@@ -85,11 +85,22 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     `tipo_accion` filtra por el tipo de la ÚLTIMA acción registrada (no cualquiera del
     historial). `sin_acciones=1` filtra las que todavía no tienen ninguna acción cargada.
     `fecha` (YYYY-MM-DD) filtra por día de recepción — para ir revisando/depurando
-    la base día por día."""
+    la base día por día.
+    `apartadas=1` muestra SOLO las NO ES FINANCIABLE. Sin este flag, esas consultas
+    quedan fuera del listado por defecto (pidió Omar que no ensucien la vista diaria) —
+    salvo que se las pida explícitamente con `estado=NO ES FINANCIABLE` (para no romper
+    el botón de estado ya existente ni una URL vieja que las tuviera filtradas)."""
     where = ["1=1"]
     params = {}
-    if estado:
-        where.append("c.estado = :estado"); params["estado"] = estado
+    if apartadas:
+        where.append("c.estado = :estado_apartada")
+        params["estado_apartada"] = "NO ES FINANCIABLE"
+    else:
+        if estado:
+            where.append("c.estado = :estado"); params["estado"] = estado
+        if estado != "NO ES FINANCIABLE":
+            where.append("c.estado IS DISTINCT FROM :estado_oculto")
+            params["estado_oculto"] = "NO ES FINANCIABLE"
     if fecha:
         where.append("c.fecha_recepcion::date = :fecha"); params["fecha"] = fecha
     if tecnico:

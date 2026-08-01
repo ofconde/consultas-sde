@@ -188,6 +188,13 @@ td .nom{font-weight:600;color:var(--navy)}
   background:var(--red);color:#fff;font-size:0.75rem;font-weight:800;
   vertical-align:middle;cursor:help}
 
+/* Casos apartados (NO ES FINANCIABLE, fuera del listado por defecto) — gris, no
+   rojo: a diferencia de Duplicados/Monto fuera de tope, esto no es una alerta a
+   corregir, es una categoría archivada que Omar pidió sacar de la vista diaria. */
+.ebtn.apartadas{border-color:#d7dbe6;color:var(--gray)}
+.ebtn.apartadas.active{background:var(--gray);border-color:var(--gray);color:#fff}
+.ebtn.apartadas.active .cnt{background:rgba(255,255,255,.25);color:#fff}
+
 /* Botones */
 .btn{display:inline-flex;align-items:center;gap:0.4375rem;padding:0.5625rem 1rem;border-radius:0.625rem;border:1px solid var(--border);background:#fff;color:var(--navy);font-weight:600;font-size:0.875rem;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s,filter .15s}
 .btn:hover{border-color:var(--celeste)}
