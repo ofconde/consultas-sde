@@ -92,6 +92,7 @@ const state = { estado: '', mios: false, dups: false, sinAcciones: false, genero
 let ROWS = [];
 let TOPE_FMT = '$ 500.000.000';   // lo pisa /api/consultas/resumen con el valor real
 let META = { grupo_color: {} };
+let TECNICOS = [];   // lo llena cargarTecnicos() — usado por los <select> inline de la tabla
 let CAT = {};
 
 async function cargarMeta(){ META = await (await fetch('/api/catalogos/estado-grupo')).json(); }
@@ -247,6 +248,7 @@ async function cargarTecnicos(){
     fetch('/api/consultas').then(r=>r.json()),
   ]);
   const set = [...new Set([...usuarios, ...consultas.consultas.map(x=>x.tecnico).filter(Boolean)])].sort();
+  TECNICOS = set;
   const sel = $('#f-tecnico');
   set.forEach(v => sel.add(new Option(v, v)));
   set.forEach(v => $('#bulk-tecnico').add(new Option(v, v)));
@@ -326,6 +328,17 @@ async function cargarTabla(){
   renderPagina();
 }
 
+// Acciones más frecuentes en el triage de un aluvión de consultas nuevas — un
+// desplegable con las 10 del catálogo sería más lento de usar que abrir el
+// detalle. Estas 3 alcanzan para resolver la mayoría de las filas sin salir
+// del panel; el resto de las acciones (menos frecuentes, o que necesitan
+// detalle/fecha puntual) siguen yendo por el detalle de la consulta.
+const ACCIONES_RAPIDAS = [
+  ['SE ENVIA INFORMACION', 'Enviar información'],
+  ['SE SOLICITA MAS INFORMACION', 'Solicitar más info'],
+  ['SE INFORMA QUE NO ES FINANCIABLE', 'No es financiable'],
+];
+
 function filaHTML(c, numeroFila){
   const dup = c.es_duplicado ? '<span class="dup">DUP</span>' : '';
   // Última acción del historial. Si hay más de una se aclara cuántas van, para no
@@ -335,6 +348,25 @@ function filaHTML(c, numeroFila){
        <div class="cod">${escapeHtml(c.ultima_accion_fecha)||'sin fecha'}${
          c.n_acciones > 1 ? ` · ${c.n_acciones} acciones` : ''}</div>`
     : '<span class="muted">sin acciones</span>';
+  // Desplegable inline de técnico: reasignar sin abrir el caso. Reusa el mismo
+  // PATCH /api/consultas/{id} y la misma regla de permisos que el detalle (un
+  // técnico se autoasigna, solo el coordinador reasigna a otro) — si el server
+  // rechaza o recorta el cambio, cargarTabla() lo va a mostrar tal cual quedó.
+  const opcionesTec = TECNICOS.map(t =>
+    `<option value="${escapeHtml(t)}" ${c.tecnico===t?'selected':''}>${escapeHtml(t)}</option>`).join('');
+  const selTecnico = `<select class="sel-inline" onclick="event.stopPropagation()"
+      onchange="cambiarTecnico(${c.id}, this.value)">
+      <option value="" ${!c.tecnico?'selected':''}>— Sin asignar</option>
+      ${opcionesTec}
+    </select>`;
+  // Acción rápida: dispara el mismo POST de acciones que usa el detalle — el
+  // estado se sincroniza solo del lado del servidor cuando corresponde (ver
+  // routers/acciones.py), acá no se duplica esa lógica.
+  const selAccionRapida = `<select class="sel-inline sel-accion-rapida" onclick="event.stopPropagation()"
+      onchange="accionRapida(${c.id}, this.value, this)">
+      <option value="" selected>Acción rápida…</option>
+      ${ACCIONES_RAPIDAS.map(([v,l]) => `<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('')}
+    </select>`;
   // Línea + Programa juntos en la misma columna, mismo patrón que CUIT/situación ARCA.
   const linea = c.linea
     ? `<span class="nom">${escapeHtml(c.linea)}</span>${c.programa?`<div class="cod">${escapeHtml(c.programa)}</div>`:''}`
@@ -360,9 +392,9 @@ function filaHTML(c, numeroFila){
         ? `<span class="tag-tope" title="Supera el tope de ${escapeHtml(TOPE_FMT)} de las líneas CFI — revisar el monto cargado">!</span>`
         : ''}</td>
       <td>${linea}</td>
-      <td>${c.tecnico?escapeHtml(c.tecnico):'<span class="muted">sin asignar</span>'}</td>
+      <td>${selTecnico}</td>
       <td>${badge(c.grupo,c.estado)}</td>
-      <td>${acc}</td>
+      <td>${acc}${selAccionRapida}</td>
       <td>${escapeHtml(c.arca_confirmado)||'—'}</td>
       <td id="bcra-${c.id}">${c.cuit
         ? `<button class="btn sm" onclick="event.stopPropagation();verBcra(${c.id})">Ver BCRA</button>`
@@ -370,6 +402,42 @@ function filaHTML(c, numeroFila){
       <td>${escapeHtml(c.destino)||'—'}</td>
       ${borrar}
     </tr>`;
+}
+
+// Reasignar técnico sin abrir el caso — mismo endpoint y misma regla de
+// permisos que el formulario de gestión del detalle. Se recarga resumen+tabla
+// como en el resto de las acciones del panel (bulk, borrar, etc.): mantiene el
+// KPI "Sin asignar" al día y confirma en la fila lo que el server terminó
+// aplicando (por si un técnico intentó reasignar a otro y el server lo ignoró).
+async function cambiarTecnico(id, tecnico){
+  const r = await fetch('/api/consultas/'+id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({tecnico}),
+  });
+  if(!r.ok){
+    const e = await r.json().catch(()=>({}));
+    alert(e.detail || 'No se pudo asignar.');
+  }
+  await cargarResumen(); await cargarTabla();
+}
+
+// Acción rápida desde el panel — mismo POST que usa el detalle. Si la acción
+// sincroniza el estado (ej. "no es financiable"), la fila puede directamente
+// desaparecer del listado al recargar: es el comportamiento esperado, no un bug.
+async function accionRapida(id, accion, el){
+  if(!accion) return;
+  el.disabled = true;
+  const r = await fetch('/api/consultas/'+id+'/acciones', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({accion, fecha: hoyISO()}),
+  });
+  if(!r.ok){
+    const e = await r.json().catch(()=>({}));
+    alert(e.detail || 'No se pudo cargar la acción.');
+    el.disabled = false;
+    return;
+  }
+  await cargarResumen(); await cargarTabla();
 }
 
 async function borrarConsulta(id, btn){

@@ -152,6 +152,18 @@ th{background:#fafbfe;color:var(--muted);font-weight:600;font-size:0.75rem;text-
 .tabla-resizable td{overflow-wrap:break-word}
 .th-rz{position:absolute;right:0;top:0;bottom:0;width:0.4375rem;cursor:col-resize;
        user-select:none;touch-action:none}
+
+/* Desplegables inline en la tabla del panel (técnico, acción rápida) — se
+   activan clic a clic sobre la fila sin abrir el detalle; texto discreto en
+   reposo, como cualquier otro dato de la celda, y solo se nota al pasar el
+   mouse o abrir la lista. */
+.sel-inline{
+  width:100%;border:1px solid transparent;background:transparent;color:var(--text);
+  font-family:inherit;font-size:0.875rem;padding:0.1875rem 0.25rem;border-radius:0.375rem;
+  cursor:pointer;
+}
+.sel-inline:hover,.sel-inline:focus{border-color:var(--border);background:#fff}
+.sel-accion-rapida{margin-top:0.25rem;color:var(--muted);font-size:0.8125rem}
 .th-rz:hover,.th-rz.arrastrando{background:var(--celeste)}
 tbody tr{cursor:pointer;transition:background .15s}
 tbody tr:hover{background:#f7f9fd}
