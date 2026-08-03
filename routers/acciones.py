@@ -7,6 +7,7 @@ from db import engine
 from auth import require_login, puede_editar
 from models import AccionIn
 from formatos import _parse_fecha, _dmy, _hora_local
+from constantes import ACCION_NO_FINANCIABLE, ESTADO_NO_FINANCIABLE
 
 router = APIRouter(prefix="/api/consultas/{cid}/acciones", tags=["acciones"])
 log = logging.getLogger("consultas_sde.acciones")
@@ -43,11 +44,20 @@ def crear(cid: int, body: AccionIn, usuario=Depends(require_login)):
             raise HTTPException(404, "Consulta no encontrada")
         if not puede_editar(usuario, consulta["tecnico"]):
             raise HTTPException(403, "Esta consulta está asignada a otro técnico")
+        accion = body.accion.strip()
         conn.execute(text("""
             INSERT INTO sde_acciones (consulta_id, fecha, accion, detalle, creado_por)
             VALUES (:cid, :fecha, :accion, :detalle, :por)
-        """), {"cid": cid, "fecha": fecha, "accion": body.accion.strip(),
+        """), {"cid": cid, "fecha": fecha, "accion": accion,
                "detalle": (body.detalle or "").strip(), "por": usuario["nombre"]})
+        # El estado se sincroniza solo con esta acción puntual: si no, queda a
+        # criterio del técnico acordarse de tocar un campo aparte, y ahí es
+        # donde se pierden casos (ver nota en constantes.py).
+        if accion.upper() == ACCION_NO_FINANCIABLE:
+            conn.execute(text("""
+                UPDATE sde_consultas SET estado = :estado, updated_at = NOW()
+                WHERE id = :cid AND estado IS DISTINCT FROM :estado
+            """), {"cid": cid, "estado": ESTADO_NO_FINANCIABLE})
     return {"ok": True}
 
 

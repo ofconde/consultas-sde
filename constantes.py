@@ -55,6 +55,16 @@ def excede_tope(monto) -> bool:
     return bool(monto) and monto > TOPE_LINEA
 
 
+# Cuando se carga esta acción, el campo `estado` de la consulta se pone en
+# sincronía sola (ver routers/acciones.py y crear_accion_bulk en
+# routers/consultas.py). Antes eran dos campos independientes: se detectaron 40
+# consultas con esta acción cargada pero el estado seguía en CONSULTA INICIAL —
+# el técnico avisaba al solicitante que no era financiable y se olvidaba de
+# reflejarlo en el estado, así que la consulta seguía "viva" en el panel.
+ACCION_NO_FINANCIABLE = "SE INFORMA QUE NO ES FINANCIABLE"
+ESTADO_NO_FINANCIABLE = "NO ES FINANCIABLE"
+
+
 def grupo_de(estado: str) -> str:
     return ESTADO_GRUPO.get((estado or "").strip().upper(), "INICIAL")
 

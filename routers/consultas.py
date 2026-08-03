@@ -7,7 +7,8 @@ from db import engine, proximo_codigo, cuits_duplicados
 from auth import require_login, require_coordinador, puede_editar
 from models import GestionIn, ConsultaManualIn, BulkGestionIn, BulkAccionIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto, _parse_fecha
-from constantes import grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS, TOPE_LINEA, excede_tope
+from constantes import (grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS, TOPE_LINEA, excede_tope,
+                         ACCION_NO_FINANCIABLE, ESTADO_NO_FINANCIABLE)
 import genero as genero_mod
 
 router = APIRouter(prefix="/api/consultas", tags=["consultas"])
@@ -294,6 +295,14 @@ def crear_accion_bulk(body: BulkAccionIn, usuario=Depends(require_login)):
                 VALUES (:cid, :fecha, :accion, :detalle, :por)
             """), {"cid": cid, "fecha": fecha, "accion": accion,
                    "detalle": detalle, "por": usuario["nombre"]})
+        # Mismo criterio que el alta individual (routers/acciones.py): esta acción
+        # puntual sincroniza el estado sola, para que la consulta no siga colgada
+        # en el listado normal por depender de que alguien toque el campo aparte.
+        if accion.upper() == ACCION_NO_FINANCIABLE and aplicar_ids:
+            conn.execute(text("""
+                UPDATE sde_consultas SET estado = :estado, updated_at = NOW()
+                WHERE id = ANY(:ids) AND estado IS DISTINCT FROM :estado
+            """), {"ids": aplicar_ids, "estado": ESTADO_NO_FINANCIABLE})
     log.info("Acción en lote: ids=%s accion=%s por=%s", aplicar_ids, accion, usuario["username"])
     return {"ok": True, "aplicados": len(aplicar_ids), "omitidos": omitidos}
 
