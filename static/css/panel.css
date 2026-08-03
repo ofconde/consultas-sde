@@ -154,15 +154,23 @@ th{background:#fafbfe;color:var(--muted);font-weight:600;font-size:0.75rem;text-
        user-select:none;touch-action:none}
 
 /* Desplegables inline en la tabla del panel (técnico, acción rápida) — se
-   activan clic a clic sobre la fila sin abrir el detalle; texto discreto en
-   reposo, como cualquier otro dato de la celda, y solo se nota al pasar el
-   mouse o abrir la lista. */
+   activan clic a clic sobre la fila sin abrir el detalle; en reposo tienen
+   que leerse como el resto de las celdas, no como un campo de formulario.
+   `appearance:none` es lo que hace la diferencia real acá: sin esto un
+   <select> dibuja su propio recuadro nativo del SO (borde + fondo) por
+   encima de cualquier border/background que le pongamos en CSS. La flechita
+   se reconstruye a mano, chica y gris, solo para no perder la pista de que
+   es clickeable. */
 .sel-inline{
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
   width:100%;border:1px solid transparent;background:transparent;color:var(--text);
-  font-family:inherit;font-size:0.875rem;padding:0.1875rem 0.25rem;border-radius:0.375rem;
-  cursor:pointer;
+  font-family:inherit;font-size:0.875rem;padding:0.1875rem 1.125rem 0.1875rem 0.25rem;
+  border-radius:0.375rem;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%238891a8'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 0.25rem center;
 }
-.sel-inline:hover,.sel-inline:focus{border-color:var(--border);background:#fff}
+.sel-inline:hover{background-color:#f7f9fd;border-color:var(--border)}
+.sel-inline:focus{background-color:#fff;border-color:var(--celeste);outline:none}
 .sel-accion-rapida{margin-top:0.25rem;color:var(--muted);font-size:0.8125rem}
 .th-rz:hover,.th-rz.arrastrando{background:var(--celeste)}
 tbody tr{cursor:pointer;transition:background .15s}
