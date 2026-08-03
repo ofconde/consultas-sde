@@ -215,6 +215,14 @@ td .nom{font-weight:600;color:var(--navy)}
 .ebtn.apartadas.active{background:var(--gray);border-color:var(--gray);color:#fff}
 .ebtn.apartadas.active .cnt{background:rgba(255,255,255,.25);color:#fff}
 
+/* Fianza de tercero — violeta, no rojo/gris: a diferencia de Duplicados/Monto
+   fuera de tope/Casos apartados, esto no es un problema a corregir ni una
+   categoría archivada — es una oportunidad de gestión a ofrecer (mismo
+   espíritu de color que "Posibles Mujeres", ver --rosa más abajo). */
+.ebtn.fianza{border-color:#d9cdf5;color:var(--violet)}
+.ebtn.fianza.active{background:var(--violet);border-color:var(--violet);color:#fff}
+.ebtn.fianza.active .cnt{background:rgba(255,255,255,.25);color:#fff}
+
 /* Botones */
 .btn{display:inline-flex;align-items:center;gap:0.4375rem;padding:0.5625rem 1rem;border-radius:0.625rem;border:1px solid var(--border);background:#fff;color:var(--navy);font-weight:600;font-size:0.875rem;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s,filter .15s}
 .btn:hover{border-color:var(--celeste)}

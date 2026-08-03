@@ -8,7 +8,7 @@ from auth import require_login, require_coordinador, puede_editar
 from models import GestionIn, ConsultaManualIn, BulkGestionIn, BulkAccionIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto, _parse_fecha
 from constantes import (grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS, TOPE_LINEA, excede_tope,
-                         ACCION_NO_FINANCIABLE, ESTADO_NO_FINANCIABLE)
+                         ACCION_NO_FINANCIABLE, ESTADO_NO_FINANCIABLE, TOPES_FIANZA_TERCERO)
 import genero as genero_mod
 
 router = APIRouter(prefix="/api/consultas", tags=["consultas"])
@@ -30,6 +30,22 @@ _CAMPOS_BUSQUEDA = [
     "departamento", "sector", "linea", "programa", "garantia",
     "tecnico", "estado", "situacion_arca", "arca_confirmado", "situacion_bcra",
 ]
+
+
+def _condicion_fianza_tercero(alias="c"):
+    """Condición SQL (+ params) para candidatos a gestión por fianza de tercero:
+    monotributo A/B/C con el monto EFECTIVO por debajo del tope que esa
+    categoría puede cubrir con fianza (TOPES_FIANZA_TERCERO en constantes.py).
+    Compartida entre `listar()` (el filtro del panel) y `resumen()` (el contador
+    del botón) para no repetir el mismo SQL dos veces."""
+    p = f"{alias}." if alias else ""
+    ors, params = [], {}
+    for i, (cat, tope) in enumerate(TOPES_FIANZA_TERCERO.items()):
+        ors.append(f"(COALESCE(NULLIF({p}arca_confirmado, ''), {p}situacion_arca) = :fz_arca_{i} "
+                   f"AND COALESCE(NULLIF({p}monto_confirmado, 0), {p}monto) <= :fz_tope_{i})")
+        params[f"fz_arca_{i}"] = cat
+        params[f"fz_tope_{i}"] = tope
+    return "(" + " OR ".join(ors) + ")", params
 
 
 def _fila_resumen(r):
@@ -76,7 +92,7 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
            departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
            situacion_arca: str = "", tipo_accion: str = "", sin_acciones: bool = False,
            fecha: str = "", genero: str = "", monto_excedido: bool = False,
-           apartadas: bool = False, usuario=Depends(require_login)):
+           apartadas: bool = False, fianza_tercero: bool = False, usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca en todos los campos de texto (nombre,
     CUIT, código, mail, teléfono, localidad, destino, observaciones, etc. — ver
     _CAMPOS_BUSQUEDA), así una consulta se encuentra sin saber en qué campo puntual
@@ -90,7 +106,10 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     `apartadas=1` muestra SOLO las NO ES FINANCIABLE. Sin este flag, esas consultas
     quedan fuera del listado por defecto (pidió Omar que no ensucien la vista diaria) —
     salvo que se las pida explícitamente con `estado=NO ES FINANCIABLE` (para no romper
-    el botón de estado ya existente ni una URL vieja que las tuviera filtradas)."""
+    el botón de estado ya existente ni una URL vieja que las tuviera filtradas).
+    `fianza_tercero=1` filtra candidatos a gestión por fianza de tercero (monotributo
+    A/B/C con el monto dentro de lo que esa categoría puede cubrir — ver
+    `_condicion_fianza_tercero`)."""
     where = ["1=1"]
     params = {}
     if apartadas:
@@ -102,6 +121,9 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         if estado != "NO ES FINANCIABLE":
             where.append("c.estado IS DISTINCT FROM :estado_oculto")
             params["estado_oculto"] = "NO ES FINANCIABLE"
+    if fianza_tercero:
+        cond, p2 = _condicion_fianza_tercero()
+        where.append(cond); params.update(p2)
     if fecha:
         where.append("c.fecha_recepcion::date = :fecha"); params["fecha"] = fecha
     if tecnico:
@@ -203,6 +225,10 @@ def resumen(_=Depends(require_login)):
             SELECT COUNT(*) FROM sde_consultas
             WHERE COALESCE(NULLIF(monto_confirmado, 0), monto) > :tope
         """), {"tope": TOPE_LINEA}).scalar() or 0
+        cond_fz, params_fz = _condicion_fianza_tercero(alias="")
+        fianza_tercero = conn.execute(text(f"""
+            SELECT COUNT(*) FROM sde_consultas WHERE {cond_fz}
+        """), params_fz).scalar() or 0
         sectores = conn.execute(text("""
             SELECT DISTINCT sector FROM sde_consultas
             WHERE sector IS NOT NULL AND sector <> '' ORDER BY sector
@@ -225,6 +251,7 @@ def resumen(_=Depends(require_login)):
         "posibles_mujeres": posibles_mujeres,
         "montos_excedidos": montos_excedidos,
         "tope_linea_fmt": _monto(TOPE_LINEA),
+        "fianza_tercero": fianza_tercero,
         "estados": estados_out,
         "sectores": [{"clave": r[0]} for r in sectores],
     }

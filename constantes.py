@@ -64,6 +64,18 @@ def excede_tope(monto) -> bool:
 ACCION_NO_FINANCIABLE = "SE INFORMA QUE NO ES FINANCIABLE"
 ESTADO_NO_FINANCIABLE = "NO ES FINANCIABLE"
 
+# Candidatos a gestión por fianza de tercero (30/07 con Omar): un monotributo
+# A/B/C no puede ser analizado por una SGR, pero sí puede acceder al crédito con
+# una fianza de tercero — siempre que el monto pedido entre dentro de lo que esa
+# categoría puede cubrir. Por eso el filtro no es solo "monotributo A/B/C", es
+# "A/B/C Y el monto efectivo por debajo de su propio tope" — un monotributo B
+# que pide $50 M no es candidato, la fianza tampoco le va a alcanzar.
+TOPES_FIANZA_TERCERO = {
+    "MONOTRIBUTO A": 6_000_000,
+    "MONOTRIBUTO B": 8_000_000,
+    "MONOTRIBUTO C": 10_000_000,
+}
+
 
 def grupo_de(estado: str) -> str:
     return ESTADO_GRUPO.get((estado or "").strip().upper(), "INICIAL")

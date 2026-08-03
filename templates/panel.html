@@ -88,7 +88,7 @@ const $ = s => document.querySelector(s);
 const ROL = "{{ usuario.rol }}";
 let TIMER = null;
 const PAGE_SIZE = 60;
-const state = { estado: '', mios: false, dups: false, sinAcciones: false, generoF: false, tope: false, apartadas: false, pagina: 1, seleccion: new Set() };
+const state = { estado: '', mios: false, dups: false, sinAcciones: false, generoF: false, tope: false, apartadas: false, fianza: false, pagina: 1, seleccion: new Set() };
 let ROWS = [];
 let TOPE_FMT = '$ 500.000.000';   // lo pisa /api/consultas/resumen con el valor real
 let META = { grupo_color: {} };
@@ -136,7 +136,7 @@ async function cargarResumen(){
     <div class="kpi card kpi-violet"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
 
   $('#kpi-total').addEventListener('click', () => {
-    Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false, generoF:false, tope:false, apartadas:false });
+    Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false, generoF:false, tope:false, apartadas:false, fianza:false });
     $('#q').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
     $('#f-accion').value=''; $('#f-departamento').value=''; $('#f-linea').value='';
     $('#f-programa').value=''; $('#f-sector').value=''; $('#f-arca').value='';
@@ -181,6 +181,13 @@ async function cargarResumen(){
     botones += `<button class="ebtn apartadas" id="btn-apartadas"
       title="Consultas marcadas NO ES FINANCIABLE — apartadas del listado normal"
       >🗂 Casos apartados <span class="cnt">${noFinanciables}</span></button>`;
+  // Candidatos a gestión por fianza de tercero: monotributo A/B/C con el monto
+  // dentro de lo que esa categoría puede cubrir (criterio y topes acordados con
+  // Omar el 31/07 — ver TOPES_FIANZA_TERCERO en constantes.py).
+  if(d.fianza_tercero > 0)
+    botones += `<button class="ebtn fianza" id="btn-fianza"
+      title="Monotributo A/B/C con el monto dentro de lo que esa categoría puede cubrir con fianza de tercero"
+      >🤝 Fianza de tercero <span class="cnt">${d.fianza_tercero}</span></button>`;
   $('#ebtns').innerHTML = botones;
 
   $('#ebtns').querySelectorAll('.ebtn[data-estado]').forEach(b => {
@@ -203,6 +210,10 @@ async function cargarResumen(){
   const bt = $('#btn-tope');
   if(bt) bt.addEventListener('click', () => {
     state.tope = !state.tope; pintarBotones(); cargarTabla();
+  });
+  const bf = $('#btn-fianza');
+  if(bf) bf.addEventListener('click', () => {
+    state.fianza = !state.fianza; pintarBotones(); cargarTabla();
   });
   const bd = $('#btn-dups');
   if(bd) bd.addEventListener('click', () => {
@@ -230,6 +241,7 @@ function pintarBotones(){
   const sa = $('#btn-sinacc'); if(sa) sa.classList.toggle('active', state.sinAcciones);
   const mj = $('#btn-mujeres'); if(mj) mj.classList.toggle('active', state.generoF);
   const bt = $('#btn-tope'); if(bt) bt.classList.toggle('active', state.tope);
+  const bf = $('#btn-fianza'); if(bf) bf.classList.toggle('active', state.fianza);
   const ba = $('#btn-apartadas'); if(ba) ba.classList.toggle('active', state.apartadas);
 }
 
@@ -276,6 +288,7 @@ function construirQuery(){
   if(state.generoF) p.set('genero','F');
   if(state.tope) p.set('monto_excedido','1');
   if(state.apartadas) p.set('apartadas','1');
+  if(state.fianza) p.set('fianza_tercero','1');
   return p;
 }
 
@@ -313,6 +326,7 @@ function restaurarDesdeURL(){
   if(p.get('genero')==='F') state.generoF = true;
   if(p.get('monto_excedido')==='1') state.tope = true;
   if(p.get('apartadas')==='1') state.apartadas = true;
+  if(p.get('fianza_tercero')==='1') state.fianza = true;
 }
 
 async function cargarTabla(){
