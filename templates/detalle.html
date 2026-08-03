@@ -296,7 +296,19 @@ $('#add-accion').addEventListener('click', async () => {
   if(!accion){ alert('Elegí un tipo de acción'); return; }
   const body = {accion, fecha:$('#a-fecha').value||null, detalle:$('#a-detalle').value};
   const r = await fetch('/api/consultas/'+CID+'/acciones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(r.ok){ $('#a-detalle').value=''; $('#a-fecha').value=''; refrescarAcciones(); }
+  if(r.ok){
+    $('#a-detalle').value=''; $('#a-fecha').value=''; refrescarAcciones();
+    // Ciertas acciones (ej. "SE INFORMA QUE NO ES FINANCIABLE") sincronizan el
+    // estado solas del lado del servidor. Sin este refresco, el <select> de
+    // Estado se queda con el valor viejo con el que se abrió la página, y un
+    // "Guardar" posterior lo manda de vuelta tal cual — pisando la sincronización
+    // que el servidor acababa de hacer. Se releen estado y grupo para que el
+    // dropdown y el badge queden al día antes de que se pueda tocar "Guardar".
+    const d = await (await fetch('/api/consultas/'+CID)).json();
+    CONSULTA = d.consulta;
+    $('#g-estado').value = d.consulta.estado;
+    badgeGrupo(d.consulta.grupo, d.consulta.estado);
+  }
 });
 
 async function refrescarAcciones(){
