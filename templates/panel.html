@@ -405,7 +405,7 @@ function filaHTML(c, numeroFila){
     <tr onclick="location.href='/consulta/${c.id}'">
       <td onclick="event.stopPropagation()"><input type="checkbox" class="chk-fila" data-id="${c.id}"
         ${state.seleccion.has(c.id)?'checked':''} onchange="toggleSeleccion(${c.id}, this.checked)"></td>
-      <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">#${numeroFila}</div></td>
+      <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">${escapeHtml(c.codigo)||'#'+numeroFila}</div></td>
       <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>${
           c.genero_estimado==='F' ? '<span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : ''}
         <div class="cod">${escapeHtml(c.cuit)}${c.cuit

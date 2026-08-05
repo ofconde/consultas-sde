@@ -37,7 +37,9 @@
           <div class="col-full"><label>Destino del financiamiento</label><span id="s-destino">—</span></div>
         </div>
 
-        <div class="sec-title">Gestión</div>
+        <div class="sec-title" style="display:flex;align-items:center;gap:0.625rem">
+          Gestión <span class="muted" id="guardado" style="font-size:0.8125rem;text-transform:none;letter-spacing:normal;font-weight:500"></span>
+        </div>
         <div class="g-grid">
           <div class="field"><label>Técnico responsable</label>
             <select id="g-tecnico"><option value="">— Sin asignar</option></select></div>
@@ -62,8 +64,6 @@
         </div>
         <div class="field" style="margin-top:0.75rem"><label>Observaciones</label><textarea id="g-observaciones"></textarea></div>
         <div class="field" style="margin-top:0.625rem"><label>Información extra</label><textarea id="g-informacion_extra"></textarea></div>
-        <button class="btn primary" id="guardar" style="margin-top:0.875rem">Guardar gestión</button>
-        <span class="muted" id="guardado" style="margin-left:0.625rem"></span>
       </div>
 
       <!-- Acciones -->
@@ -72,6 +72,15 @@
           <div class="sec-title" style="margin-top:0">Nueva acción</div>
           <div class="field"><label>Tipo de acción</label><select id="a-accion"></select></div>
           <div class="field"><label>Fecha</label><input id="a-fecha" type="date"></div>
+          <div class="field"><label>Detalle rápido</label>
+            <select id="a-detalle-rapido">
+              <option value="">— Elegir frase o escribir abajo —</option>
+              <option value="Por mail">Por mail</option>
+              <option value="Por teléfono">Por teléfono</option>
+              <option value="Por WhatsApp">Por WhatsApp</option>
+              <option value="Se envió formulario/documentación">Se envió formulario/documentación</option>
+            </select>
+          </div>
           <div class="field"><label>Detalle</label><textarea id="a-detalle" placeholder="Qué se hizo / resultado…"></textarea></div>
           <button class="btn primary" id="add-accion">Agregar acción</button>
         </div>
@@ -176,6 +185,16 @@ async function cargarBcra(cuit){
     el.innerHTML += `<div class="cod" style="color:var(--red);margin-top:0.25rem">${
       d.alertas.map(a=>escapeHtml(a)).join(' · ')}</div>`;
   }
+
+  // Autocompleta el campo manual de "Situación BCRA" con el resultado de la
+  // consulta automática, para no tener que retipearlo — solo si el campo está
+  // vacío, para no pisar una nota que el técnico ya haya escrito a mano.
+  const campoBcra = $('#g-situacion_bcra');
+  if(campoBcra && !campoBcra.value){
+    const texto = `${d.situacion_max} · ${d.situacion_label}`;
+    campoBcra.value = texto;
+    guardarCampo('situacion_bcra', texto);
+  }
 }
 
 // Tope de crédito del CFI. Un monto por encima casi siempre es un error de tipeo
@@ -271,24 +290,57 @@ function renderAcciones(acc){
     </li>`).join('');
 }
 
-$('#guardar').addEventListener('click', async () => {
-  const body = {
-    tecnico:$('#g-tecnico').value, estado:$('#g-estado').value,
-    departamento:$('#g-departamento').value, localidad_confirmada:$('#g-localidad_confirmada').value,
-    linea:$('#g-linea').value, programa:$('#g-programa').value, garantia:$('#g-garantia').value,
-    arca_confirmado:$('#g-arca_confirmado').value, situacion_bcra:$('#g-situacion_bcra').value,
-    actividad_inscripta:$('#g-actividad_inscripta').value, observaciones:$('#g-observaciones').value,
-    informacion_extra:$('#g-informacion_extra').value, monto_confirmado:$('#g-monto_confirmado').value,
-    monto:$('#g-monto').value,
-  };
-  const r = await fetch('/api/consultas/'+CID, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+// Guardado automático por campo: cada control de Gestión se guarda solo, al
+// tipo de cambio que le corresponda (select → change, texto → blur). Reemplaza
+// al botón "Guardar gestión", que obligaba a un segundo click y arrastraba el
+// riesgo de reenviar el formulario entero con algún campo desactualizado (ver
+// el refresco de #g-estado en "add-accion" más abajo, que existía justamente
+// para evitar eso). El endpoint ya soporta PATCH de un solo campo — es el mismo
+// mecanismo que usan hace rato "guardar monto" acá y "cambiarTecnico" en panel.html.
+async function guardarCampo(campo, valor){
+  const ind = $('#guardado');
+  if(ind) ind.textContent = 'Guardando…';
+  const body = {}; body[campo] = valor;
+  const r = await fetch('/api/consultas/'+CID, {
+    method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
+  });
   if(r.ok){
-    $('#guardado').textContent='✓ Guardado';
-    const nuevoEstado = $('#g-estado').value;
-    badgeGrupo(META.estado_grupo[nuevoEstado] || 'INICIAL', nuevoEstado);
-    setTimeout(()=>$('#guardado').textContent='',2000);
+    CONSULTA[campo] = valor;
+    if(campo === 'estado'){
+      badgeGrupo(META.estado_grupo[valor] || 'INICIAL', valor);
+    }
+    if(ind){
+      ind.textContent = '✓ Guardado';
+      setTimeout(()=>{ if(ind.textContent==='✓ Guardado') ind.textContent=''; }, 1500);
+    }
+  } else {
+    const d = await r.json().catch(()=>({}));
+    if(ind) ind.textContent = '';
+    alert(d.detail || 'No se pudo guardar.');
   }
-  else $('#guardado').textContent='Error al guardar';
+}
+
+const CAMPOS_SELECT_GESTION = ['tecnico','estado','departamento','linea','programa','garantia','arca_confirmado'];
+CAMPOS_SELECT_GESTION.forEach(campo => {
+  $('#g-'+campo).addEventListener('change', () => guardarCampo(campo, $('#g-'+campo).value));
+});
+
+const CAMPOS_TEXTO_GESTION = ['localidad_confirmada','situacion_bcra','actividad_inscripta','observaciones','informacion_extra'];
+CAMPOS_TEXTO_GESTION.forEach(campo => {
+  $('#g-'+campo).addEventListener('blur', () => guardarCampo(campo, $('#g-'+campo).value));
+});
+
+// El monto confirmado no tenía guardado propio (dependía del botón "Guardar
+// gestión" que se sacó); el monto solicitado sigue con su propio botón
+// dedicado, sin tocar — es la excepción ya documentada de corrección abierta
+// a cualquier técnico aunque la consulta no sea suya.
+$('#g-monto_confirmado').addEventListener('blur', () => guardarCampo('monto_confirmado', $('#g-monto_confirmado').value));
+
+// Frases comunes para no retipear el detalle en cada acción; el textarea queda
+// editable igual, por si hace falta agregar algo puntual a la frase elegida.
+$('#a-detalle-rapido').addEventListener('change', () => {
+  const frase = $('#a-detalle-rapido').value;
+  if(frase) $('#a-detalle').value = frase;
 });
 
 $('#add-accion').addEventListener('click', async () => {
@@ -297,7 +349,7 @@ $('#add-accion').addEventListener('click', async () => {
   const body = {accion, fecha:$('#a-fecha').value||null, detalle:$('#a-detalle').value};
   const r = await fetch('/api/consultas/'+CID+'/acciones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(r.ok){
-    $('#a-detalle').value=''; $('#a-fecha').value=''; refrescarAcciones();
+    $('#a-detalle').value=''; $('#a-fecha').value=''; $('#a-detalle-rapido').value=''; refrescarAcciones();
     // Ciertas acciones (ej. "SE INFORMA QUE NO ES FINANCIABLE") sincronizan el
     // estado solas del lado del servidor. Sin este refresco, el <select> de
     // Estado se queda con el valor viejo con el que se abrió la página, y un
