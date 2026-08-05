@@ -289,6 +289,9 @@ function construirQuery(){
   if(state.tope) p.set('monto_excedido','1');
   if(state.apartadas) p.set('apartadas','1');
   if(state.fianza) p.set('fianza_tercero','1');
+  // Solo se guarda si no es la 1 — mantiene las URLs limpias en el caso común
+  // y evita que "página 1" quede escrito por todos lados sin necesidad.
+  if(state.pagina > 1) p.set('pagina', state.pagina);
   return p;
 }
 
@@ -327,14 +330,23 @@ function restaurarDesdeURL(){
   if(p.get('monto_excedido')==='1') state.tope = true;
   if(p.get('apartadas')==='1') state.apartadas = true;
   if(p.get('fianza_tercero')==='1') state.fianza = true;
+  if(p.has('pagina')) state.pagina = parseInt(p.get('pagina'), 10) || 1;
 }
 
-async function cargarTabla(){
+// `mantenerPagina`: al arrancar la página (boot) hay que respetar la página que
+// traía la URL — típicamente porque se volvió de "Volver al panel" estando en
+// la página 4 de 8, y sin esto el panel siempre reaparecía en la 1 aunque la
+// URL diga otra cosa. Cualquier cambio de filtro real (buscar, tocar un botón
+// de estado, etc.) sigue arrancando en la página 1, que es lo correcto ahí.
+async function cargarTabla(mantenerPagina){
+  // Se resetea ANTES de armar la query: así la URL/sessionStorage quedan bien
+  // sincronizadas desde el primer momento (si se resetea después, la URL llega
+  // a mostrar brevemente la página vieja hasta el próximo cambio de filtro).
+  if(!mantenerPagina) state.pagina = 1;
   const p = construirQuery();
   sincronizarURL(p);
   const r = await fetch('/api/consultas?'+p); const d = await r.json();
   ROWS = d.consultas;
-  state.pagina = 1;
   // Un cambio de filtro puede sacar de la vista filas que estaban tildadas —
   // se limpia la selección para no arrastrar ids que ya no se ven.
   state.seleccion.clear();
@@ -512,8 +524,12 @@ function renderPagina(){
         <span class="pg">Página ${state.pagina} / ${pages}</span>
         <button class="btn sm" id="pg-next" ${state.pagina>=pages?'disabled':''}>Siguiente →</button>
       </span>`;
-    $('#pg-prev').onclick = ()=>{ if(state.pagina>1){ state.pagina--; renderPagina(); window.scrollTo(0,0);} };
-    $('#pg-next').onclick = ()=>{ if(state.pagina<pages){ state.pagina++; renderPagina(); window.scrollTo(0,0);} };
+    // sincronizarURL() acá es lo que hace que "Volver al panel" te devuelva a la
+    // página en la que estabas trabajando: sin esto, cambiar de página con estos
+    // botones nunca quedaba escrito en la URL/sessionStorage, y un vuelta al panel
+    // siempre caía en la página 1 aunque hubieras estado en la 4.
+    $('#pg-prev').onclick = ()=>{ if(state.pagina>1){ state.pagina--; renderPagina(); sincronizarURL(construirQuery()); window.scrollTo(0,0);} };
+    $('#pg-next').onclick = ()=>{ if(state.pagina<pages){ state.pagina++; renderPagina(); sincronizarURL(construirQuery()); window.scrollTo(0,0);} };
   } else {
     pg.style.display = 'none';
   }
@@ -725,7 +741,9 @@ function iniciarRedimensionColumnas(){
   // restaurado — antes de esto, seteás un valor que ninguna <option> tiene todavía.
   restaurarDesdeURL();
   pintarBotones(); pintarKpis();
-  await cargarTabla();
+  // true: respeta la página que haya traído la URL (ver nota en cargarTabla) —
+  // es lo que hace que "Volver al panel" te devuelva a donde estabas.
+  await cargarTabla(true);
 })();
 </script>
 {% endblock %}
