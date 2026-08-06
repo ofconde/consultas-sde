@@ -418,7 +418,7 @@ function filaHTML(c, numeroFila){
           : ''}${c.mail
           ? `<button class="copy-btn copy-btn-xs" data-mail="${escapeHtml(c.mail)}"
                onclick="event.stopPropagation();copiar(this.dataset.mail,this)" title="Copiar mail">copiar mail</button>`
-          : ''}</div>${(dup || c.situacion_arca) ? `<div class="cod">${dup}${c.situacion_arca ? ` · ${escapeHtml(c.situacion_arca)}` : ''}</div>` : ''}</td>
+          : ''}</div>${(dup || c.situacion_arca) ? `<div class="cod">${dup}${c.situacion_arca ? `${dup ? ' · ' : ''}${escapeHtml(c.situacion_arca)}` : ''}</div>` : ''}</td>
       <td>${escapeHtml(c.localidad)||'—'}</td>
       <td>${c.sector?`<span class="chip">${escapeHtml(c.sector)}</span>`:'—'}</td>
       <td>${escapeHtml(c.monto)}${c.monto_excede
