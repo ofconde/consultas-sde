@@ -44,6 +44,9 @@
       <input type="text" id="bulk-accion-detalle" placeholder="Detalle (opcional)">
       <button class="btn sm primary" id="bulk-agregar-accion">Agregar acción a todas</button>
       <span class="bulkbar-sep"></span>
+      <select id="bulk-arca"><option value="">Situación ARCA confirmada…</option></select>
+      <button class="btn sm primary" id="bulk-arca-confirmar">Confirmar</button>
+      <span class="bulkbar-sep"></span>
       <button class="btn sm" id="bulk-cancelar">Cancelar selección</button>
     </div>
 
@@ -110,6 +113,7 @@ async function cargarCatalogos(){
   llenar($('#f-linea'), CAT.LINEA||[], 'Todas las líneas');
   llenar($('#f-programa'), CAT.PROGRAMA||[], 'Todos los programas');
   llenar($('#bulk-accion-tipo'), CAT.ACCION||[], 'Tipo de acción…');
+  llenar($('#bulk-arca'), CAT.SITUACION_AFIP||[], 'Situación ARCA confirmada…');
   // ARCA sí se llena desde el catálogo: a diferencia de sector, estos valores son un
   // listado fijo (RESPONSABLE INSCRIPTO, MONOTRIBUTO A-K, etc.) y coinciden con los
   // que realmente están guardados — verificado contra la base, no supuesto.
@@ -411,6 +415,9 @@ function filaHTML(c, numeroFila){
         <div class="cod">${escapeHtml(c.cuit)}${c.cuit
           ? `<button class="copy-btn" data-cuit="${escapeHtml(c.cuit)}"
                onclick="event.stopPropagation();copiar(this.dataset.cuit,this)" title="Copiar CUIT">copiar</button>`
+          : ''}${c.mail
+          ? `<button class="copy-btn" data-mail="${escapeHtml(c.mail)}"
+               onclick="event.stopPropagation();copiar(this.dataset.mail,this)" title="Copiar mail">mail</button>`
           : ''}${dup}${c.situacion_arca ? ` · ${escapeHtml(c.situacion_arca)}` : ''}</div></td>
       <td>${escapeHtml(c.localidad)||'—'}</td>
       <td>${c.sector?`<span class="chip">${escapeHtml(c.sector)}</span>`:'—'}</td>
@@ -607,6 +614,24 @@ $('#bulk-asignar').addEventListener('click', async () => {
     const d = await r.json();
     if(!r.ok){ alert(d.detail || 'No se pudo asignar.'); return; }
     alert(`${d.aplicados} consulta(s) asignada(s) a ${tecnico}.${avisoOmitidos(d.omitidos)}`);
+    state.seleccion.clear();
+    await cargarResumen(); await cargarTabla();
+  } finally { btn.disabled = false; }
+});
+
+$('#bulk-arca-confirmar').addEventListener('click', async () => {
+  const arca_confirmado = $('#bulk-arca').value;
+  if(!arca_confirmado){ alert('Elegí la situación ARCA a confirmar.'); return; }
+  const ids = [...state.seleccion];
+  const btn = $('#bulk-arca-confirmar'); btn.disabled = true;
+  try{
+    const r = await fetch('/api/consultas/bulk', {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ids, arca_confirmado }),
+    });
+    const d = await r.json();
+    if(!r.ok){ alert(d.detail || 'No se pudo confirmar la situación ARCA.'); return; }
+    alert(`Situación ARCA confirmada en ${d.aplicados} consulta(s).${avisoOmitidos(d.omitidos)}`);
     state.seleccion.clear();
     await cargarResumen(); await cargarTabla();
   } finally { btn.disabled = false; }

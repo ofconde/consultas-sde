@@ -59,9 +59,10 @@ class AccionIn(BaseModel):
 class BulkGestionIn(BaseModel):
     """Asignación en lote: mismo técnico y/o estado para un grupo de consultas
     (ej. 15 casos sin ARCA activo que llegan juntos y se descartan de una)."""
-    ids:     List[int] = Field(min_length=1, max_length=500)
-    tecnico: Optional[str] = _TXT
-    estado:  Optional[str] = _TXT
+    ids:            List[int] = Field(min_length=1, max_length=500)
+    tecnico:        Optional[str] = _TXT
+    estado:         Optional[str] = _TXT
+    arca_confirmado: Optional[str] = _TXT
 
 
 class BulkAccionIn(BaseModel):
