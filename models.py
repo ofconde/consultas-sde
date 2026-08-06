@@ -64,6 +64,7 @@ class BulkGestionIn(BaseModel):
     estado:         Optional[str] = _TXT
     arca_confirmado: Optional[str] = _TXT
     linea:          Optional[str] = _TXT
+    programa:       Optional[str] = _TXT
 
 
 class BulkAccionIn(BaseModel):
