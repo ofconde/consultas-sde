@@ -286,6 +286,8 @@ def editar_gestion_bulk(body: BulkGestionIn, usuario=Depends(require_login)):
         campos["estado"] = body.estado
     if body.arca_confirmado is not None:
         campos["arca_confirmado"] = body.arca_confirmado
+    if body.linea is not None:
+        campos["linea"] = body.linea
     if not campos:
         raise HTTPException(422, "Nada para actualizar")
     # Reasignar a otro técnico sigue siendo privilegio del coordinador — mismo

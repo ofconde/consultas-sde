@@ -47,6 +47,9 @@
       <select id="bulk-arca"><option value="">Situación ARCA confirmada…</option></select>
       <button class="btn sm primary" id="bulk-arca-confirmar">Confirmar</button>
       <span class="bulkbar-sep"></span>
+      <select id="bulk-linea"><option value="">Asignar línea…</option></select>
+      <button class="btn sm primary" id="bulk-linea-asignar">Asignar</button>
+      <span class="bulkbar-sep"></span>
       <button class="btn sm" id="bulk-cancelar">Cancelar selección</button>
     </div>
 
@@ -114,6 +117,7 @@ async function cargarCatalogos(){
   llenar($('#f-programa'), CAT.PROGRAMA||[], 'Todos los programas');
   llenar($('#bulk-accion-tipo'), CAT.ACCION||[], 'Tipo de acción…');
   llenar($('#bulk-arca'), CAT.SITUACION_AFIP||[], 'Situación ARCA confirmada…');
+  llenar($('#bulk-linea'), CAT.LINEA||[], 'Asignar línea…');
   // ARCA sí se llena desde el catálogo: a diferencia de sector, estos valores son un
   // listado fijo (RESPONSABLE INSCRIPTO, MONOTRIBUTO A-K, etc.) y coinciden con los
   // que realmente están guardados — verificado contra la base, no supuesto.
@@ -632,6 +636,24 @@ $('#bulk-arca-confirmar').addEventListener('click', async () => {
     const d = await r.json();
     if(!r.ok){ alert(d.detail || 'No se pudo confirmar la situación ARCA.'); return; }
     alert(`Situación ARCA confirmada en ${d.aplicados} consulta(s).${avisoOmitidos(d.omitidos)}`);
+    state.seleccion.clear();
+    await cargarResumen(); await cargarTabla();
+  } finally { btn.disabled = false; }
+});
+
+$('#bulk-linea-asignar').addEventListener('click', async () => {
+  const linea = $('#bulk-linea').value;
+  if(!linea){ alert('Elegí la línea a asignar.'); return; }
+  const ids = [...state.seleccion];
+  const btn = $('#bulk-linea-asignar'); btn.disabled = true;
+  try{
+    const r = await fetch('/api/consultas/bulk', {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ids, linea }),
+    });
+    const d = await r.json();
+    if(!r.ok){ alert(d.detail || 'No se pudo asignar la línea.'); return; }
+    alert(`Línea asignada en ${d.aplicados} consulta(s).${avisoOmitidos(d.omitidos)}`);
     state.seleccion.clear();
     await cargarResumen(); await cargarTabla();
   } finally { btn.disabled = false; }
