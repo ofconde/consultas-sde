@@ -96,7 +96,11 @@ h3{font-size:1.125rem}
 /* Variante compacta para filas de tabla con más de un botón de copiar seguido
    (CUIT + mail): mismo font-size que .copy-btn (ver nota arriba, no bajar más
    con la escala al 61.2%), pero menos padding/margen para que entren juntos. */
-.copy-btn-xs{padding:0.125rem 0.375rem;margin-left:0.375rem}
+.copy-btn-xs{padding:0.125rem 0.375rem;margin-left:0}
+/* CUIT + botones copiar cuit/mail: si no entran en una línea, que el segundo
+   botón baje alineado con el primero (flex-wrap) en vez de quedar suelto a la
+   izquierda con la métrica rara del salto de línea inline por defecto. */
+.cod-cuit-row{display:flex;flex-wrap:wrap;align-items:center;gap:0.375rem;row-gap:0.25rem}
 
 /* Filtros */
 /* Sticky debajo del topbar: sin overflow-x:auto en ningún ancestro entre esto

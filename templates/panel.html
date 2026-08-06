@@ -412,7 +412,7 @@ function filaHTML(c, numeroFila){
       <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">${escapeHtml(c.codigo)||'#'+numeroFila}</div></td>
       <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>${
           c.genero_estimado==='F' ? '<span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : ''}
-        <div class="cod">${escapeHtml(c.cuit)}${c.cuit
+        <div class="cod cod-cuit-row">${escapeHtml(c.cuit)}${c.cuit
           ? `<button class="copy-btn copy-btn-xs" data-cuit="${escapeHtml(c.cuit)}"
                onclick="event.stopPropagation();copiar(this.dataset.cuit,this)" title="Copiar CUIT">copiar cuit</button>`
           : ''}${c.mail
