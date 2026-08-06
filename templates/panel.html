@@ -413,11 +413,11 @@ function filaHTML(c, numeroFila){
       <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>${
           c.genero_estimado==='F' ? '<span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : ''}
         <div class="cod">${escapeHtml(c.cuit)}${c.cuit
-          ? `<button class="copy-btn" data-cuit="${escapeHtml(c.cuit)}"
-               onclick="event.stopPropagation();copiar(this.dataset.cuit,this)" title="Copiar CUIT">copiar</button>`
+          ? `<button class="copy-btn copy-btn-xs" data-cuit="${escapeHtml(c.cuit)}"
+               onclick="event.stopPropagation();copiar(this.dataset.cuit,this)" title="Copiar CUIT">copiar cuit</button>`
           : ''}${c.mail
-          ? `<button class="copy-btn" data-mail="${escapeHtml(c.mail)}"
-               onclick="event.stopPropagation();copiar(this.dataset.mail,this)" title="Copiar mail">mail</button>`
+          ? `<button class="copy-btn copy-btn-xs" data-mail="${escapeHtml(c.mail)}"
+               onclick="event.stopPropagation();copiar(this.dataset.mail,this)" title="Copiar mail">copiar mail</button>`
           : ''}${dup}${c.situacion_arca ? ` · ${escapeHtml(c.situacion_arca)}` : ''}</div></td>
       <td>${escapeHtml(c.localidad)||'—'}</td>
       <td>${c.sector?`<span class="chip">${escapeHtml(c.sector)}</span>`:'—'}</td>

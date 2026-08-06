@@ -93,6 +93,10 @@ h3{font-size:1.125rem}
 .copy-btn.ok{border-color:var(--green);color:var(--green);background:#e5f7ee}
 .copy-btn.destacado{color:var(--celeste);border-color:#bfe4f5}
 .copy-btn.destacado:hover{background:var(--celeste);color:#fff;border-color:var(--celeste)}
+/* Variante compacta para filas de tabla con más de un botón de copiar seguido
+   (CUIT + mail): mismo font-size que .copy-btn (ver nota arriba, no bajar más
+   con la escala al 61.2%), pero menos padding/margen para que entren juntos. */
+.copy-btn-xs{padding:0.125rem 0.375rem;margin-left:0.375rem}
 
 /* Filtros */
 /* Sticky debajo del topbar: sin overflow-x:auto en ningún ancestro entre esto
