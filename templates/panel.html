@@ -28,6 +28,7 @@
         <button class="btn sm" id="dia-next" title="Día siguiente">▶</button>
         <button class="btn sm" id="dia-limpiar" title="Quitar el filtro de día" style="display:none">✕</button>
       </span>
+      <button class="btn sm" id="btn-limpiar-filtros" title="Sacar todos los filtros activos (búsqueda, dropdowns, botones de estado y día)">✕ Limpiar filtros</button>
       <span class="muted" id="cont"></span>
     </div>
 
@@ -145,14 +146,7 @@ async function cargarResumen(){
     <div class="kpi card kpi-red clickable" id="kpi-sin-acciones"><div class="n">${d.sin_acciones}</div><div class="l">Sin acciones</div></div>
     <div class="kpi card kpi-violet"><div class="n">${d.nuevas_semana}</div><div class="l">Nuevas (7 días)</div></div>`;
 
-  $('#kpi-total').addEventListener('click', () => {
-    Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false, generoF:false, tope:false, apartadas:false, fianza:false });
-    $('#q').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
-    $('#f-accion').value=''; $('#f-departamento').value=''; $('#f-linea').value='';
-    $('#f-programa').value=''; $('#f-sector').value=''; $('#f-arca').value='';
-    $('#f-fecha').value=''; $('#dia-limpiar').style.display = 'none';
-    pintarBotones(); pintarKpis(); cargarTabla();
-  });
+  $('#kpi-total').addEventListener('click', limpiarFiltros);
   $('#kpi-sin-asignar').addEventListener('click', () => {
     $('#f-tecnico').value = $('#f-tecnico').value === '__sin__' ? '' : '__sin__';
     pintarKpis(); cargarTabla();
@@ -259,6 +253,18 @@ function pintarKpis(){
   const k = $('#kpi-sin-acciones'); if(k) k.classList.toggle('active', state.sinAcciones);
   const a = $('#kpi-sin-asignar'); if(a) a.classList.toggle('active', $('#f-tecnico').value === '__sin__');
 }
+
+// Con tantos filtros/botones (dropdowns, botones de estado, día, KPIs clicables)
+// no siempre es obvio cuál quedó activo — un solo botón que resetea todo a la vez.
+function limpiarFiltros(){
+  Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false, generoF:false, tope:false, apartadas:false, fianza:false });
+  $('#q').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
+  $('#f-accion').value=''; $('#f-departamento').value=''; $('#f-linea').value='';
+  $('#f-programa').value=''; $('#f-sector').value=''; $('#f-arca').value='';
+  $('#f-fecha').value=''; $('#dia-limpiar').style.display = 'none';
+  pintarBotones(); pintarKpis(); cargarTabla();
+}
+$('#btn-limpiar-filtros').addEventListener('click', limpiarFiltros);
 
 async function cargarTecnicos(){
   // Usuarios activos registrados + cualquier nombre viejo que ya esté en las
