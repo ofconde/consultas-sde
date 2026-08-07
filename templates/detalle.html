@@ -276,6 +276,7 @@ async function cargar(){
   montoAutoFormato('#g-monto_confirmado');
 
   fill($('#a-accion'), CAT.ACCION||[], '');
+  $('#a-fecha').value = hoyISO();
   renderAcciones(d.acciones);
 }
 
@@ -349,7 +350,7 @@ $('#add-accion').addEventListener('click', async () => {
   const body = {accion, fecha:$('#a-fecha').value||null, detalle:$('#a-detalle').value};
   const r = await fetch('/api/consultas/'+CID+'/acciones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(r.ok){
-    $('#a-detalle').value=''; $('#a-fecha').value=''; $('#a-detalle-rapido').value=''; refrescarAcciones();
+    $('#a-detalle').value=''; $('#a-fecha').value=hoyISO(); $('#a-detalle-rapido').value=''; refrescarAcciones();
     // Ciertas acciones (ej. "SE INFORMA QUE NO ES FINANCIABLE") sincronizan el
     // estado solas del lado del servidor. Sin este refresco, el <select> de
     // Estado se queda con el valor viejo con el que se abrió la página, y un
