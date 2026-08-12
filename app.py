@@ -99,6 +99,14 @@ def panel(request: Request):
     return templates.TemplateResponse("panel.html", {"request": request, "usuario": u, "activo": "panel"})
 
 
+@app.get("/panel/lectura", response_class=HTMLResponse)
+def panel_lectura(request: Request):
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("lectura.html", {"request": request, "usuario": u, "activo": "lectura"})
+
+
 @app.get("/consulta/nueva", response_class=HTMLResponse)
 def consulta_nueva_page(request: Request):
     # esta ruta debe registrarse ANTES que /consulta/{cid}: si no, FastAPI intenta

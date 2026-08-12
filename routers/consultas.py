@@ -69,6 +69,7 @@ def _fila_resumen(r):
         "linea": r["linea"],
         "programa": r["programa"],
         "destino": r["destino"],
+        "actividad_economica": r["actividad_economica"],
         "tecnico": r["tecnico"],
         "estado": r["estado"],
         "grupo": grupo_de(r["estado"]),
