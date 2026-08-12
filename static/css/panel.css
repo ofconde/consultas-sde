@@ -298,22 +298,26 @@ a:focus-visible,.btn:focus-visible,.ebtn:focus-visible,
   border-radius:0.625rem;font-size:0.875rem;font-family:inherit;background:#fff}
 .lectura-filtros input[type=search]{min-width:16rem}
 .lf-check{display:flex;align-items:center;gap:0.4375rem;font-size:0.875rem;color:var(--text);cursor:pointer;user-select:none}
-.lectura-lista{display:flex;flex-direction:column;overflow:hidden}
-.lf-fila{display:grid;grid-template-columns:8.5rem 15rem 1fr 1fr 8rem;gap:1rem;align-items:center;
-  padding:0.75rem 1.125rem;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
-.lf-fila:last-child{border-bottom:none}
-.lf-fila:hover{background:var(--bg)}
-.lf-col-cod .cod{font-size:0.75rem;color:var(--muted);font-family:ui-monospace,monospace}
-.lf-dias{font-size:0.75rem;font-weight:700;color:var(--muted);margin-top:0.125rem}
+.lectura-tabla-wrap{overflow:hidden}
+.lf-tabla{width:100%;border-collapse:collapse;font-size:0.8125rem}
+.lf-tabla th{position:sticky;top:0;background:#fff;text-align:left;padding:0.5rem 0.625rem;
+  border-bottom:2px solid var(--border);font-size:0.6875rem;text-transform:uppercase;
+  letter-spacing:0.02em;color:var(--muted);font-weight:700;white-space:nowrap}
+.lf-tabla td{padding:0.4375rem 0.625rem;border-bottom:1px solid var(--border);vertical-align:middle}
+.lf-tabla tbody tr{cursor:pointer;transition:background .12s}
+.lf-tabla tbody tr:hover{background:var(--bg)}
+.lf-th-dias,.lf-td-dias{width:3.5rem;text-align:center}
+.lf-td-dias{font-weight:700;color:var(--muted)}
 .lf-dias-urgente{color:var(--red)}
-.lf-col-sol .nom{font-weight:600;color:var(--navy)}
-.lf-col-sol .cod{margin-top:0.125rem}
-.lf-sin-asignar{color:var(--amber);font-weight:600}
-.lf-label{font-size:0.6875rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.02em;margin-bottom:0.125rem}
-.lf-col-texto{font-size:0.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lf-col-monto{font-weight:700;color:var(--navy);text-align:right;white-space:nowrap}
+.lf-th-cod{width:6.5rem}
+.lf-tabla .cod{font-size:0.75rem;color:var(--muted);font-family:ui-monospace,monospace}
+.lf-tabla .nom{font-weight:600;color:var(--navy);white-space:nowrap;max-width:12rem;
+  overflow:hidden;text-overflow:ellipsis}
+.lf-sin-asignar{color:var(--amber);font-weight:600;font-size:0.75rem}
+.lf-th-monotributo,.lf-td-monotributo{width:5.5rem;text-align:center;font-weight:700;color:var(--navy)}
+.lf-td-texto{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:16rem}
+.lf-th-monto,.lf-td-monto{text-align:right;white-space:nowrap;font-weight:700;color:var(--navy)}
 .lectura-vacio{padding:2rem;text-align:center}
 @media (max-width: 62rem){
-  .lf-fila{grid-template-columns:1fr;gap:0.375rem}
-  .lf-col-texto{white-space:normal}
+  .lf-td-texto{max-width:9rem}
 }

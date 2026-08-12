@@ -16,7 +16,24 @@
       <span class="muted" id="lf-cont"></span>
     </div>
 
-    <div class="card lectura-lista" id="lf-lista"></div>
+    <div class="tabla-wrap card lectura-tabla-wrap">
+      <div class="tabla-scroll">
+        <table class="lf-tabla">
+          <thead><tr>
+            <th class="lf-th-dias">Días</th>
+            <th class="lf-th-cod">Código</th>
+            <th>Solicitante</th>
+            <th>CUIT</th>
+            <th>Técnico</th>
+            <th class="lf-th-monotributo">Monotributo</th>
+            <th>Actividad declarada</th>
+            <th>Destino del financiamiento</th>
+            <th class="lf-th-monto">Monto</th>
+          </tr></thead>
+          <tbody id="lf-tbody"></tbody>
+        </table>
+      </div>
+    </div>
     <div class="muted lectura-vacio" id="lf-vacio" style="display:none">No hay consultas que coincidan con este filtro.</div>
   </div>
 {% endblock %}
@@ -33,6 +50,20 @@ function diasDesde(fechaDMY){
   const fecha = new Date(y, m-1, d);
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   return Math.round((hoy - fecha) / 86400000);
+}
+
+// Mismas abreviaturas cortas que se usan a mano para tramitar en lote (CASFOG,
+// SGR, etc.): RI, EX, y solo la letra para monotributo — así entra en una
+// columna angosta sin perder el dato.
+function abreviarArca(s){
+  if(!s) return null;
+  if(s === 'RESPONSABLE INSCRIPTO') return 'RI';
+  if(s === 'EXENTO') return 'EX';
+  if(s === 'NO INSCRIPTO') return 'NI';
+  if(s === 'SOCIAL') return 'SOC';
+  if(s === 'NO SE PUEDE VERIFICAR') return '?';
+  const m = s.match(/^MONOTRIBUTO (\w)$/);
+  return m ? m[1] : s;
 }
 
 async function cargarTecnicos(){
@@ -77,26 +108,18 @@ function truncar(s, n){
 function render(){
   $('#lf-cont').textContent = ROWS.length + ' consulta' + (ROWS.length===1?'':'s');
   $('#lf-vacio').style.display = ROWS.length ? 'none' : 'block';
-  $('#lf-lista').innerHTML = ROWS.map(c => `
-    <div class="lf-fila" onclick="location.href='/consulta/${c.id}'">
-      <div class="lf-col-cod">
-        <div class="cod">${escapeHtml(c.codigo)}</div>
-        <div class="lf-dias ${c.dias >= 15 ? 'lf-dias-urgente' : ''}">${c.dias==null ? '' : c.dias + ' día' + (c.dias===1?'':'s')}</div>
-      </div>
-      <div class="lf-col-sol">
-        <div class="nom">${escapeHtml(c.nombre)||'—'}</div>
-        <div class="cod">${escapeHtml(c.cuit)||'—'}${c.tecnico ? ' · ' + escapeHtml(c.tecnico) : ' · <span class=\"lf-sin-asignar\">sin asignar</span>'}</div>
-      </div>
-      <div class="lf-col-texto">
-        <div class="lf-label">Actividad declarada</div>
-        <div>${truncar(c.actividad_economica, 70)}</div>
-      </div>
-      <div class="lf-col-texto">
-        <div class="lf-label">Destino del financiamiento</div>
-        <div>${truncar(c.destino, 70)}</div>
-      </div>
-      <div class="lf-col-monto">${escapeHtml(c.monto)}</div>
-    </div>`).join('');
+  $('#lf-tbody').innerHTML = ROWS.map(c => `
+    <tr onclick="location.href='/consulta/${c.id}'">
+      <td class="lf-td-dias ${c.dias >= 15 ? 'lf-dias-urgente' : ''}">${c.dias==null ? '—' : c.dias}</td>
+      <td class="cod">${escapeHtml(c.codigo)}</td>
+      <td class="nom">${escapeHtml(c.nombre)||'—'}</td>
+      <td class="cod">${escapeHtml(c.cuit)||'—'}</td>
+      <td>${c.tecnico ? escapeHtml(c.tecnico) : '<span class="lf-sin-asignar">sin asignar</span>'}</td>
+      <td class="lf-td-monotributo">${escapeHtml(abreviarArca(c.situacion_arca)) || '<span class="muted">—</span>'}</td>
+      <td class="lf-td-texto">${truncar(c.actividad_economica, 55)}</td>
+      <td class="lf-td-texto">${truncar(c.destino, 55)}</td>
+      <td class="lf-td-monto">${escapeHtml(c.monto)}</td>
+    </tr>`).join('');
 }
 
 $('#lf-tecnico').addEventListener('change', cargar);
