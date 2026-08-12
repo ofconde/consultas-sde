@@ -7,8 +7,8 @@
 <title>{% block title %}Consultas SDE{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Raleway:wght@500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/panel.css">
-<script src="/static/js/util.js"></script>
+<link rel="stylesheet" href="/static/css/panel.css?v={{ ASSET_V }}">
+<script src="/static/js/util.js?v={{ ASSET_V }}"></script>
 {% block extra_head %}{% endblock %}
 </head>
 <body{% block body_attrs %}{% endblock %}>

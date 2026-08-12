@@ -3,6 +3,7 @@
 App FastAPI dedicada. Sirve el frontend y la API. Startup: crea esquema + seeds.
 """
 import logging
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -30,6 +31,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Consultas SDE", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+# Cache-busting de CSS/JS: cambia en cada arranque del proceso (= cada deploy en
+# Railway), así el navegador no se queda con un panel.css viejo cacheado hasta
+# que alguien fuerce un hard refresh — pasó con la Lista de lectura recién
+# agregada, el CSS estaba en el servidor pero el navegador seguía usando el
+# anterior. Estable entre requests del mismo deploy, para no perder el cacheo
+# normal del navegador.
+templates.env.globals["ASSET_V"] = str(int(time.time()))
 
 
 @app.exception_handler(Exception)
