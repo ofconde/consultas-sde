@@ -21,6 +21,14 @@ _GESTION_COLS = [
     "estado", "observaciones", "informacion_extra", "genero",
 ]
 
+# datos que carga el propio solicitante en el formulario público — a diferencia
+# de _GESTION_COLS, solo el coordinador los puede corregir (ver editar_gestion):
+# un técnico no debería poder cambiar el nombre o el CUIT de un solicitante.
+_SOLICITANTE_COLS = [
+    "nombre", "cuit", "telefono", "mail", "localidad", "actividad_economica",
+    "sector", "destino", "como_se_entero", "situacion_arca",
+]
+
 # columnas de texto donde busca el buscador del panel — todos los campos de
 # texto libre o identificador de la consulta, del solicitante y de la gestión.
 _CAMPOS_BUSQUEDA = [
@@ -423,6 +431,11 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
         raise HTTPException(404, "Consulta no encontrada")
 
     campos = body.model_dump(exclude_none=True)
+    # Los datos que llegaron con el formulario (nombre, CUIT, teléfono, actividad,
+    # destino, etc.) los puede corregir SOLO el coordinador — un técnico gestiona
+    # una consulta, pero no debería poder cambiar la identidad del solicitante.
+    if set(campos) & set(_SOLICITANTE_COLS) and usuario["rol"] != ROL_COORDINADOR:
+        raise HTTPException(403, "Solo el coordinador puede editar los datos del solicitante")
     # El monto solicitado lo carga el propio interesado en el formulario público y a
     # veces llega con errores gruesos (se detectaron cargas de $150.000.000.000 contra
     # un límite de crédito de $500 M). Corregirlo se habilita a cualquier usuario,
@@ -439,7 +452,7 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
         if _norm(campos["tecnico"]) != _norm(usuario["nombre"]):
             campos.pop("tecnico")
     sets, params = [], {"id": cid}
-    for col in _GESTION_COLS:
+    for col in _GESTION_COLS + _SOLICITANTE_COLS:
         if col in campos:
             sets.append(f"{col} = :{col}"); params[col] = campos[col]
     if "monto_confirmado" in campos:

@@ -23,8 +23,13 @@ class ConsultaIngesta(BaseModel):
     genero:               Optional[str] = _TXT
 
 
-class GestionIn(BaseModel):
-    """Edición de los campos de gestión que confirma el técnico."""
+class GestionIn(ConsultaIngesta):
+    """Edición de los campos de gestión que confirma el técnico, más los datos
+    del solicitante (nombre, cuit, telefono, mail, localidad, actividad_economica,
+    sector, destino, como_se_entero, situacion_arca, monto, genero) heredados de
+    ConsultaIngesta — mismos campos que llegan del formulario, ahora también
+    editables desde el detalle. La restricción de que solo el coordinador pueda
+    tocarlos vive en editar_gestion(), no acá."""
     tecnico:              Optional[str] = _TXT
     departamento:         Optional[str] = _TXT
     localidad_confirmada: Optional[str] = _TXT
@@ -35,18 +40,17 @@ class GestionIn(BaseModel):
     monto_confirmado:     Optional[str] = _TXT
     actividad_inscripta:  Optional[str] = _TXT
     situacion_bcra:       Optional[str] = _TXT
-    monto:                Optional[str] = _TXT
     estado:               Optional[str] = _TXT
     observaciones:        Optional[str] = _TXT
     informacion_extra:    Optional[str] = _TXT
-    genero:               Optional[str] = _TXT
 
 
-class ConsultaManualIn(ConsultaIngesta, GestionIn):
+class ConsultaManualIn(GestionIn):
     """Alta manual de una consulta que llegó por un medio distinto al formulario
     (llamada telefónica, presencial, mail directo, etc.). Combina los campos del
-    solicitante con los de gestión en un solo alta — a diferencia de la ingesta
-    automática, acá el técnico ya conoce y confirma todo de una."""
+    solicitante (heredados de ConsultaIngesta vía GestionIn) con los de gestión
+    en un solo alta — a diferencia de la ingesta automática, acá el técnico ya
+    conoce y confirma todo de una."""
     nombre: str = Field(max_length=2000)
 
 
