@@ -78,6 +78,11 @@ _NO_REPETIDA_C = "UPPER(TRIM(COALESCE(c.estado, ''))) <> 'REPETIDO'"
 # saber cuántas se rechazaron, no se está escondiendo el dato.
 _NO_APARTADA = "UPPER(TRIM(COALESCE(estado, ''))) <> 'NO ES FINANCIABLE'"
 
+# Estados que cuentan como "en trámite" para la sección 8 del informe: gestión
+# activa avanzada, no la consulta recién entrada. Acordado con Omar 14/08 — a
+# diferencia del resto del informe, esta sección no depende del rango de fechas.
+_ESTADOS_TRAMITE = {"COMPLETANDO DOCUMENTACION", "EN GESTION CON SGR O FONDO"}
+
 _ARCA_EFECTIVA = "COALESCE(NULLIF(arca_confirmado, ''), situacion_arca)"
 _ARCA_AGRUPADA = f"""
     CASE WHEN UPPER(TRIM({_ARCA_EFECTIVA})) IN ('EXENTO', 'NO INSCRIPTO')
@@ -236,6 +241,23 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         por_arca = _breakdown(conn, _ARCA_AGRUPADA, "(sin dato)", rango, params)
         por_departamento = _breakdown(conn, "departamento", _PENDIENTE_UEP, rango, params)
         por_origen = _breakdown(conn, "como_se_entero", "(sin dato)", rango, params)
+
+        # Casos en trámite: detalle de las consultas con gestión activa avanzada
+        # (en trámite con SGR/fondo, o completando documentación) — "al día de
+        # emisión", no acotado por el rango del informe: es una foto del estado
+        # actual, no de lo que entró en el período.
+        casos_tramite_rows = conn.execute(text(f"""
+            SELECT nombre, {_MONTO_EFECTIVO} AS monto, destino, garantia, estado, observaciones
+            FROM sde_consultas
+            WHERE UPPER(TRIM(COALESCE(estado, ''))) = ANY(:estados)
+            ORDER BY fecha_recepcion DESC
+        """), {"estados": list(_ESTADOS_TRAMITE)}).mappings().all()
+        casos_tramite = [{
+            "nombre": r["nombre"], "monto": int(r["monto"] or 0), "monto_fmt": _monto(r["monto"]),
+            "destino": r["destino"], "garantia": r["garantia"], "estado": r["estado"],
+            "observaciones": r["observaciones"],
+        } for r in casos_tramite_rows]
+        casos_tramite_total = sum(c["monto"] for c in casos_tramite)
 
         primera_fecha = conn.execute(text(
             "SELECT MIN(fecha_recepcion)::date FROM sde_consultas WHERE fecha_recepcion IS NOT NULL"
@@ -407,4 +429,7 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
                     for r in por_dia],
         "inicial_por_tecnico": [{"tecnico": r["tecnico"], "n": r["n"]} for r in inicial_por_tecnico],
         "sin_acciones_por_tecnico": [{"tecnico": r["tecnico"], "n": r["n"]} for r in sin_acciones_por_tecnico],
+        "casos_tramite": casos_tramite,
+        "casos_tramite_total": casos_tramite_total,
+        "casos_tramite_total_fmt": _monto(casos_tramite_total),
     }

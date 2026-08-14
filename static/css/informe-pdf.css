@@ -42,6 +42,16 @@ body{
 .tbtn.primary{background:var(--celeste);border-color:var(--celeste)}
 .tbtn.primary:hover{filter:brightness(1.08)}
 
+/* Selección de secciones — solo pantalla, nunca se imprime (vive fuera de #doc,
+   la regla de impresión de más abajo ya la excluye). */
+.secciones-toggle{
+  display:flex;flex-wrap:wrap;gap:4px 16px;
+  background:#fff;border-bottom:1px solid var(--border);
+  padding:9px 20px;font-size:10.5px;
+}
+.sec-check{display:flex;align-items:center;gap:5px;color:var(--text);cursor:pointer;user-select:none;white-space:nowrap}
+.sec-check input{margin:0;cursor:pointer}
+
 /* Aviso de montos fuera de tope — solo pantalla, ver informe_pdf.html */
 .aviso{
   margin:14px auto 0;max-width:var(--hoja);
@@ -182,6 +192,18 @@ td.num{text-align:right;font-weight:700;color:var(--navy);white-space:nowrap}
 td.money{text-align:right;white-space:nowrap}
 thead th{white-space:nowrap}
 .t-grupo{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+
+/* Sección "Casos en trámite" */
+.badge-tramite{
+  display:inline-block;background:var(--navy);color:#fff;font-size:8.5px;font-weight:700;
+  padding:2px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;
+}
+.estado-obs .estado-linea{font-weight:700}
+.estado-obs .obs-linea{display:block;color:var(--muted);font-size:9.5px;margin-top:2px;font-weight:400}
+.tramite-total{
+  margin-top:10px;padding-top:8px;border-top:1.5px solid var(--border);
+  font-size:11px;font-weight:700;color:var(--navy);text-align:right;
+}
 
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
 .vacio{padding:26px;text-align:center;color:var(--muted);font-style:italic;border:1px dashed var(--border);border-radius:8px}

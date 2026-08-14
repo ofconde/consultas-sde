@@ -28,6 +28,11 @@
   <button class="tbtn primary" id="btn-imprimir">Imprimir / Guardar PDF</button>
 </div>
 
+{# Selección de secciones — modular, cada una se puede sacar del informe.
+   Vive fuera de #doc, así que la regla de impresión (body > *:not(#doc){display:none})
+   ya la excluye del PDF sin necesidad de CSS extra. #}
+<div class="secciones-toggle" id="secciones-toggle"></div>
+
 <div id="aviso"></div>
 
 <div id="doc">
@@ -90,6 +95,59 @@ let META = { grupo_color: {} };
 // Debe coincidir con _PENDIENTE_UEP de routers/informe.py — es la etiqueta con la
 // que vuelven los campos que la UEP todavía no confirmó.
 const ESPERA = 'En espera de asignación';
+
+/* ── Secciones modulares ─────────────────────────────────────────────────
+   Cada sección (incluido el resumen ejecutivo) se puede sacar del informe con
+   un check — a pedido de Omar, para armar un recorte más corto según a quién
+   se lo mande. La numeración de las secciones con número se recalcula sola
+   según cuáles queden prendidas, para no dejar huecos ("1, 3, 5..."). */
+const SECCIONES_DEF = [
+  { id: 'resumen',   label: 'Resumen ejecutivo',                numerada: false },
+  { id: 'general',   label: 'Resumen general',                   numerada: true },
+  { id: 'evolucion', label: 'Evolución de las consultas recibidas', numerada: true },
+  { id: 'situacion', label: 'Situación de las consultas',         numerada: true },
+  { id: 'sector',    label: 'Perfil económico de la demanda',     numerada: true },
+  { id: 'arca',      label: 'Condición fiscal de los solicitantes', numerada: true },
+  { id: 'montos',    label: 'Montos solicitados',                 numerada: true },
+  { id: 'lineas',    label: 'Encuadre en líneas y programas',     numerada: true },
+  { id: 'tramite',   label: 'Casos en trámite',                   numerada: true },
+];
+
+function seccionesDeURL(){
+  const p = new URLSearchParams(location.search);
+  if(!p.has('secciones')) return SECCIONES_DEF.map(s => s.id); // sin parámetro: todo prendido
+  const activas = new Set(p.get('secciones').split(',').filter(Boolean));
+  return SECCIONES_DEF.map(s => s.id).filter(id => activas.has(id));
+}
+
+let SECCIONES_ACTIVAS = new Set(seccionesDeURL());
+
+function pintarToggleSecciones(){
+  $('#secciones-toggle').innerHTML = SECCIONES_DEF.map(s => `
+    <label class="sec-check">
+      <input type="checkbox" data-sec="${s.id}" ${SECCIONES_ACTIVAS.has(s.id) ? 'checked' : ''}>
+      ${escapeHtml(s.label)}
+    </label>`).join('');
+  $('#secciones-toggle').querySelectorAll('input[data-sec]').forEach(chk => {
+    chk.addEventListener('change', () => {
+      if(chk.checked) SECCIONES_ACTIVAS.add(chk.dataset.sec);
+      else SECCIONES_ACTIVAS.delete(chk.dataset.sec);
+      sincronizarSeccionesURL();
+      if(ULTIMO_DATO) render(ULTIMO_DATO); // re-renderiza sin volver a pedir al backend
+    });
+  });
+}
+
+function sincronizarSeccionesURL(){
+  const p = new URLSearchParams(location.search);
+  // si están todas prendidas (el caso más común) se saca el parámetro, para no
+  // ensuciar la URL por defecto con una lista larga que no aporta nada.
+  if(SECCIONES_ACTIVAS.size === SECCIONES_DEF.length) p.delete('secciones');
+  else p.set('secciones', SECCIONES_DEF.map(s => s.id).filter(id => SECCIONES_ACTIVAS.has(id)).join(','));
+  history.replaceState(null, '', location.pathname + (p.toString() ? '?'+p : ''));
+}
+
+let ULTIMO_DATO = null; // último JSON de /api/informe, para re-renderizar al tocar un check sin refetch
 
 /* ── Gráficos ─────────────────────────────────────────────────────────────
    SVG dibujado a mano, sin librerías (el proyecto no tiene dependencias de
@@ -204,6 +262,33 @@ function variacion(actual, previo){
   return `<span class="delta ${cls}">${flecha} ${Math.abs(pct)}%</span>`;
 }
 
+// Estado de gestión con color — mismo criterio semántico que los badges del
+// panel: verde = avanzando bien (SGR/fondo en trámite), ámbar = necesita algo
+// del solicitante (completando documentación).
+const _COLOR_ESTADO_TRAMITE = {
+  'EN GESTION CON SGR O FONDO': 'var(--green)',
+  'COMPLETANDO DOCUMENTACION': 'var(--amber)',
+};
+
+function tablaTramite(casos, totalFmt){
+  if(!casos.length) return '<div class="vacio">Sin casos en trámite al día de emisión.</div>';
+  return `<table><thead><tr>
+      <th>Solicitante</th><th style="text-align:right">Monto</th><th>Destino</th>
+      <th>Garantía</th><th>Estado / Observaciones</th>
+    </tr></thead><tbody>${casos.map(c => `
+      <tr>
+        <td>${escapeHtml(c.nombre)||'—'}</td>
+        <td class="money">${escapeHtml(c.monto_fmt)}</td>
+        <td>${escapeHtml(c.destino)||'—'}</td>
+        <td>${c.garantia ? `<span class="badge-tramite">${escapeHtml(c.garantia)}</span>` : '—'}</td>
+        <td class="estado-obs">
+          <span class="estado-linea" style="color:${_COLOR_ESTADO_TRAMITE[c.estado]||'var(--navy)'}">${escapeHtml(c.estado)}</span>
+          ${c.observaciones ? `<span class="obs-linea">${escapeHtml(c.observaciones)}</span>` : ''}
+        </td>
+      </tr>`).join('')}</tbody></table>
+    <div class="tramite-total">Total comprometido en trámite: ${escapeHtml(totalFmt)}</div>`;
+}
+
 function tablaBreakdown(filas, encabezado, maxFilas){
   if(!filas.length) return '<div class="vacio">Sin datos en el período.</div>';
   const datos = maxFilas ? filas.slice(0, maxFilas) : filas;
@@ -279,6 +364,7 @@ function resumenEjecutivo(d, cmp, gc, porGrupo){
 
 /* ── Armado del documento ────────────────────────────────────────────────── */
 function render(d){
+  ULTIMO_DATO = d; // para poder re-renderizar al tocar un checkbox de sección sin refetch
   const gc = META.grupo_color;
   const porGrupo = Object.fromEntries(d.grupos.map(g=>[g.clave,g.n]));
 
@@ -311,110 +397,112 @@ function render(d){
   const esTodoHistorico = d.periodo.desde === PRIMERA && d.periodo.hasta === hoyISO();
   const cmp = esTodoHistorico ? {disponible:false} : d.comparacion;
 
+  // El resumen ejecutivo también es opcional (ver SECCIONES_DEF) — no lleva
+  // número, así que se muestra/oculta aparte de la numeración de abajo.
+  $('.doc-resumen-ejec').style.display = SECCIONES_ACTIVAS.has('resumen') ? '' : 'none';
   $('#resumen-ejecutivo').innerHTML = resumenEjecutivo(d, cmp, gc, porGrupo);
 
-  const s = [];
-
-  // 1 · Resumen general
-  s.push(`<div class="sec">
-    <h2 class="sec-title">1 · Resumen general</h2>
-    <div class="kpi-row">
-      <div class="kpi c-navy"><div class="n">${d.total}</div><div class="l">Consultas recibidas</div>
-        <div class="sub">${d.promedio_diario.periodo} por día${(cmp.disponible && variacion(d.total, cmp.total))?' · '+variacion(d.total, cmp.total):''}</div></div>
-      <div class="kpi c-green"><div class="n">${d.activas}</div><div class="l">En gestión activa</div>
-        <div class="sub">${d.situacion.activas_pct}% del total</div></div>
-      <div class="kpi c-blue"><div class="n">${porGrupo.EN_SEDE||0}</div><div class="l">Derivadas a CFI Sede</div>
-        <div class="sub">ingresadas al circuito</div></div>
-      <div class="kpi c-gray"><div class="n">${porGrupo.INACTIVAS||0}</div><div class="l">No prosperaron</div>
-        <div class="sub">no financiables o desisten</div></div>
-    </div>
-    ${cmp.disponible ? `<div class="sec-nota">Comparado con el período anterior de igual duración
-      (${escapeHtml(cmp.desde_fmt)} al ${escapeHtml(cmp.hasta_fmt)}, ${cmp.total} consultas).</div>` : ''}
-  </div>`);
-
-  // 2 · Evolución
   const unidad = d.granularidad==='semana' ? 'semana' : 'día';
-  s.push(`<div class="sec">
-    <h2 class="sec-title">2 · Evolución de las consultas recibidas</h2>
-    <div class="grafico">${graficoBarras(d.por_dia, '#00A7E1')}
-      <div class="g-resumen">Consultas por ${unidad} · ${d.total} en ${d.periodo.dias} días
-        · promedio de ${d.promedio_diario.periodo} por día</div></div>
-  </div>`);
-
-  // 3 · Situación
   const segs = d.grupos.map(g=>({...g, color: gc[g.clave]||'#8891a8'}));
-  s.push(`<div class="sec">
-    <h2 class="sec-title">3 · Situación de las consultas</h2>
-    <div class="donut-wrap">
-      ${graficoDonut(segs)}
-      <div class="donut-leg">${segs.map(g=>`
-        <div class="leg-row">
-          <span class="leg-dot" style="background:${g.color}"></span>
-          <span class="leg-lbl">${escapeHtml(g.label)}</span>
-          <span class="leg-n">${g.n}</span>
-          <span class="leg-pct">${d.total?Math.round(g.n/d.total*100):0}%</span>
-        </div>`).join('')}</div>
-    </div>
-    <div style="margin-top:11px">
-      <table><thead><tr><th>Estado</th><th style="text-align:right">Consultas</th><th style="text-align:right">%</th></tr></thead>
-      <tbody>${d.estados.map(e=>`
-        <tr><td><span class="t-grupo" style="background:${gc[e.grupo]||'#8891a8'}"></span>${escapeHtml(e.estado)}</td>
-          <td class="num">${e.n}</td>
-          <td class="money">${d.total?Math.round(e.n/d.total*100):0}%</td></tr>`).join('')}</tbody></table>
-    </div>
-  </div>`);
-
-  // 4 · Sector
-  s.push(`<div class="sec">
-    <h2 class="sec-title">4 · Perfil económico de la demanda</h2>
-    ${barrasHorizontales(d.sectores, '#6c4bd0')}
-    <div class="sec-nota">Sector de actividad declarado por el solicitante en el formulario.</div>
-  </div>`);
-
-  // 5 · ARCA
-  s.push(`<div class="sec">
-    <h2 class="sec-title">5 · Condición fiscal de los solicitantes</h2>
-    ${barrasHorizontales(d.situacion_arca, '#2f6fd0', 8)}
-    <div class="sec-nota">Situación ante ARCA confirmada por el equipo técnico; si no fue verificada, la declarada por el solicitante.</div>
-  </div>`);
-
-  // 6 · Montos
-  s.push(`<div class="sec">
-    <h2 class="sec-title">6 · Montos solicitados</h2>
-    <div class="kpi-row" style="margin-bottom:11px">
-      <div class="kpi c-green"><div class="n" style="font-size:16px">${escapeHtml(d.montos.total_fmt)}</div>
-        <div class="l">Total solicitado</div><div class="sub">${d.montos.con_monto} consultas con monto</div></div>
-      <div class="kpi c-blue"><div class="n" style="font-size:16px">${escapeHtml(d.montos.promedio_fmt)}</div>
-        <div class="l">Monto promedio</div></div>
-      <div class="kpi c-navy"><div class="n" style="font-size:16px">${escapeHtml(d.montos.mediana_fmt)}</div>
-        <div class="l">Monto mediano</div></div>
-      <div class="kpi c-amber"><div class="n" style="font-size:16px">${escapeHtml(d.montos.maximo_fmt)}</div>
-        <div class="l">Monto máximo</div></div>
-    </div>
-    ${barrasHorizontales(d.montos.tramos.filter(t=>t.n>0).map(t=>({clave:t.label, n:t.n})), '#1a9e57')}
-  </div>`);
-
-  // 7 · Líneas y programas — parcial, se aclara con el dato exacto de avance
   const pend = c => (c.find(x=>x.clave===ESPERA)||{n:0}).n;
   const pctHecho = n => d.total ? Math.round((d.total-n)/d.total*100) : 0;
-  s.push(`<div class="sec">
-    <h2 class="sec-title">7 · Encuadre en líneas y programas</h2>
-    <div class="grid2">
-      <div>${tablaBreakdown(d.lineas, 'Línea de crédito')}</div>
-      <div>${tablaBreakdown(d.programas, 'Programa')}</div>
-    </div>
-    <div class="sec-nota">Encuadre confirmado por la UEP al analizar cada caso.
-      Al día de emisión tienen línea asignada ${d.total-pend(d.lineas)} de ${d.total} consultas
-      (${pctHecho(pend(d.lineas))}%) y programa ${d.total-pend(d.programas)} (${pctHecho(pend(d.programas))}%);
-      el resto está en gestión. No todas las consultas derivan en un programa: solo se asigna
-      cuando el proyecto encuadra en uno.</div>
-  </div>`);
+
+  // Cuerpo de cada sección numerada, sin el título — el número se calcula
+  // aparte según cuáles queden prendidas (ver SECCIONES_DEF/pintarToggleSecciones).
+  const CUERPO = {
+    general: () => `
+      <div class="kpi-row">
+        <div class="kpi c-navy"><div class="n">${d.total}</div><div class="l">Consultas recibidas</div>
+          <div class="sub">${d.promedio_diario.periodo} por día${(cmp.disponible && variacion(d.total, cmp.total))?' · '+variacion(d.total, cmp.total):''}</div></div>
+        <div class="kpi c-green"><div class="n">${d.activas}</div><div class="l">En gestión activa</div>
+          <div class="sub">${d.situacion.activas_pct}% del total</div></div>
+        <div class="kpi c-blue"><div class="n">${porGrupo.EN_SEDE||0}</div><div class="l">Derivadas a CFI Sede</div>
+          <div class="sub">ingresadas al circuito</div></div>
+        <div class="kpi c-gray"><div class="n">${porGrupo.INACTIVAS||0}</div><div class="l">No prosperaron</div>
+          <div class="sub">no financiables o desisten</div></div>
+      </div>
+      ${cmp.disponible ? `<div class="sec-nota">Comparado con el período anterior de igual duración
+        (${escapeHtml(cmp.desde_fmt)} al ${escapeHtml(cmp.hasta_fmt)}, ${cmp.total} consultas).</div>` : ''}`,
+
+    evolucion: () => `
+      <div class="grafico">${graficoBarras(d.por_dia, '#00A7E1')}
+        <div class="g-resumen">Consultas por ${unidad} · ${d.total} en ${d.periodo.dias} días
+          · promedio de ${d.promedio_diario.periodo} por día</div></div>`,
+
+    situacion: () => `
+      <div class="donut-wrap">
+        ${graficoDonut(segs)}
+        <div class="donut-leg">${segs.map(g=>`
+          <div class="leg-row">
+            <span class="leg-dot" style="background:${g.color}"></span>
+            <span class="leg-lbl">${escapeHtml(g.label)}</span>
+            <span class="leg-n">${g.n}</span>
+            <span class="leg-pct">${d.total?Math.round(g.n/d.total*100):0}%</span>
+          </div>`).join('')}</div>
+      </div>
+      <div style="margin-top:11px">
+        <table><thead><tr><th>Estado</th><th style="text-align:right">Consultas</th><th style="text-align:right">%</th></tr></thead>
+        <tbody>${d.estados.map(e=>`
+          <tr><td><span class="t-grupo" style="background:${gc[e.grupo]||'#8891a8'}"></span>${escapeHtml(e.estado)}</td>
+            <td class="num">${e.n}</td>
+            <td class="money">${d.total?Math.round(e.n/d.total*100):0}%</td></tr>`).join('')}</tbody></table>
+      </div>`,
+
+    sector: () => `
+      ${barrasHorizontales(d.sectores, '#6c4bd0')}
+      <div class="sec-nota">Sector de actividad declarado por el solicitante en el formulario.</div>`,
+
+    arca: () => `
+      ${barrasHorizontales(d.situacion_arca, '#2f6fd0', 8)}
+      <div class="sec-nota">Situación ante ARCA confirmada por el equipo técnico; si no fue verificada, la declarada por el solicitante.</div>`,
+
+    montos: () => `
+      <div class="kpi-row" style="margin-bottom:11px">
+        <div class="kpi c-green"><div class="n" style="font-size:16px">${escapeHtml(d.montos.total_fmt)}</div>
+          <div class="l">Total solicitado</div><div class="sub">${d.montos.con_monto} consultas con monto</div></div>
+        <div class="kpi c-blue"><div class="n" style="font-size:16px">${escapeHtml(d.montos.promedio_fmt)}</div>
+          <div class="l">Monto promedio</div></div>
+        <div class="kpi c-navy"><div class="n" style="font-size:16px">${escapeHtml(d.montos.mediana_fmt)}</div>
+          <div class="l">Monto mediano</div></div>
+        <div class="kpi c-amber"><div class="n" style="font-size:16px">${escapeHtml(d.montos.maximo_fmt)}</div>
+          <div class="l">Monto máximo</div></div>
+      </div>
+      ${barrasHorizontales(d.montos.tramos.filter(t=>t.n>0).map(t=>({clave:t.label, n:t.n})), '#1a9e57')}`,
+
+    lineas: () => `
+      <div class="grid2">
+        <div>${tablaBreakdown(d.lineas, 'Línea de crédito')}</div>
+        <div>${tablaBreakdown(d.programas, 'Programa')}</div>
+      </div>
+      <div class="sec-nota">Encuadre confirmado por la UEP al analizar cada caso.
+        Al día de emisión tienen línea asignada ${d.total-pend(d.lineas)} de ${d.total} consultas
+        (${pctHecho(pend(d.lineas))}%) y programa ${d.total-pend(d.programas)} (${pctHecho(pend(d.programas))}%);
+        el resto está en gestión. No todas las consultas derivan en un programa: solo se asigna
+        cuando el proyecto encuadra en uno.</div>`,
+
+    // A diferencia del resto, no depende del rango del informe: es la foto del
+    // estado actual (ver nota en routers/informe.py sobre _ESTADOS_TRAMITE).
+    tramite: () => `
+      ${tablaTramite(d.casos_tramite, d.casos_tramite_total_fmt)}
+      <div class="sec-nota">Consultas en gestión activa avanzada (en trámite con SGR/fondo, o completando
+        documentación) al día de emisión — no depende del período elegido arriba.</div>`,
+  };
 
   // Alcance territorial: fuera por ahora — con 85%+ de consultas sin departamento
   // confirmado, la distribución no es representativa todavía (ver [[project_pendientes]]
   // sobre limpieza de localidades). Se retoma cuando haya más carga real.
 
-  $('#secciones').innerHTML = s.join('');
+  let n = 0;
+  const html = SECCIONES_DEF
+    .filter(sdef => sdef.numerada && SECCIONES_ACTIVAS.has(sdef.id))
+    .map(sdef => {
+      n++;
+      return `<div class="sec">
+        <h2 class="sec-title">${n} · ${escapeHtml(sdef.label)}</h2>
+        ${CUERPO[sdef.id]()}
+      </div>`;
+    }).join('');
+  $('#secciones').innerHTML = html || '<div class="vacio" style="padding:60px">Ninguna sección seleccionada.</div>';
 }
 
 /* ── Rango y carga ───────────────────────────────────────────────────────── */
@@ -431,6 +519,11 @@ async function cargar(){
   const p = new URLSearchParams();
   if(desde) p.set('desde', desde);
   if(hasta) p.set('hasta', hasta);
+  // "secciones" viene de otro flujo (pintarToggleSecciones), pero cargar() arma
+  // la URL desde cero con el rango — sin esto, aplicar un rango nuevo pisaba
+  // silenciosamente la selección de secciones ya elegida.
+  const seccionesURL = new URLSearchParams(location.search).get('secciones');
+  if(seccionesURL) p.set('secciones', seccionesURL);
   // el rango queda en la URL: el informe se puede recargar y compartir tal cual
   history.replaceState(null, '', location.pathname + (p.toString() ? '?'+p : ''));
   // El institucional siempre excluye REPETIDO: contar dos veces al mismo
@@ -465,6 +558,7 @@ $('#btn-todo').addEventListener('click', () => {
   const r = rangoDeURL();
   $('#f-desde').value = r.desde;
   $('#f-hasta').value = r.hasta;
+  pintarToggleSecciones();
   META = await (await fetch('/api/catalogos/estado-grupo')).json();
   await cargar();
 })();
