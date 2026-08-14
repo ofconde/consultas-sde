@@ -68,6 +68,16 @@ _PENDIENTE_UEP = "En espera de asignación"
 _NO_REPETIDA = "UPPER(TRIM(COALESCE(estado, ''))) <> 'REPETIDO'"
 _NO_REPETIDA_C = "UPPER(TRIM(COALESCE(c.estado, ''))) <> 'REPETIDO'"
 
+# NO ES FINANCIABLE: casos ya rechazados. El monto que declararon sigue siendo
+# el que tipeó el solicitante en el formulario público — sin encuadre real
+# detrás y sin que nadie lo corrija después (nadie revisa el monto de un caso
+# ya descartado) — así que sumarlo como "demanda" infla el total del informe
+# con pedidos que nunca se van a otorgar. Se excluye SIEMPRE de los montos
+# (a diferencia de REPETIDO, que es opcional vía excluir_repetidas), pero las
+# consultas se siguen contando en "Situación de las consultas": ahí sí importa
+# saber cuántas se rechazaron, no se está escondiendo el dato.
+_NO_APARTADA = "UPPER(TRIM(COALESCE(estado, ''))) <> 'NO ES FINANCIABLE'"
+
 _ARCA_EFECTIVA = "COALESCE(NULLIF(arca_confirmado, ''), situacion_arca)"
 _ARCA_AGRUPADA = f"""
     CASE WHEN UPPER(TRIM({_ARCA_EFECTIVA})) IN ('EXENTO', 'NO INSCRIPTO')
@@ -125,6 +135,9 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
     if excluir_repetidas:
         rango.append(_NO_REPETIDA)
         rango_c.append(_NO_REPETIDA_C)
+    # Rango específico para los agregados de monto (total/promedio/mediana/máximo/
+    # tramos): siempre sin NO ES FINANCIABLE, independiente de excluir_repetidas.
+    rango_monto = rango + [_NO_APARTADA]
     params = {}
     if d:
         params["desde"] = d
@@ -201,7 +214,7 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
                    COALESCE(MAX(monto),0) maximo, COUNT(monto) con_monto,
                    COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY monto),0) mediana,
                    COUNT(*) FILTER (WHERE {_MONTO_EFECTIVO} > {TOPE_LINEA}) fuera_de_tope
-            FROM sde_consultas {_where(*rango)}
+            FROM sde_consultas {_where(*rango_monto)}
         """), params).mappings().first()
 
         filtros_tramo = ", ".join(
@@ -210,7 +223,7 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         )
         tr = conn.execute(text(f"""
             SELECT {filtros_tramo} FROM sde_consultas
-            {_where("monto IS NOT NULL", *rango)}
+            {_where("monto IS NOT NULL", *rango_monto)}
         """), params).mappings().first()
 
         # breakdowns por sector / línea / programa (de la pestaña INFORME del Excel)
@@ -282,6 +295,11 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
             prev_cond = _condiciones_rango(prev_desde, prev_hasta)
             if excluir_repetidas:
                 prev_cond.append(_NO_REPETIDA)
+            # Nota: esta consulta trae "n" (cantidad, comparada contra d.total en el
+            # PDF — ese sí debe incluir NO ES FINANCIABLE para que la comparación de
+            # volumen sea consistente) Y "monto" en la misma fila. No se le agrega acá
+            # _NO_APARTADA: haría que "n" y el total del período actual dejen de ser
+            # comparables. El campo "monto" de este bloque no se usa todavía en el PDF.
             prev = conn.execute(text(f"""
                 SELECT COUNT(*) AS n, COALESCE(SUM(monto), 0) AS monto
                 FROM sde_consultas {_where(*prev_cond)}
