@@ -115,7 +115,11 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     `apartadas=1` muestra SOLO las NO ES FINANCIABLE. Sin este flag, esas consultas
     quedan fuera del listado por defecto (pidió Omar que no ensucien la vista diaria) —
     salvo que se las pida explícitamente con `estado=NO ES FINANCIABLE` (para no romper
-    el botón de estado ya existente ni una URL vieja que las tuviera filtradas).
+    el botón de estado ya existente ni una URL vieja que las tuviera filtradas), o que
+    haya una búsqueda de texto (`q`): encontrar por nombre/CUIT/mail/teléfono es una
+    búsqueda puntual, no el barrido diario — esconder un resultado que sí matchea solo
+    porque el caso quedó marcado como no financiable es más confuso que mostrarlo (con
+    su badge de estado bien visible, así se nota igual que está apartada).
     `fianza_tercero=1` filtra candidatos a gestión por fianza de tercero (monotributo
     A/B/C con el monto dentro de lo que esa categoría puede cubrir — ver
     `_condicion_fianza_tercero`)."""
@@ -127,7 +131,7 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     else:
         if estado:
             where.append("c.estado = :estado"); params["estado"] = estado
-        if estado != "NO ES FINANCIABLE":
+        if estado != "NO ES FINANCIABLE" and not q:
             where.append("c.estado IS DISTINCT FROM :estado_oculto")
             params["estado_oculto"] = "NO ES FINANCIABLE"
     if fianza_tercero:
