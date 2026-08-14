@@ -81,7 +81,10 @@ _NO_APARTADA = "UPPER(TRIM(COALESCE(estado, ''))) <> 'NO ES FINANCIABLE'"
 # Estados que cuentan como "en trámite" para la sección 8 del informe: gestión
 # activa avanzada, no la consulta recién entrada. Acordado con Omar 14/08 — a
 # diferencia del resto del informe, esta sección no depende del rango de fechas.
-_ESTADOS_TRAMITE = {"COMPLETANDO DOCUMENTACION", "EN GESTION CON SGR O FONDO"}
+_ESTADOS_TRAMITE = {
+    "COMPLETANDO DOCUMENTACION", "EN GESTION CON SGR O FONDO",
+    "REMITIDO PARA FIRMA DE REPRESENTANTE",
+}
 
 _ARCA_EFECTIVA = "COALESCE(NULLIF(arca_confirmado, ''), situacion_arca)"
 _ARCA_AGRUPADA = f"""
