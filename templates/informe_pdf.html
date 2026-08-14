@@ -96,6 +96,92 @@ let META = { grupo_color: {} };
 // que vuelven los campos que la UEP todavía no confirmó.
 const ESPERA = 'En espera de asignación';
 
+/* ── Mayúscula/minúscula prolija ─────────────────────────────────────────
+   Los valores de catálogo (estado, sector, situación ARCA, línea, programa,
+   garantía) se guardan en la base en MAYÚSCULA SOSTENIDA y sin tildes en
+   varios casos (dato de origen, no un capricho) — mostrados tal cual en un
+   informe institucional leen como si el documento estuviera "gritando".
+   Diccionario a mano (con tildes correctas) para los catálogos cerrados de
+   catalogos_seed.json; lo que no esté mapeado cae a un Title Case genérico
+   que al menos saca las mayúsculas, aunque no restituya una tilde faltante. */
+const ETIQUETAS_BONITAS = {
+  // ESTADO
+  'CONSULTA INICIAL': 'Consulta inicial',
+  'REPETIDO': 'Repetido',
+  'DESISTE DE TOMAR EL CRÉDITO': 'Desiste de tomar el crédito',
+  'HAY INTERÉS PERO NO SE DECIDE': 'Hay interés pero no se decide',
+  'NO ES FINANCIABLE': 'No es financiable',
+  'EN GESTION CON SGR O FONDO': 'En gestión con SGR o fondo',
+  'COMPLETANDO DOCUMENTACION': 'Completando documentación',
+  'INGRESADO EN CFI SEDE': 'Ingresado en CFI Sede',
+  'DERIVADO A FONDO DE GARANTIA CFI': 'Derivado a Fondo de Garantía CFI',
+  'DERIVADO A MERCADO DE CAPITALES': 'Derivado a mercado de capitales',
+  'DERIVADO A OTRA PROVINCIA': 'Derivado a otra provincia',
+  // SECTOR (valores reales cargados + catálogo completo de referencia)
+  'COMERCIAL': 'Comercial', 'SERVICIOS': 'Servicios', 'AGROPECUARIO': 'Agropecuario',
+  'OTRO': 'Otro', 'CONSTRUCCION': 'Construcción', 'INDUSTRIAL': 'Industrial', 'MINERO': 'Minero',
+  'ACTIVIDADES FINANCIERAS': 'Actividades financieras',
+  'AGRICULTURA (CEREALES Y OTROS CULTIVOS)': 'Agricultura (cereales y otros cultivos)',
+  'ALIMENTOS Y BEBIDAS': 'Alimentos y bebidas', 'APICULTURA': 'Apicultura',
+  'CERDOS Y OTROS ANIMALES': 'Cerdos y otros animales',
+  'COMERCIO (MAYORISTA Y MINORISTA)': 'Comercio (mayorista y minorista)',
+  'FORESTO-INDUSTRIA': 'Foresto-industria', 'GANADERIA': 'Ganadería',
+  'INFORMATICA-TELECOMUNICACIONES': 'Informática-telecomunicaciones', 'MANUFACTURAS': 'Manufacturas',
+  'MAQUINARIA AGRICOLA': 'Maquinaria agrícola', 'METALMECANICA': 'Metalmecánica', 'MINERIA': 'Minería',
+  'PAPEL E IMPRESIONES': 'Papel e impresiones', 'PESCA Y PISCICULTURA': 'Pesca y piscicultura',
+  'PRODUCCION FRUTI-HORTICOLA': 'Producción fruti-hortícola',
+  'QUIMICOS-PLASTICOS-MINERALES NO METALICOS': 'Químicos-plásticos-minerales no metálicos',
+  'SALUD-EDUCACION-DIFUSION-DEPORTES': 'Salud-educación-difusión-deportes',
+  'SERVICIOS AGROPECUARIOS': 'Servicios agropecuarios', 'TEXTILES-CUEROS-CALZADO': 'Textiles-cueros-calzado',
+  'TRANSPORTE DE CARGAS': 'Transporte de cargas', 'TURISMO Y SERVICIOS': 'Turismo y servicios', 'OTROS': 'Otros',
+  // SITUACION_AFIP (incluye el agrupado que arma _ARCA_AGRUPADA en el backend)
+  'NO SE PUEDE VERIFICAR': 'No se puede verificar', 'NO INSCRIPTO': 'No inscripto',
+  'SOCIAL': 'Social', 'EXENTO': 'Exento', 'EXENTO / NO INSCRIPTO': 'Exento / No inscripto',
+  'RESPONSABLE INSCRIPTO': 'Responsable inscripto',
+  'MONOTRIBUTO A': 'Monotributo A', 'MONOTRIBUTO B': 'Monotributo B', 'MONOTRIBUTO C': 'Monotributo C',
+  'MONOTRIBUTO D': 'Monotributo D', 'MONOTRIBUTO E': 'Monotributo E', 'MONOTRIBUTO F': 'Monotributo F',
+  'MONOTRIBUTO G': 'Monotributo G', 'MONOTRIBUTO H': 'Monotributo H', 'MONOTRIBUTO I': 'Monotributo I',
+  'MONOTRIBUTO J': 'Monotributo J', 'MONOTRIBUTO K': 'Monotributo K',
+  // LINEA
+  'COMPETITIVIDAD PYME': 'Competitividad PYME', 'PROGRAMATICA': 'Programática',
+  'TRIPLE IMPACTO': 'Triple Impacto', 'PREFINANCIACION DE EXPORTACIONES': 'Prefinanciación de exportaciones',
+  // PROGRAMA
+  'DESARROLLO PRODUCTIVO Y FINANCIERO DE MUJERES': 'Desarrollo Productivo y Financiero de Mujeres',
+  'FINANCIAMIENTO VERDE': 'Financiamiento Verde', 'GESTION ENERGETICA': 'Gestión Energética',
+  'ACCIONES SUSTENTABLES': 'Acciones Sustentables', 'DESARROLLO DE PROVEEDORES': 'Desarrollo de Proveedores',
+  'RIEGO Y EFICIENCIA HIDRICA': 'Riego y Eficiencia Hídrica',
+  // GARANTIA
+  'PRENDA': 'Prenda', 'HIPOTECA': 'Hipoteca', 'FIANZA': 'Fianza', 'CO-AVALES': 'Co-Avales',
+  'ACINDAR': 'Acindar', 'AFB AVALES': 'AFB Avales', 'AFFIDAVIT': 'Affidavit', 'ARGENPYMES': 'ArgenPymes',
+  'AVAL RURAL': 'Aval Rural', 'AVALAR': 'Avalar', 'AVALES DEL CENTRO': 'Avales del Centro',
+  'AVALUAR': 'Avaluar', 'CAMPO AVAL': 'Campo Aval', 'CASFOG': 'CASFOG', 'CONAVAL': 'Conaval',
+  'FINTECH': 'Fintech', 'GARANTIAS BIND': 'Garantías Bind', 'GARANTIZAR': 'Garantizar', 'MOVIL': 'Móvil',
+  'NEUQUEN PYMES': 'Neuquén Pymes', 'POTENCIAR': 'Potenciar', 'RESILIENCIA': 'Resiliencia',
+  'RIG AVALES': 'RIG Avales', 'TREND': 'Trend', 'UNION': 'Unión',
+};
+
+const _CONECTORES_MINUSCULA = new Set(['de','del','la','el','en','y','o','a','para','con','las','los','al']);
+const _SIGLAS_MAYUSCULA = new Set(['SGR','CFI','PYME','ARCA','BCRA','SRL','SA','SAS']);
+
+function _tituloGenerico(s){
+  return s.toLowerCase().split(' ').map((palabra, i) => {
+    const limpio = palabra.replace(/[().,]/g, '');
+    if(_SIGLAS_MAYUSCULA.has(limpio.toUpperCase())) return palabra.toUpperCase();
+    if(i > 0 && _CONECTORES_MINUSCULA.has(palabra)) return palabra;
+    return palabra.charAt(0).toUpperCase() + palabra.slice(1);
+  }).join(' ');
+}
+
+// Etiqueta prolija para un valor de catálogo. Si ya viene con alguna minúscula
+// (ej. "En espera de asignación", que arma el propio backend) se asume que no
+// es un valor "gritando" de la base y se devuelve tal cual, sin tocarlo.
+function etiqueta(v){
+  if(!v) return v;
+  if(ETIQUETAS_BONITAS[v]) return ETIQUETAS_BONITAS[v];
+  if(v !== v.toUpperCase()) return v;
+  return _tituloGenerico(v);
+}
+
 /* ── Secciones modulares ─────────────────────────────────────────────────
    Cada sección (incluido el resumen ejecutivo) se puede sacar del informe con
    un check — a pedido de Omar, para armar un recorte más corto según a quién
@@ -272,19 +358,19 @@ const _COLOR_ESTADO_TRAMITE = {
 
 function tablaTramite(casos, totalFmt){
   if(!casos.length) return '<div class="vacio">Sin casos en trámite al día de emisión.</div>';
+  // Solo el estado, sin el texto libre de "observaciones" — ese campo es para
+  // uso interno del técnico y puede traer datos que no corresponde subir a
+  // un informe institucional (ver nota en routers/informe.py).
   return `<table><thead><tr>
       <th>Solicitante</th><th style="text-align:right">Monto</th><th>Destino</th>
-      <th>Garantía</th><th>Estado / Observaciones</th>
+      <th>Garantía</th><th>Estado</th>
     </tr></thead><tbody>${casos.map(c => `
       <tr>
         <td>${escapeHtml(c.nombre)||'—'}</td>
         <td class="money">${escapeHtml(c.monto_fmt)}</td>
         <td>${escapeHtml(c.destino)||'—'}</td>
-        <td>${c.garantia ? `<span class="badge-tramite">${escapeHtml(c.garantia)}</span>` : '—'}</td>
-        <td class="estado-obs">
-          <span class="estado-linea" style="color:${_COLOR_ESTADO_TRAMITE[c.estado]||'var(--navy)'}">${escapeHtml(c.estado)}</span>
-          ${c.observaciones ? `<span class="obs-linea">${escapeHtml(c.observaciones)}</span>` : ''}
-        </td>
+        <td>${c.garantia ? `<span class="badge-tramite">${escapeHtml(etiqueta(c.garantia))}</span>` : '—'}</td>
+        <td><span class="estado-linea" style="color:${_COLOR_ESTADO_TRAMITE[c.estado]||'var(--navy)'}">${escapeHtml(etiqueta(c.estado))}</span></td>
       </tr>`).join('')}</tbody></table>
     <div class="tramite-total">Total comprometido en trámite: ${escapeHtml(totalFmt)}</div>`;
 }
@@ -340,14 +426,14 @@ function resumenEjecutivo(d, cmp, gc, porGrupo){
 
   const topSector = [...d.sectores].sort((a,b)=>b.n-a.n)[0];
   if(topSector){
-    frases.push(`El sector <strong>${escapeHtml(topSector.clave)}</strong> concentra la mayor demanda (${Math.round(topSector.n/d.total*100)}%).`);
+    frases.push(`El sector <strong>${escapeHtml(etiqueta(topSector.clave))}</strong> concentra la mayor demanda (${Math.round(topSector.n/d.total*100)}%).`);
   }
 
   // Condición fiscal: se destaca la más frecuente, agrupando ARCA/monotributo como
   // "regularizada" vs. lo que necesita revisión (no inscripto / no se pudo verificar).
   const topArca = [...d.situacion_arca].sort((a,b)=>b.n-a.n)[0];
   if(topArca){
-    frases.push(`En cuanto a condición fiscal, <strong>${escapeHtml(topArca.clave.toLowerCase())}</strong> es la situación más frecuente (${Math.round(topArca.n/d.total*100)}%).`);
+    frases.push(`En cuanto a condición fiscal, <strong>${escapeHtml(etiqueta(topArca.clave).toLowerCase())}</strong> es la situación más frecuente (${Math.round(topArca.n/d.total*100)}%).`);
   }
 
   // Posibles Mujeres: heurística por CUIT/nombre (ver genero.py) — se aclara que no
@@ -443,17 +529,17 @@ function render(d){
       <div style="margin-top:11px">
         <table><thead><tr><th>Estado</th><th style="text-align:right">Consultas</th><th style="text-align:right">%</th></tr></thead>
         <tbody>${d.estados.map(e=>`
-          <tr><td><span class="t-grupo" style="background:${gc[e.grupo]||'#8891a8'}"></span>${escapeHtml(e.estado)}</td>
+          <tr><td><span class="t-grupo" style="background:${gc[e.grupo]||'#8891a8'}"></span>${escapeHtml(etiqueta(e.estado))}</td>
             <td class="num">${e.n}</td>
             <td class="money">${d.total?Math.round(e.n/d.total*100):0}%</td></tr>`).join('')}</tbody></table>
       </div>`,
 
     sector: () => `
-      ${barrasHorizontales(d.sectores, '#6c4bd0')}
+      ${barrasHorizontales(d.sectores.map(f=>({...f, clave: etiqueta(f.clave)})), '#6c4bd0')}
       <div class="sec-nota">Sector de actividad declarado por el solicitante en el formulario.</div>`,
 
     arca: () => `
-      ${barrasHorizontales(d.situacion_arca, '#2f6fd0', 8)}
+      ${barrasHorizontales(d.situacion_arca.map(f=>({...f, clave: etiqueta(f.clave)})), '#2f6fd0', 8)}
       <div class="sec-nota">Situación ante ARCA confirmada por el equipo técnico; si no fue verificada, la declarada por el solicitante.</div>`,
 
     montos: () => `
@@ -471,8 +557,8 @@ function render(d){
 
     lineas: () => `
       <div class="grid2">
-        <div>${tablaBreakdown(d.lineas, 'Línea de crédito')}</div>
-        <div>${tablaBreakdown(d.programas, 'Programa')}</div>
+        <div>${tablaBreakdown(d.lineas.map(f=>({...f, clave: etiqueta(f.clave)})), 'Línea de crédito')}</div>
+        <div>${tablaBreakdown(d.programas.map(f=>({...f, clave: etiqueta(f.clave)})), 'Programa')}</div>
       </div>
       <div class="sec-nota">Encuadre confirmado por la UEP al analizar cada caso.
         Al día de emisión tienen línea asignada ${d.total-pend(d.lineas)} de ${d.total} consultas

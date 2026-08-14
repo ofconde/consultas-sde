@@ -17,12 +17,16 @@ ESTADO_GRUPO = {
     "REPETIDO":                         "INACTIVAS",
 }
 
-# Orden y etiquetas de los grupos para el informe/kanban
+# Orden y etiquetas de los grupos para el informe/kanban. "Analizadas — no
+# continúan" (antes "Inactivas"): son casos que SÍ se trabajaron (se evaluaron
+# y no eran financiables, el solicitante desistió, o era repetido) — "Inactivas"
+# se leía como que nadie las tocó, y en un informe que sube a jefatura eso
+# transmite lo contrario de lo que pasó.
 GRUPOS = [
     ("INICIAL",    "Consulta inicial"),
     ("EN_GESTION", "En gestión"),
     ("EN_SEDE",    "En sede / derivadas"),
-    ("INACTIVAS",  "Inactivas"),
+    ("INACTIVAS",  "Analizadas — no continúan"),
 ]
 
 # Un grupo se considera "activo" (dentro del universo de trabajo) si no es INACTIVAS

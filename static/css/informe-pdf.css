@@ -198,8 +198,7 @@ thead th{white-space:nowrap}
   display:inline-block;background:var(--navy);color:#fff;font-size:8.5px;font-weight:700;
   padding:2px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;
 }
-.estado-obs .estado-linea{font-weight:700}
-.estado-obs .obs-linea{display:block;color:var(--muted);font-size:9.5px;margin-top:2px;font-weight:400}
+.estado-linea{font-weight:700}
 .tramite-total{
   margin-top:10px;padding-top:8px;border-top:1.5px solid var(--border);
   font-size:11px;font-weight:700;color:var(--navy);text-align:right;

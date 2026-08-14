@@ -246,8 +246,13 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         # (en trámite con SGR/fondo, o completando documentación) — "al día de
         # emisión", no acotado por el rango del informe: es una foto del estado
         # actual, no de lo que entró en el período.
+        # OJO: no se trae "observaciones" a propósito — es texto libre que el
+        # técnico escribe para uso interno (a veces incluye datos sensibles del
+        # solicitante, ej. deuda en el BCRA) y este documento institucional lo
+        # eleva a jefatura. Ni se selecciona de la base, para no depender de
+        # acordarse de sacarlo en el template.
         casos_tramite_rows = conn.execute(text(f"""
-            SELECT nombre, {_MONTO_EFECTIVO} AS monto, destino, garantia, estado, observaciones
+            SELECT nombre, {_MONTO_EFECTIVO} AS monto, destino, garantia, estado
             FROM sde_consultas
             WHERE UPPER(TRIM(COALESCE(estado, ''))) = ANY(:estados)
             ORDER BY fecha_recepcion DESC
@@ -255,7 +260,6 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         casos_tramite = [{
             "nombre": r["nombre"], "monto": int(r["monto"] or 0), "monto_fmt": _monto(r["monto"]),
             "destino": r["destino"], "garantia": r["garantia"], "estado": r["estado"],
-            "observaciones": r["observaciones"],
         } for r in casos_tramite_rows]
         casos_tramite_total = sum(c["monto"] for c in casos_tramite)
 
