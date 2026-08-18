@@ -117,6 +117,25 @@ def init_db():
             ON sde_consultas (fecha_recepcion)
         """))
 
+        # Seguimiento personal: casos que un coordinador decide vigilar de cerca,
+        # más allá de a quién estén asignados. "Mis casos" filtra por asignación;
+        # esto es 100% manual (se tilda caso por caso) y lleva una nota privada
+        # por usuario — no se muestra a otros usuarios ni al técnico.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sde_seguimiento (
+                id          SERIAL PRIMARY KEY,
+                consulta_id INT NOT NULL REFERENCES sde_consultas(id) ON DELETE CASCADE,
+                usuario     TEXT NOT NULL,
+                nota        TEXT DEFAULT '',
+                created_at  TIMESTAMP DEFAULT NOW(),
+                UNIQUE (consulta_id, usuario)
+            )
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_sde_seguimiento_usuario
+            ON sde_seguimiento (usuario)
+        """))
+
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS sde_catalogos (
                 id     SERIAL PRIMARY KEY,

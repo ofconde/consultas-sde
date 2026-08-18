@@ -6,6 +6,9 @@
     <nav>
       <a href="/panel" class="{% if activo=='panel' %}active{% endif %}">Panel</a>
       <a href="/panel/lectura" class="{% if activo=='lectura' %}active{% endif %}" title="Lista compacta para priorizar rápido, ordenada por antigüedad">Lista de lectura</a>
+      {% if usuario.rol == 'coordinador' %}
+      <a href="/panel/seguimiento" class="{% if activo=='seguimiento' %}active{% endif %}" title="Casos que elegiste seguir de cerca, con notas privadas">Mi seguimiento</a>
+      {% endif %}
       <a href="/informe" class="{% if activo=='informe' %}active{% endif %}">Estadísticas</a>
       {% if usuario.rol == 'coordinador' %}
       <a href="/admin" class="{% if activo=='admin' %}active{% endif %}">Admin</a>

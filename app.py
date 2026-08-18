@@ -15,7 +15,7 @@ from sqlalchemy import text
 from db import init_db, engine
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
                   SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
-from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra
+from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("consultas_sde")
@@ -52,6 +52,7 @@ app.include_router(informe.router)
 app.include_router(catalogos.router)
 app.include_router(usuarios.router)
 app.include_router(bcra.router)
+app.include_router(seguimiento.router)
 
 
 # ── Páginas ──────────────────────────────────────────────────────────
@@ -113,6 +114,18 @@ def panel_lectura(request: Request):
     if not u:
         return RedirectResponse("/login")
     return templates.TemplateResponse("lectura.html", {"request": request, "usuario": u, "activo": "lectura"})
+
+
+@app.get("/panel/seguimiento", response_class=HTMLResponse)
+def panel_seguimiento(request: Request):
+    """Casos que el coordinador eligió seguir de cerca — página personal, no
+    aparece en la nav para técnicos (ver _topbar.html)."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    if u["rol"] != "coordinador":
+        return RedirectResponse("/panel")
+    return templates.TemplateResponse("seguimiento.html", {"request": request, "usuario": u, "activo": "seguimiento"})
 
 
 @app.get("/consulta/nueva", response_class=HTMLResponse)

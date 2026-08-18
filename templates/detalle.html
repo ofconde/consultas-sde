@@ -16,6 +16,10 @@
       <span class="chip" id="recepcion"></span>
       <button class="copy-btn destacado" id="cp-elevar"
               title="Copia Solicitante / CUIT / Actividad / Solicitud, listo para pegar en el mail de elevación">copiar datos para el mail</button>
+      {% if usuario.rol == 'coordinador' %}
+      <button class="copy-btn" id="btn-seguir"
+              title="Agregar a Mi seguimiento — casos que vigilás de cerca, con nota privada">☆ Seguir</button>
+      {% endif %}
     </div>
 
     <div class="grid2">
@@ -429,6 +433,26 @@ async function borrarAccion(aid){
   if(!confirm('¿Eliminar esta acción?')) return;
   await fetch('/api/consultas/'+CID+'/acciones/'+aid,{method:'DELETE'});
   refrescarAcciones();
+}
+
+// "Mi seguimiento" — solo coordinador (el botón no existe en el DOM para técnico).
+const btnSeguir = $('#btn-seguir');
+if(btnSeguir){
+  let siguiendo = false;
+  function pintarSeguir(){
+    btnSeguir.textContent = siguiendo ? '★ Siguiendo' : '☆ Seguir';
+    btnSeguir.classList.toggle('destacado', siguiendo);
+  }
+  (async () => {
+    const d = await (await fetch('/api/seguimiento/ids')).json();
+    siguiendo = d.ids.includes(CID);
+    pintarSeguir();
+  })();
+  btnSeguir.addEventListener('click', async () => {
+    const metodo = siguiendo ? 'DELETE' : 'POST';
+    const r = await fetch('/api/seguimiento/'+CID, {method: metodo});
+    if(r.ok){ siguiendo = !siguiendo; pintarSeguir(); }
+  });
 }
 
 cargar();

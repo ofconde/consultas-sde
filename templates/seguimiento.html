@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Mi seguimiento · Consultas SDE{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+
+  <div class="wrap lectura-wrap">
+    <div class="lectura-header">
+      <h1 class="brand-font">Mi seguimiento</h1>
+      <p class="muted">Casos que elegiste seguir de cerca desde el detalle (⭐), más allá de a quién estén asignados — ordenados por lo que se movió más recientemente. Las notas son privadas: solo las ves vos.</p>
+    </div>
+
+    <div class="tabla-wrap card lectura-tabla-wrap">
+      <div class="tabla-scroll">
+        <table class="lf-tabla sg-tabla">
+          <thead><tr>
+            <th>Código</th>
+            <th>Solicitante</th>
+            <th>CUIT</th>
+            <th>Técnico</th>
+            <th>Estado</th>
+            <th>Última actividad</th>
+            <th>Nota privada</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="sg-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="muted lectura-vacio" id="sg-vacio" style="display:none">Todavía no estás siguiendo ningún caso. Abrí una consulta y tocá "⭐ Seguir" para agregarla acá.</div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = s => document.querySelector(s);
+let ROWS = [];
+
+async function cargar(){
+  const r = await fetch('/api/seguimiento');
+  const d = await r.json();
+  ROWS = d.seguidos;
+  render();
+}
+
+function render(){
+  $('#sg-vacio').style.display = ROWS.length ? 'none' : 'block';
+  $('#sg-tbody').innerHTML = ROWS.map(c => `
+    <tr>
+      <td class="cod sg-abrir" data-id="${c.id}">${escapeHtml(c.codigo)}</td>
+      <td class="nom sg-abrir" data-id="${c.id}">${escapeHtml(c.nombre)||'—'}</td>
+      <td class="cod">${escapeHtml(c.cuit)||'—'}</td>
+      <td>${c.tecnico ? escapeHtml(c.tecnico) : '<span class="lf-sin-asignar">sin asignar</span>'}</td>
+      <td><span class="badge g-${c.grupo}">${escapeHtml(c.estado)||'Sin estado'}</span></td>
+      <td class="muted">${c.ultima_actividad ? escapeHtml(c.ultima_actividad) : '—'}</td>
+      <td><input class="sg-nota" data-id="${c.id}" value="${escapeHtml(c.nota)}" placeholder="Nota privada…"></td>
+      <td><button class="copy-btn-xs sg-quitar" data-id="${c.id}" title="Dejar de seguir">✕</button></td>
+    </tr>`).join('');
+
+  document.querySelectorAll('.sg-abrir').forEach(el => {
+    el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
+  });
+  document.querySelectorAll('.sg-nota').forEach(el => {
+    el.addEventListener('blur', () => {
+      fetch('/api/seguimiento/' + el.dataset.id, {
+        method: 'PATCH', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({nota: el.value}),
+      });
+    });
+  });
+  document.querySelectorAll('.sg-quitar').forEach(el => {
+    el.addEventListener('click', async () => {
+      await fetch('/api/seguimiento/' + el.dataset.id, {method: 'DELETE'});
+      cargar();
+    });
+  });
+}
+
+cargar();
+</script>
+{% endblock %}
