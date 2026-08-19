@@ -1,4 +1,5 @@
 """API de consultas — listar/filtrar, detalle, editar gestión, alta manual, baja."""
+import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Body
 from sqlalchemy import text
@@ -484,9 +485,21 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
 @router.delete("/{cid}")
 def eliminar(cid: int, usuario=Depends(require_coordinador)):
     with engine.begin() as conn:
-        r = conn.execute(text("DELETE FROM sde_consultas WHERE id = :id RETURNING id, codigo"),
-                         {"id": cid}).first()
-    if not r:
-        raise HTTPException(404, "Consulta no encontrada")
-    log.info("Consulta eliminada: id=%s codigo=%s por=%s", cid, r[1], usuario["username"])
+        actual = conn.execute(text("SELECT * FROM sde_consultas WHERE id = :id"),
+                              {"id": cid}).mappings().first()
+        if not actual:
+            raise HTTPException(404, "Consulta no encontrada")
+        # snapshot ANTES de borrar, misma transacción: si el DELETE no llega a
+        # correr (ej. una FK que lo bloquea), tampoco queda un registro de baja
+        # fantasma. Ver comentario en db.py sobre por qué existe esta tabla.
+        conn.execute(text("""
+            INSERT INTO sde_consultas_bajas (consulta_id, codigo, snapshot, eliminado_por)
+            VALUES (:id, :codigo, :snapshot, :por)
+        """), {
+            "id": cid, "codigo": actual["codigo"],
+            "snapshot": json.dumps(dict(actual), default=str),
+            "por": usuario["nombre"],
+        })
+        conn.execute(text("DELETE FROM sde_consultas WHERE id = :id"), {"id": cid})
+    log.info("Consulta eliminada: id=%s codigo=%s por=%s", cid, actual["codigo"], usuario["username"])
     return {"ok": True}

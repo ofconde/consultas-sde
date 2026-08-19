@@ -30,6 +30,16 @@
         <tbody id="tabla-usuarios"></tbody>
       </table>
     </div>
+
+    <h1 class="brand-font" style="margin:2rem 0 0.25rem">Bajas de consultas</h1>
+    <p class="muted" style="margin:0 0 1rem">Quién eliminó cada consulta y cuándo, con los datos que tenía en ese momento. El borrado sigue siendo definitivo — esto es un registro, no una papelera.</p>
+    <div class="tabla-wrap card">
+      <table>
+        <thead><tr><th>Eliminado</th><th>Código</th><th>Solicitante</th><th>CUIT</th><th>Estado al borrar</th><th>Técnico</th><th>Eliminado por</th></tr></thead>
+        <tbody id="tabla-bajas"></tbody>
+      </table>
+    </div>
+    <div class="muted" id="sin-bajas" style="display:none;padding:1.25rem;text-align:center">Todavía no se eliminó ninguna consulta desde que existe este registro.</div>
   </div>
 {% endblock %}
 {% block scripts %}
@@ -118,6 +128,22 @@ $('#n-crear').addEventListener('click', async () => {
   }
 });
 
+async function cargarBajas(){
+  const d = await (await fetch('/api/auditoria/bajas')).json();
+  $('#sin-bajas').style.display = d.total ? 'none' : 'block';
+  $('#tabla-bajas').innerHTML = d.bajas.map(b => `
+    <tr>
+      <td class="muted">${escapeHtml(b.eliminado_en)}</td>
+      <td class="cod">${escapeHtml(b.codigo)}</td>
+      <td>${escapeHtml(b.nombre)||'—'}</td>
+      <td class="cod">${escapeHtml(b.cuit)||'—'}</td>
+      <td>${escapeHtml(b.estado)||'—'}</td>
+      <td>${escapeHtml(b.tecnico)||'—'}</td>
+      <td>${escapeHtml(b.eliminado_por)}</td>
+    </tr>`).join('');
+}
+
 cargarUsuarios();
+cargarBajas();
 </script>
 {% endblock %}

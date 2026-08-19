@@ -15,7 +15,7 @@ from sqlalchemy import text
 from db import init_db, engine
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
                   SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
-from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento
+from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("consultas_sde")
@@ -53,6 +53,7 @@ app.include_router(catalogos.router)
 app.include_router(usuarios.router)
 app.include_router(bcra.router)
 app.include_router(seguimiento.router)
+app.include_router(auditoria.router)
 
 
 # ── Páginas ──────────────────────────────────────────────────────────

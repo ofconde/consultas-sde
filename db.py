@@ -136,6 +136,28 @@ def init_db():
             ON sde_seguimiento (usuario)
         """))
 
+        # Auditoría de bajas: hoy el DELETE de una consulta es físico y no deja
+        # rastro (pasó con el lote del 25/07/2026 — 17 consultas borradas sin que
+        # quede registrado quién ni cuándo, y los logs de Railway ya habían
+        # rotado para cuando se investigó). El snapshot completo de la fila se
+        # guarda ANTES de borrar, en la misma transacción — así la baja sigue
+        # siendo física (no hay "papelera" ni restauración), pero de ahora en
+        # más queda quién, cuándo y qué decía la consulta en ese momento.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sde_consultas_bajas (
+                id            SERIAL PRIMARY KEY,
+                consulta_id   INT NOT NULL,
+                codigo        TEXT NOT NULL,
+                snapshot      JSONB NOT NULL,
+                eliminado_por TEXT NOT NULL,
+                eliminado_en  TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_sde_consultas_bajas_codigo
+            ON sde_consultas_bajas (codigo)
+        """))
+
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS sde_catalogos (
                 id     SERIAL PRIMARY KEY,
