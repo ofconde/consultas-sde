@@ -102,11 +102,16 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
            departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
            situacion_arca: str = "", tipo_accion: str = "", sin_acciones: bool = False,
            fecha: str = "", genero: str = "", monto_excedido: bool = False,
-           apartadas: bool = False, fianza_tercero: bool = False, usuario=Depends(require_login)):
+           apartadas: bool = False, fianza_tercero: bool = False, numero: str = "",
+           usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca en todos los campos de texto (nombre,
     CUIT, código, mail, teléfono, localidad, destino, observaciones, etc. — ver
     _CAMPOS_BUSQUEDA), así una consulta se encuentra sin saber en qué campo puntual
     quedó el dato que se recuerda.
+    `numero` busca por el número de orden del código SDE-NNNNNN (coincidencia exacta,
+    no substring — así "387" no trae de rebote un CUIT o un monto que también
+    contenga esos dígitos, algo que sí puede pasar con `q`). Acepta el número solo
+    (387), con ceros a la izquierda (000387) o el código completo (SDE-000387).
     `mios=1` filtra las asignadas al técnico logueado (match sin acentos/mayúsculas).
     `dups=1` muestra solo consultas con CUIT duplicado, agrupadas por CUIT.
     `tipo_accion` filtra por el tipo de la ÚLTIMA acción registrada (no cualquiera del
@@ -132,7 +137,7 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     else:
         if estado:
             where.append("c.estado = :estado"); params["estado"] = estado
-        if estado != "NO ES FINANCIABLE" and not q:
+        if estado != "NO ES FINANCIABLE" and not q and not numero:
             where.append("c.estado IS DISTINCT FROM :estado_oculto")
             params["estado_oculto"] = "NO ES FINANCIABLE"
     if fianza_tercero:
@@ -148,6 +153,13 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     if q:
         where.append("(" + " OR ".join(f"c.{col} ILIKE :q" for col in _CAMPOS_BUSQUEDA) + ")")
         params["q"] = f"%{q}%"
+    if numero:
+        digitos = "".join(ch for ch in numero if ch.isdigit())
+        if digitos:
+            where.append("c.codigo = :codigo_exacto")
+            params["codigo_exacto"] = f"SDE-{int(digitos):06d}"
+        else:
+            where.append("1=0")  # "numero" sin dígitos válidos: sin resultados, no todos
     if departamento:
         where.append("c.departamento = :departamento"); params["departamento"] = departamento
     if linea:

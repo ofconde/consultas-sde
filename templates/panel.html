@@ -14,6 +14,7 @@
 
     <div class="filtros">
       <input type="search" id="q" placeholder="Buscar por nombre, CUIT, mail, teléfono, localidad, destino…">
+      <input type="text" inputmode="numeric" id="f-numero" placeholder="N° de orden (ej: 387)" title="Busca por el número del código SDE-NNNNNN, coincidencia exacta" style="max-width:11rem">
       <select id="f-tecnico"><option value="">Todos los técnicos</option><option value="__sin__">— Sin asignar</option></select>
       <select id="f-estado"><option value="">Todos los estados</option></select>
       <select id="f-accion"><option value="">Última acción (todas)</option></select>
@@ -258,7 +259,7 @@ function pintarKpis(){
 // no siempre es obvio cuál quedó activo — un solo botón que resetea todo a la vez.
 function limpiarFiltros(){
   Object.assign(state, { estado:'', mios:false, dups:false, sinAcciones:false, generoF:false, tope:false, apartadas:false, fianza:false });
-  $('#q').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
+  $('#q').value=''; $('#f-numero').value=''; $('#f-tecnico').value=''; $('#f-estado').value='';
   $('#f-accion').value=''; $('#f-departamento').value=''; $('#f-linea').value='';
   $('#f-programa').value=''; $('#f-sector').value=''; $('#f-arca').value='';
   $('#f-fecha').value=''; $('#dia-limpiar').style.display = 'none';
@@ -289,6 +290,7 @@ function badge(g, estado){ return `<span class="badge g-${g}">${escapeHtml(estad
 function construirQuery(){
   const p = new URLSearchParams();
   if($('#q').value) p.set('q',$('#q').value);
+  if($('#f-numero').value) p.set('numero',$('#f-numero').value);
   if(state.estado) p.set('estado',state.estado);
   if($('#f-tecnico').value) p.set('tecnico',$('#f-tecnico').value);
   if(state.mios) p.set('mios','1');
@@ -330,6 +332,7 @@ function sincronizarURL(p){
 function restaurarDesdeURL(){
   const p = new URLSearchParams(location.search);
   if(p.has('q')) $('#q').value = p.get('q');
+  if(p.has('numero')) $('#f-numero').value = p.get('numero');
   if(p.has('estado')){ state.estado = p.get('estado'); $('#f-estado').value = state.estado; }
   if(p.has('tecnico')) $('#f-tecnico').value = p.get('tecnico');
   if(p.get('mios')==='1') state.mios = true;
@@ -711,6 +714,7 @@ $('#bulk-agregar-accion').addEventListener('click', async () => {
 });
 
 $('#q').addEventListener('input', ()=>{clearTimeout(TIMER);TIMER=setTimeout(cargarTabla,250)});
+$('#f-numero').addEventListener('input', ()=>{clearTimeout(TIMER);TIMER=setTimeout(cargarTabla,250)});
 $('#f-tecnico').addEventListener('change', ()=>{ pintarKpis(); cargarTabla(); });
 $('#f-accion').addEventListener('change', cargarTabla);
 $('#f-departamento').addEventListener('change', cargarTabla);
