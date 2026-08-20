@@ -28,7 +28,7 @@
         <button class="btn sm" id="dia-next" title="Día siguiente">▶</button>
         <button class="btn sm" id="dia-limpiar" title="Quitar el filtro de día" style="display:none">✕</button>
       </span>
-      <button class="btn sm" id="btn-limpiar-filtros" title="Sacar todos los filtros activos (búsqueda, dropdowns, botones de estado y día)">✕ Limpiar filtros</button>
+      <button class="btn sm" id="btn-limpiar-filtros" style="display:none" title="Sacar todos los filtros activos (búsqueda, dropdowns, botones de estado y día)">✕ Limpiar filtros</button>
       <span class="muted" id="cont"></span>
     </div>
 
@@ -368,6 +368,14 @@ async function cargarTabla(mantenerPagina){
   state.seleccion.clear();
   $('#cont').textContent = d.total + ' consulta' + (d.total===1?'':'s');
   renderPagina();
+  // El botón solo tiene sentido si hay algo para limpiar — mismo criterio que
+  // "dia-limpiar". Antes quedaba visible siempre, aunque no hubiera ningún
+  // filtro puesto, lo que hacía parecer "activo" un panel que en realidad
+  // estaba mostrando la vista por defecto. Se reusa construirQuery() (ya arma
+  // los params a partir de TODOS los filtros/botones/estado) en vez de repetir
+  // esa misma lista acá — "pagina" no cuenta como filtro, se saca antes de mirar.
+  const pq = construirQuery(); pq.delete('pagina');
+  $('#btn-limpiar-filtros').style.display = pq.toString() ? '' : 'none';
 }
 
 // Acciones más frecuentes en el triage de un aluvión de consultas nuevas — un
