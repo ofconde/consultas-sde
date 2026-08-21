@@ -9,6 +9,7 @@ Alimenta dos consumidores con distinto recorte del mismo JSON:
 Sin `desde`/`hasta` el endpoint se comporta exactamente como antes de que existiera
 el informe PDF: todo el histórico, y la serie diaria acotada a los últimos 90 días.
 """
+from collections import Counter
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,6 +19,7 @@ from db import engine, cuits_duplicados
 from auth import require_login
 from formatos import _monto, _dmy, _parse_fecha
 from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS, TOPE_LINEA
+from clasificacion import clasificar_motivo, ORDEN_CATEGORIAS
 import genero as genero_mod
 
 # "Situación de consultas" — desglose fino por estado (equivalente a la hoja
@@ -128,11 +130,15 @@ def _breakdown(conn, columna, etiqueta_vacia, rango, params):
 
 @router.get("")
 def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
-            _=Depends(require_login)):
+            sector: str = "", _=Depends(require_login)):
     """KPIs del informe. `desde`/`hasta` (YYYY-MM-DD o DD-MM-YYYY) acotan por fecha
     de recepción; sin ellos se toma todo el histórico. `excluir_repetidas` saca del
     universo las consultas marcadas REPETIDO — las usa el informe institucional,
-    donde contar dos veces al mismo solicitante infla la demanda informada."""
+    donde contar dos veces al mismo solicitante infla la demanda informada.
+    `sector` acota TODO el informe (KPIs, situación, montos, casos en trámite,
+    motivo de inversión) a un único valor de Sector — nace del informe especial
+    de agro del 21/08/2026, para no tener que repetir ese trabajo a mano la
+    próxima vez que jefatura pida el corte de un sector puntual."""
     d = _parse_fecha(desde)
     h = _parse_fecha(hasta)
     if d and h and d > h:
@@ -143,6 +149,9 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
     if excluir_repetidas:
         rango.append(_NO_REPETIDA)
         rango_c.append(_NO_REPETIDA_C)
+    if sector:
+        rango.append("sector = :sector")
+        rango_c.append("c.sector = :sector")
     # Rango específico para los agregados de monto (total/promedio/mediana/máximo/
     # tramos): siempre sin NO ES FINANCIABLE, independiente de excluir_repetidas.
     rango_monto = rango + [_NO_APARTADA]
@@ -151,6 +160,8 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         params["desde"] = d
     if h:
         params["hasta"] = h
+    if sector:
+        params["sector"] = sector
 
     with engine.connect() as conn:
         # Cuántas se dejaron afuera — se informa al pie, no se esconde el recorte.
@@ -245,6 +256,15 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         por_departamento = _breakdown(conn, "departamento", _PENDIENTE_UEP, rango, params)
         por_origen = _breakdown(conn, "como_se_entero", "(sin dato)", rango, params)
 
+        # Motivo de inversión: clasificación por palabra clave sobre texto libre
+        # (ver clasificacion.py) — no se puede resolver con GROUP BY como el resto
+        # de los breakdowns porque no es una columna cerrada, así que se trae el
+        # texto y se clasifica en Python. Mismo rango que los montos (sin NO ES
+        # FINANCIABLE): un motivo de un caso ya rechazado no es demanda real.
+        destinos = conn.execute(text(f"""
+            SELECT destino FROM sde_consultas {_where(*rango_monto)}
+        """), params).all()
+
         # Casos en trámite: detalle de las consultas con gestión activa avanzada
         # (en trámite con SGR/fondo, o completando documentación) — "al día de
         # emisión", no acotado por el rango del informe: es una foto del estado
@@ -257,9 +277,10 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         casos_tramite_rows = conn.execute(text(f"""
             SELECT nombre, {_MONTO_EFECTIVO} AS monto, destino, garantia, estado
             FROM sde_consultas
-            WHERE UPPER(TRIM(COALESCE(estado, ''))) = ANY(:estados)
+            {_where("UPPER(TRIM(COALESCE(estado, ''))) = ANY(:estados)",
+                    "sector = :sector" if sector else "")}
             ORDER BY fecha_recepcion DESC
-        """), {"estados": list(_ESTADOS_TRAMITE)}).mappings().all()
+        """), {"estados": list(_ESTADOS_TRAMITE), **({"sector": sector} if sector else {})}).mappings().all()
         casos_tramite = [{
             "nombre": r["nombre"], "monto": int(r["monto"] or 0), "monto_fmt": _monto(r["monto"]),
             "destino": r["destino"], "garantia": r["garantia"], "estado": r["estado"],
@@ -356,6 +377,10 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
             GROUP BY 1 ORDER BY n DESC
         """), params).mappings().all()
 
+    por_motivo = Counter(clasificar_motivo(r[0]) for r in destinos)
+    motivo_inversion = [{"clave": cat, "n": por_motivo[cat]}
+                        for cat in ORDEN_CATEGORIAS if por_motivo.get(cat)]
+
     # agrupar estados en grupos
     grupos_cnt = {g[0]: 0 for g in GRUPOS}
     estados_out = []
@@ -422,6 +447,8 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         "situacion_arca": por_arca,
         "departamentos": por_departamento,
         "origenes": por_origen,
+        "motivo_inversion": motivo_inversion,
+        "sector_filtro": sector,
         "promedio_diario": promedio_diario,
         "situacion": situacion,
         "periodo": {

@@ -22,6 +22,8 @@
   <input type="date" id="f-desde">
   <label for="f-hasta">Hasta</label>
   <input type="date" id="f-hasta">
+  <label for="f-sector">Sector</label>
+  <select id="f-sector"><option value="">Todos</option></select>
   <button class="tbtn" id="btn-aplicar">Aplicar</button>
   <button class="tbtn" id="btn-todo" title="Volver al histórico completo">Todo el histórico</button>
   <span class="spacer"></span>
@@ -61,6 +63,7 @@
     <span>Período del informe</span>
     <span class="rango" id="p-rango">—</span>
     <span class="dias" id="p-dias"></span>
+    <span class="dias" id="p-sector" style="display:none"></span>
   </div>
 
   {# Síntesis en prosa para quien no va a leer las 8 secciones — un funcionario quiere el
@@ -196,6 +199,7 @@ const SECCIONES_DEF = [
   { id: 'sector',    label: 'Perfil económico de la demanda',     numerada: true },
   { id: 'arca',      label: 'Condición fiscal de los solicitantes', numerada: true },
   { id: 'montos',    label: 'Montos solicitados',                 numerada: true },
+  { id: 'motivo',    label: 'Motivo de la inversión declarado',   numerada: true },
   { id: 'lineas',    label: 'Encuadre en líneas y programas',     numerada: true },
   { id: 'tramite',   label: 'Casos en trámite',                   numerada: true },
 ];
@@ -458,6 +462,9 @@ function render(d){
 
   $('#p-rango').textContent = `${d.periodo.desde_fmt} al ${d.periodo.hasta_fmt}`;
   $('#p-dias').textContent = `${d.periodo.dias} día${d.periodo.dias===1?'':'s'}`;
+  const pSector = $('#p-sector');
+  if(d.sector_filtro){ pSector.textContent = `Sector: ${etiqueta(d.sector_filtro)}`; pSector.style.display = ''; }
+  else { pSector.style.display = 'none'; }
   // El informe excluye del universo las consultas REPETIDO (mismo solicitante que
   // ya había consultado) para no contar dos veces la misma demanda.
   $('#nota-repetidas').textContent = d.repetidas_excluidas > 0
@@ -557,6 +564,12 @@ function render(d){
       </div>
       ${barrasHorizontales(d.montos.tramos.filter(t=>t.n>0).map(t=>({clave:t.label, n:t.n})), '#1a9e57')}`,
 
+    motivo: () => `
+      ${barrasHorizontales(d.motivo_inversion, '#6c4bd0')}
+      <div class="sec-nota">Clasificado por palabra clave sobre el destino del financiamiento declarado
+        en el formulario (maquinaria, obra civil, capital de trabajo, etc.). No incluye consultas
+        NO ES FINANCIABLE.</div>`,
+
     lineas: () => `
       <div class="grid2">
         <div>${tablaBreakdown(d.lineas.map(f=>({...f, clave: etiqueta(f.clave)})), 'Línea de crédito')}</div>
@@ -598,15 +611,19 @@ const PRIMERA = "{{ primera_consulta }}";
 
 function rangoDeURL(){
   const p = new URLSearchParams(location.search);
-  return { desde: p.get('desde') || PRIMERA || '', hasta: p.get('hasta') || hoyISO() };
+  return {
+    desde: p.get('desde') || PRIMERA || '', hasta: p.get('hasta') || hoyISO(),
+    sector: p.get('sector') || '',
+  };
 }
 
 async function cargar(){
-  const desde = $('#f-desde').value, hasta = $('#f-hasta').value;
+  const desde = $('#f-desde').value, hasta = $('#f-hasta').value, sector = $('#f-sector').value;
   if(desde && hasta && desde > hasta){ alert('La fecha "desde" no puede ser posterior a "hasta".'); return; }
   const p = new URLSearchParams();
   if(desde) p.set('desde', desde);
   if(hasta) p.set('hasta', hasta);
+  if(sector) p.set('sector', sector);
   // "secciones" viene de otro flujo (pintarToggleSecciones), pero cargar() arma
   // la URL desde cero con el rango — sin esto, aplicar un rango nuevo pisaba
   // silenciosamente la selección de secciones ya elegida.
@@ -630,7 +647,7 @@ async function cargar(){
 $('#btn-aplicar').addEventListener('click', cargar);
 $('#btn-imprimir').addEventListener('click', () => window.print());
 $('#btn-todo').addEventListener('click', () => {
-  $('#f-desde').value = PRIMERA; $('#f-hasta').value = hoyISO(); cargar();
+  $('#f-desde').value = PRIMERA; $('#f-hasta').value = hoyISO(); $('#f-sector').value = ''; cargar();
 });
 [$('#f-desde'), $('#f-hasta')].forEach(el =>
   el.addEventListener('keydown', e => { if(e.key === 'Enter') cargar(); }));
@@ -647,7 +664,13 @@ $('#btn-todo').addEventListener('click', () => {
   $('#f-desde').value = r.desde;
   $('#f-hasta').value = r.hasta;
   pintarToggleSecciones();
-  META = await (await fetch('/api/catalogos/estado-grupo')).json();
+  const [catalogos, estadoGrupo] = await Promise.all([
+    fetch('/api/catalogos').then(x => x.json()),
+    fetch('/api/catalogos/estado-grupo').then(x => x.json()),
+  ]);
+  META = estadoGrupo;
+  (catalogos.SECTOR || []).forEach(s => $('#f-sector').add(new Option(s, s)));
+  $('#f-sector').value = r.sector;
   await cargar();
 })();
 </script>
