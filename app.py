@@ -16,6 +16,7 @@ from db import init_db, engine
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
                   SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
 from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria
+from routers.auditoria import registrar_actividad, registrar_accion
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("consultas_sde")
@@ -45,6 +46,23 @@ async def excepcion_no_controlada(request: Request, exc: Exception):
     log.exception("Error no controlado en %s %s", request.method, request.url.path)
     return JSONResponse({"detail": "Error interno del servidor."}, status_code=500)
 
+
+@app.middleware("http")
+async def auditar_actividad(request: Request, call_next):
+    """Actualiza la actividad diaria del usuario logueado en cada request, y
+    registra en sde_auditoria los métodos que cambian datos. Login/logout se
+    auditan aparte (routers/auditoria.py) porque ahí todavía no hay cookie de
+    sesión en el request que llega, o ya se está por borrar."""
+    response = await call_next(request)
+    try:
+        u = usuario_actual(request)
+        if u and not request.url.path.startswith("/static"):
+            ip = request.client.host if request.client else None
+            registrar_actividad(u["username"], request.method, request.url.path, response.status_code, ip)
+    except Exception:
+        log.exception("No se pudo registrar actividad de auditoría")
+    return response
+
 app.include_router(consultas.router)
 app.include_router(acciones.router)
 app.include_router(ingesta.router)
@@ -73,6 +91,7 @@ def login_page(request: Request):
 
 @app.post("/login")
 def login_post(request: Request, username: str = Form(...), password: str = Form(...)):
+    ip = request.client.host if request.client else None
     if rate_limit_excedido(username):
         return templates.TemplateResponse(
             "login.html",
@@ -82,12 +101,14 @@ def login_post(request: Request, username: str = Form(...), password: str = Form
     u = autenticar(username, password)
     if not u:
         registrar_intento_fallido(username)
+        registrar_accion(username, "LOGIN_FALLIDO", "/login", 401, ip)
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": "Usuario o contraseña incorrectos."},
             status_code=401,
         )
     limpiar_intentos(username)
+    registrar_actividad(u["username"], "LOGIN", "/login", 200, ip)
     resp = RedirectResponse("/panel", status_code=303)
     resp.set_cookie(COOKIE_NAME, crear_token(u["username"]),
                     httponly=True, samesite="lax", max_age=SESSION_MAX_AGE)
@@ -95,7 +116,11 @@ def login_post(request: Request, username: str = Form(...), password: str = Form
 
 
 @app.get("/logout")
-def logout():
+def logout(request: Request):
+    u = usuario_actual(request)
+    if u:
+        ip = request.client.host if request.client else None
+        registrar_accion(u["username"], "LOGOUT", "/logout", 200, ip)
     resp = RedirectResponse("/login", status_code=303)
     resp.delete_cookie(COOKIE_NAME)
     return resp
@@ -184,6 +209,18 @@ def admin_page(request: Request):
     if u["rol"] != "coordinador":
         return RedirectResponse("/panel")
     return templates.TemplateResponse("admin.html", {"request": request, "usuario": u, "activo": "admin"})
+
+
+@app.get("/admin/auditoria", response_class=HTMLResponse)
+def admin_auditoria_page(request: Request):
+    """Registro de acciones (qué se hizo, quién, cuándo) y actividad diaria por
+    usuario (primera/última acción del día, como aproximación de uso)."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    if u["rol"] != "coordinador":
+        return RedirectResponse("/panel")
+    return templates.TemplateResponse("auditoria.html", {"request": request, "usuario": u, "activo": "auditoria"})
 
 
 @app.get("/perfil", response_class=HTMLResponse)

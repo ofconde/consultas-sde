@@ -158,6 +158,37 @@ def init_db():
             ON sde_consultas_bajas (codigo)
         """))
 
+        # Auditoría general: quién hizo qué (todo método que cambia datos), y
+        # actividad diaria por usuario para medir tiempo de uso. No es una
+        # sesión real (HTTP es sin estado): "conexión" acá significa el tramo
+        # entre la primera y la última acción del usuario en el día — se rotula
+        # así en la UI para no prometer más precisión de la que hay.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sde_auditoria (
+                id          SERIAL PRIMARY KEY,
+                usuario     TEXT NOT NULL,
+                metodo      TEXT NOT NULL,
+                ruta        TEXT NOT NULL,
+                status_code INT,
+                ip          TEXT,
+                creado_en   TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_auditoria_usuario ON sde_auditoria (usuario)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_auditoria_creado ON sde_auditoria (creado_en)"))
+
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sde_actividad_diaria (
+                usuario            TEXT NOT NULL,
+                fecha              DATE NOT NULL,
+                primera_actividad  TIMESTAMP NOT NULL,
+                ultima_actividad   TIMESTAMP NOT NULL,
+                cantidad_requests  INT NOT NULL DEFAULT 0,
+                PRIMARY KEY (usuario, fecha)
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_actividad_fecha ON sde_actividad_diaria (fecha)"))
+
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS sde_catalogos (
                 id     SERIAL PRIMARY KEY,

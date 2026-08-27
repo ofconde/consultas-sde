@@ -12,6 +12,7 @@
       <a href="/informe" class="{% if activo=='informe' %}active{% endif %}">Estadísticas</a>
       {% if usuario.rol == 'coordinador' %}
       <a href="/admin" class="{% if activo=='admin' %}active{% endif %}">Admin</a>
+      <a href="/admin/auditoria" class="{% if activo=='auditoria' %}active{% endif %}" title="Registro de acciones y actividad diaria por usuario">Auditoría</a>
       {% endif %}
     </nav>
     <div class="spacer"></div>

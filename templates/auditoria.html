@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Auditoría · Consultas SDE{% endblock %}
+{% block extra_head %}
+<style>
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.8125rem}
+  .badge-ok{background:var(--celeste,#e8f1ff);color:var(--blue)}
+  .badge-err{background:var(--red-bg);color:var(--red)}
+</style>
+{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+
+  <div class="wrap">
+    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">Auditoría</h1>
+    <p class="muted" style="margin:0 0 1.25rem">Actividad diaria por usuario y registro de acciones. "Duración" es el tramo entre la primera y la última acción del día — no es tiempo de conexión real, HTTP no mantiene una sesión abierta.</p>
+
+    <div class="card" style="padding:1rem 1.25rem;margin-bottom:1.5rem">
+      <div class="sec-title" style="margin-top:0">Actividad diaria por usuario</div>
+      <div class="row2" style="margin-bottom:0.75rem">
+        <div class="field"><label>Desde</label><input type="date" id="c-desde"></div>
+        <div class="field"><label>Hasta</label><input type="date" id="c-hasta"></div>
+      </div>
+      <div class="field" style="max-width:16rem;margin-bottom:0.75rem">
+        <label>Usuario</label>
+        <select id="c-usuario"><option value="">— Todos —</option></select>
+      </div>
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Usuario</th><th>Primera actividad</th><th>Última actividad</th><th>Duración</th><th>Acciones</th></tr></thead>
+          <tbody id="tabla-conexiones"></tbody>
+        </table>
+      </div>
+      <div class="muted" id="sin-conexiones" style="display:none;padding:1.25rem;text-align:center">No hay actividad registrada en ese rango.</div>
+    </div>
+
+    <div class="card" style="padding:1rem 1.25rem">
+      <div class="sec-title" style="margin-top:0">Registro de acciones</div>
+      <p class="muted" style="margin:0 0 0.75rem">Todo lo que modifica datos (altas, ediciones, borrados) más inicios y cierres de sesión. Las vistas de página (GET) no se listan acá — quedan cubiertas por la actividad diaria de arriba.</p>
+      <div class="row2" style="margin-bottom:0.75rem">
+        <div class="field"><label>Usuario</label>
+          <select id="a-usuario"><option value="">— Todos —</option></select>
+        </div>
+        <div class="field"><label>Método</label>
+          <select id="a-metodo">
+            <option value="">— Todos —</option>
+            <option value="LOGIN">LOGIN</option>
+            <option value="LOGIN_FALLIDO">LOGIN_FALLIDO</option>
+            <option value="LOGOUT">LOGOUT</option>
+            <option value="POST">POST</option>
+            <option value="PATCH">PATCH</option>
+            <option value="PUT">PUT</option>
+            <option value="DELETE">DELETE</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2" style="margin-bottom:0.75rem">
+        <div class="field"><label>Desde</label><input type="date" id="a-desde"></div>
+        <div class="field"><label>Hasta</label><input type="date" id="a-hasta"></div>
+      </div>
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr><th>Cuándo</th><th>Usuario</th><th>Método</th><th>Ruta</th><th>Estado</th><th>IP</th></tr></thead>
+          <tbody id="tabla-acciones"></tbody>
+        </table>
+      </div>
+      <div class="muted" id="sin-acciones" style="display:none;padding:1.25rem;text-align:center">No hay acciones registradas con esos filtros.</div>
+      <div style="text-align:center;margin-top:0.75rem">
+        <button class="btn sm" id="btn-mas" style="display:none">Cargar más</button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = s => document.querySelector(s);
+let offsetAcciones = 0;
+const LIMITE = 100;
+
+function badgeEstado(status){
+  if(!status) return '<span class="muted">—</span>';
+  const cls = status < 400 ? 'badge-ok' : 'badge-err';
+  return `<span class="badge ${cls}">${status}</span>`;
+}
+
+async function poblarUsuarios(){
+  const r = await fetch('/api/auditoria/usuarios-conocidos');
+  const lista = await r.json();
+  const opts = lista.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+  $('#c-usuario').insertAdjacentHTML('beforeend', opts);
+  $('#a-usuario').insertAdjacentHTML('beforeend', opts);
+}
+
+async function cargarConexiones(){
+  const qs = new URLSearchParams();
+  if($('#c-desde').value) qs.set('desde', $('#c-desde').value);
+  if($('#c-hasta').value) qs.set('hasta', $('#c-hasta').value);
+  if($('#c-usuario').value) qs.set('usuario_filtro', $('#c-usuario').value);
+  const r = await fetch('/api/auditoria/conexiones?' + qs.toString());
+  const data = await r.json();
+  $('#tabla-conexiones').innerHTML = data.conexiones.map(c => `
+    <tr>
+      <td>${c.fecha}</td>
+      <td>${escapeHtml(c.usuario)}</td>
+      <td>${c.primera_actividad}</td>
+      <td>${c.ultima_actividad}</td>
+      <td><strong>${c.duracion}</strong></td>
+      <td>${c.cantidad_requests}</td>
+    </tr>
+  `).join('');
+  $('#sin-conexiones').style.display = data.conexiones.length ? 'none' : '';
+}
+
+async function cargarAcciones(reset){
+  if(reset) offsetAcciones = 0;
+  const qs = new URLSearchParams();
+  if($('#a-usuario').value) qs.set('usuario_filtro', $('#a-usuario').value);
+  if($('#a-metodo').value) qs.set('metodo', $('#a-metodo').value);
+  if($('#a-desde').value) qs.set('desde', $('#a-desde').value);
+  if($('#a-hasta').value) qs.set('hasta', $('#a-hasta').value);
+  qs.set('limit', LIMITE);
+  qs.set('offset', offsetAcciones);
+  const r = await fetch('/api/auditoria/acciones?' + qs.toString());
+  const data = await r.json();
+  const filas = data.acciones.map(a => `
+    <tr>
+      <td>${a.cuando}</td>
+      <td>${escapeHtml(a.usuario)}</td>
+      <td><span class="mono">${escapeHtml(a.metodo)}</span></td>
+      <td class="mono" style="word-break:break-all">${escapeHtml(a.ruta)}</td>
+      <td>${badgeEstado(a.status_code)}</td>
+      <td class="muted">${escapeHtml(a.ip || '—')}</td>
+    </tr>
+  `).join('');
+  if(reset) $('#tabla-acciones').innerHTML = filas;
+  else $('#tabla-acciones').insertAdjacentHTML('beforeend', filas);
+  $('#sin-acciones').style.display = (reset && !data.acciones.length) ? '' : 'none';
+  offsetAcciones += data.acciones.length;
+  $('#btn-mas').style.display = offsetAcciones < data.total ? '' : 'none';
+}
+
+['c-desde','c-hasta','c-usuario'].forEach(id => $('#'+id).addEventListener('change', cargarConexiones));
+['a-usuario','a-metodo','a-desde','a-hasta'].forEach(id => $('#'+id).addEventListener('change', () => cargarAcciones(true)));
+$('#btn-mas').addEventListener('click', () => cargarAcciones(false));
+
+poblarUsuarios().then(() => { cargarConexiones(); cargarAcciones(true); });
+</script>
+{% endblock %}
