@@ -12,6 +12,7 @@ Tres cosas viven acá:
    acción registrada ese día. Se rotula así en la UI, sin prometer precisión
    de reloj de conexión que no existe.
 """
+import re
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 
@@ -28,6 +29,36 @@ router = APIRouter(prefix="/api/auditoria", tags=["auditoria"])
 # — la actividad diaria (abajo) ya cubre "el usuario estuvo usando el sistema"
 # sin inundar la tabla con cada vista de página.
 _METODOS_AUDITADOS = {"POST", "PUT", "PATCH", "DELETE"}
+
+# Rutas que llevan un id de consulta embebido — para mostrar el nombre del
+# solicitante al lado del número en el registro de acciones (más fácil de
+# ubicar después que memorizar el id). Cubre /api/consultas/{cid},
+# /api/consultas/{cid}/acciones(/{aid}) y /api/seguimiento/{cid}.
+_RUTA_CON_CID = re.compile(r"^/api/(?:consultas|seguimiento)/(\d+)(?:/|$)")
+
+
+def _con_nombre_solicitante(filas: list[dict]) -> list[dict]:
+    """Agrega ' — Nombre' al final de la ruta cuando esta referencia una
+    consulta puntual. No falla si el id ya no existe (consulta borrada)."""
+    ids = set()
+    for f in filas:
+        m = _RUTA_CON_CID.match(f["ruta"])
+        if m:
+            ids.add(int(m.group(1)))
+    nombres = {}
+    if ids:
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT id, nombre, codigo FROM sde_consultas WHERE id = ANY(:ids)"
+            ), {"ids": list(ids)}).mappings().all()
+        nombres = {r["id"]: f"{r['codigo']} · {r['nombre']}" for r in rows}
+    for f in filas:
+        m = _RUTA_CON_CID.match(f["ruta"])
+        if m:
+            cid = int(m.group(1))
+            etiqueta = nombres.get(cid, "consulta eliminada")
+            f["ruta"] = f"{f['ruta']} — {etiqueta}"
+    return filas
 
 
 def registrar_accion(usuario: str, metodo: str, ruta: str, status_code=None, ip=None):
@@ -121,13 +152,11 @@ def listar_acciones(
     with engine.connect() as conn:
         rows = conn.execute(text(sql), params).mappings().all()
         total = conn.execute(text(f"SELECT COUNT(*) FROM sde_auditoria WHERE {' AND '.join(where)}"), params).scalar()
-    return {
-        "total": total,
-        "acciones": [{
-            "id": r["id"], "usuario": r["usuario"], "metodo": r["metodo"], "ruta": r["ruta"],
-            "status_code": r["status_code"], "ip": r["ip"], "cuando": _hora_local(r["creado_en"]),
-        } for r in rows],
-    }
+    acciones = [{
+        "id": r["id"], "usuario": r["usuario"], "metodo": r["metodo"], "ruta": r["ruta"],
+        "status_code": r["status_code"], "ip": r["ip"], "cuando": _hora_local(r["creado_en"]),
+    } for r in rows]
+    return {"total": total, "acciones": _con_nombre_solicitante(acciones)}
 
 
 @router.get("/conexiones")
