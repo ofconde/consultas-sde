@@ -201,6 +201,16 @@ thead th{white-space:nowrap}
   padding:2px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;
 }
 .estado-linea{font-weight:700}
+
+/* Tabla de "Casos avanzados" — table-layout:fixed para que los anchos del
+   <colgroup> se respeten de verdad (si no, el navegador ensancha la columna
+   con más texto a costa de las demás, y "Estado"/"Línea" quedan angostas al
+   punto de apilarse en 3-4 líneas). word-break solo en las columnas de texto
+   largo, no en Código/Monto/Días que deben quedar en una sola línea. */
+.tabla-avanzados{table-layout:fixed}
+.tabla-avanzados td, .tabla-avanzados th{overflow-wrap:break-word}
+.tabla-avanzados td.money, .tabla-avanzados td.num{white-space:nowrap}
+.tabla-avanzados .estado-linea{white-space:nowrap}
 .tramite-total{
   margin-top:10px;padding-top:8px;border-top:1.5px solid var(--border);
   font-size:11px;font-weight:700;color:var(--navy);text-align:right;

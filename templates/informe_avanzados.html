@@ -65,6 +65,17 @@ function etiqueta(s){
   return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 }
 
+// Etiqueta corta para la columna Estado de la tabla — el nombre completo del
+// catálogo ("Remitido Para Firma De Representante") no entra en una columna
+// angosta sin apilarse en 3-4 líneas. En los KPI de arriba sí va completo,
+// ahí hay ancho de sobra.
+const _ESTADO_CORTO = {
+  'REMITIDO PARA FIRMA DE REPRESENTANTE': 'Firma pendiente',
+  'INGRESADO EN CFI SEDE': 'En sede',
+  'EN TRAMITE DE DESEMBOLSO': 'En desembolso',
+  'DESEMBOLSADO': 'Desembolsado',
+};
+
 function colorEstado(estado){
   const grupo = META.estado_grupo[estado];
   return META.grupo_color[grupo] || 'var(--navy)';
@@ -80,20 +91,27 @@ function pintarKpis(resumen){
 
 function tablaCasos(casos){
   if(!casos.length) return '<div class="vacio">No hay casos en estas etapas al día de emisión.</div>';
-  return `<table><thead><tr>
-      <th>Código</th><th>Solicitante</th><th>CUIT</th><th>Técnico</th>
+  // Programa es el dato más específico de los dos cuando está confirmado
+  // (línea es la categoría amplia); si no hay programa se muestra la línea.
+  // Mostrar los dos concatenados no entraba en una columna angosta sin
+  // apilarse en varias líneas.
+  const lineaCorta = c => (c.programa && c.programa !== '—') ? c.programa : c.linea;
+  return `<table class="tabla-avanzados"><colgroup>
+      <col style="width:8%"><col style="width:20%"><col style="width:10%">
+      <col style="width:17%"><col style="width:18%"><col style="width:7%"><col style="width:20%">
+    </colgroup><thead><tr>
+      <th>Código</th><th>Solicitante</th><th>Técnico</th>
       <th>Línea / Programa</th><th style="text-align:right">Monto</th>
-      <th style="text-align:right">Días desde recepción</th><th>Estado</th>
+      <th style="text-align:right" title="Días desde la recepción de la consulta">Días</th><th>Estado</th>
     </tr></thead><tbody>${casos.map(c => `
       <tr>
         <td>${escapeHtml(c.codigo)}</td>
         <td>${escapeHtml(c.nombre)||'—'}</td>
-        <td>${escapeHtml(c.cuit)||'—'}</td>
         <td>${escapeHtml(c.tecnico)}</td>
-        <td>${escapeHtml(c.linea)}${c.programa && c.programa!=='—' ? ' · '+escapeHtml(c.programa) : ''}</td>
+        <td>${escapeHtml(lineaCorta(c))}</td>
         <td class="money">${escapeHtml(c.monto_fmt)}</td>
         <td class="num">${c.dias_desde_recepcion ?? '—'}</td>
-        <td><span class="estado-linea" style="color:${colorEstado(c.estado)}">${escapeHtml(etiqueta(c.estado))}</span></td>
+        <td><span class="estado-linea" style="color:${colorEstado(c.estado)}">${escapeHtml(_ESTADO_CORTO[c.estado] || etiqueta(c.estado))}</span></td>
       </tr>`).join('')}</tbody></table>`;
 }
 
