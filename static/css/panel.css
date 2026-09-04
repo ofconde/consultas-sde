@@ -160,6 +160,9 @@ th{background:#fafbfe;color:var(--muted);font-weight:600;font-size:0.75rem;text-
 .tabla-resizable td{overflow-wrap:break-word}
 .th-rz{position:absolute;right:0;top:0;bottom:0;width:0.4375rem;cursor:col-resize;
        user-select:none;touch-action:none}
+.th-ordenable{cursor:pointer}
+.th-ordenable:hover{color:var(--celeste)}
+.th-sort{font-size:0.6875rem}
 
 /* Desplegables inline en la tabla del panel (técnico, acción rápida) — se
    activan clic a clic sobre la fila sin abrir el detalle; en reposo tienen

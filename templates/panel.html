@@ -76,7 +76,7 @@
             <th data-col="monto">Monto<span class="th-rz"></span></th>
             <th data-col="linea">Línea / Programa<span class="th-rz"></span></th>
             <th data-col="tecnico">Técnico<span class="th-rz"></span></th>
-            <th data-col="estado">Estado<span class="th-rz"></span></th>
+            <th data-col="estado" id="th-estado" class="th-ordenable" title="Ordenar por estado (según el orden del circuito)">Estado<span class="th-sort" id="th-estado-ind"></span><span class="th-rz"></span></th>
             <th data-col="ultima_accion">Última acción<span class="th-rz"></span></th>
             <th data-col="arca">ARCA confirmado<span class="th-rz"></span></th>
             <th data-col="bcra" title="Consulta a demanda a la Central de Deudores del BCRA — hace clic en el botón de cada fila">Situación BCRA<span class="th-rz"></span></th>
@@ -366,6 +366,7 @@ async function cargarTabla(mantenerPagina){
   sincronizarURL(p);
   const r = await fetch('/api/consultas?'+p); const d = await r.json();
   ROWS = d.consultas;
+  aplicarOrdenEstado();
   // Un cambio de filtro puede sacar de la vista filas que estaban tildadas —
   // se limpia la selección para no arrastrar ids que ya no se ven.
   state.seleccion.clear();
@@ -787,6 +788,39 @@ function aplicarAnchosColumnas(){
     if(w) col.style.width = w + 'px';
   });
 }
+// Orden por Estado, a pedido: la tabla viene por defecto ordenada por fecha
+// de recepción y con 15 estados posibles quedaba difícil revisar de a un
+// estado por vez sin usar el filtro. No se ordena alfabéticamente (no
+// significa nada: "COMPLETANDO DOCUMENTACION" quedaría antes que "CONSULTA
+// INICIAL") sino según el orden real del circuito, el mismo de CAT.ESTADO
+// (que alimenta el desplegable de Estado y viene de catalogos_seed.json).
+let ordenEstado = 0; // 0 = sin ordenar (orden que trae el servidor), 1 = asc, -1 = desc
+
+function _rankEstado(estado){
+  const arr = CAT.ESTADO || [];
+  const i = arr.indexOf(estado);
+  return i === -1 ? arr.length : i;
+}
+function aplicarOrdenEstado(){
+  if(ordenEstado === 0) return;
+  ROWS.sort((a, b) => (_rankEstado(a.estado) - _rankEstado(b.estado)) * ordenEstado);
+}
+function pintarIndicadorOrdenEstado(){
+  const ind = $('#th-estado-ind');
+  if(!ind) return;
+  ind.textContent = ordenEstado === 1 ? ' ▲' : ordenEstado === -1 ? ' ▼' : '';
+}
+function iniciarOrdenEstado(){
+  $('#th-estado').addEventListener('click', (e) => {
+    if(e.target.closest('.th-rz')) return;
+    ordenEstado = ordenEstado === 1 ? -1 : 1;
+    state.pagina = 1;
+    aplicarOrdenEstado();
+    renderPagina();
+    pintarIndicadorOrdenEstado();
+  });
+}
+
 function iniciarRedimensionColumnas(){
   document.querySelectorAll('#tabla thead .th-rz').forEach(handle => {
     handle.addEventListener('mousedown', e => {
@@ -815,6 +849,7 @@ function iniciarRedimensionColumnas(){
 (async function(){
   aplicarAnchosColumnas();
   iniciarRedimensionColumnas();
+  iniciarOrdenEstado();
   $('#bulk-accion-fecha').value = hoyISO();
   await cargarMeta(); await cargarCatalogos(); await cargarTecnicos();
   await cargarResumen();

@@ -22,6 +22,7 @@
        herramienta de gestión que necesite el técnico. #}
     {% if usuario.rol == 'coordinador' %}
     <a href="/informe/pdf" target="_blank" class="btn-informe" title="Informe institucional imprimible">Informe PDF</a>
+    <a href="/informe/avanzados" target="_blank" class="btn-informe" title="Casos desde firma de representante hasta desembolso, una hoja">Casos Avanzados</a>
     {% endif %}
     <div class="user">
       <span>{{ usuario.nombre }}</span>

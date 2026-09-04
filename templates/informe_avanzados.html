@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+{# Documento imprimible standalone, mismo criterio que informe_pdf.html (no
+   extiende base.html, reusa static/css/informe-pdf.css) — ver el comentario
+   ahí para el porqué. Esta es la versión "una hoja": una lista, sin secciones
+   ni gráficos, así que no necesita el motor de toggles del informe general. #}
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/img/favicon.png">
+<title>Casos avanzados · Consultas SDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Raleway:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/informe-pdf.css">
+<script src="/static/js/util.js"></script>
+</head>
+<body>
+
+<div class="toolbar">
+  <img class="tl-logo" src="/static/img/logo-cfi.png" alt="CFI">
+  <span class="tl-tit">Casos avanzados</span>
+  <span class="spacer"></span>
+  <button class="tbtn" id="btn-actualizar">Actualizar</button>
+  <button class="tbtn primary" id="btn-imprimir">Imprimir / Guardar PDF</button>
+</div>
+
+<div id="doc">
+  <div class="doc-head">
+    <img class="doc-escudo" src="/static/img/escudo-sde.svg" alt="Escudo de la Provincia de Santiago del Estero">
+    <div class="doc-head-txt">
+      <div class="doc-gob">Gobierno de la Provincia<br>de Santiago del Estero</div>
+      <div class="doc-casa">Casa de Santiago del Estero</div>
+      <div class="doc-casa-sub">Representación Oficial del Gobierno de la Provincia
+        en la Ciudad de Buenos Aires y Relaciones Internacionales</div>
+    </div>
+    <div class="doc-cfi">
+      <img src="/static/img/logo-cfi.png" alt="Consejo Federal de Inversiones">
+      <div class="emitido" id="emitido"></div>
+    </div>
+  </div>
+
+  <div class="doc-titulo-wrap">
+    <h1 class="doc-titulo brand-font">Casos avanzados</h1>
+    <div class="doc-sub">Desde que se remiten a firma del representante hasta el desembolso — foto del estado actual, Unidad de Enlace Provincial Santiago del Estero</div>
+  </div>
+
+  <div class="kpi-row" id="kpis"></div>
+
+  <div class="sec" style="margin-top:16px">
+    <div class="sec-title">Detalle por caso</div>
+    <div id="tabla-casos"></div>
+  </div>
+
+  <div class="doc-foot">
+    <span>Consejo Federal de Inversiones · UEP Santiago del Estero · {{ usuario.nombre }}</span>
+    <span id="foot-emitido"></span>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let META = { estado_grupo: {}, grupo_color: {} };
+
+function etiqueta(s){
+  return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+}
+
+function colorEstado(estado){
+  const grupo = META.estado_grupo[estado];
+  return META.grupo_color[grupo] || 'var(--navy)';
+}
+
+function pintarKpis(resumen){
+  $('#kpis').innerHTML = resumen.map(r => `
+    <div class="kpi" style="border-top-color:${colorEstado(r.estado)}">
+      <div class="n" style="color:${colorEstado(r.estado)}">${r.n}</div>
+      <div class="l">${escapeHtml(etiqueta(r.estado))}</div>
+    </div>`).join('');
+}
+
+function tablaCasos(casos){
+  if(!casos.length) return '<div class="vacio">No hay casos en estas etapas al día de emisión.</div>';
+  return `<table><thead><tr>
+      <th>Código</th><th>Solicitante</th><th>CUIT</th><th>Técnico</th>
+      <th>Línea / Programa</th><th style="text-align:right">Monto</th>
+      <th style="text-align:right">Días desde recepción</th><th>Estado</th>
+    </tr></thead><tbody>${casos.map(c => `
+      <tr>
+        <td>${escapeHtml(c.codigo)}</td>
+        <td>${escapeHtml(c.nombre)||'—'}</td>
+        <td>${escapeHtml(c.cuit)||'—'}</td>
+        <td>${escapeHtml(c.tecnico)}</td>
+        <td>${escapeHtml(c.linea)}${c.programa && c.programa!=='—' ? ' · '+escapeHtml(c.programa) : ''}</td>
+        <td class="money">${escapeHtml(c.monto_fmt)}</td>
+        <td class="num">${c.dias_desde_recepcion ?? '—'}</td>
+        <td><span class="estado-linea" style="color:${colorEstado(c.estado)}">${escapeHtml(etiqueta(c.estado))}</span></td>
+      </tr>`).join('')}</tbody></table>`;
+}
+
+async function cargar(){
+  META = await (await fetch('/api/catalogos/estado-grupo')).json();
+  const d = await (await fetch('/api/informe/avanzados')).json();
+  $('#emitido').textContent = 'Emitido: ' + d.generado_en;
+  $('#foot-emitido').textContent = 'Emitido: ' + d.generado_en;
+  pintarKpis(d.resumen);
+  $('#tabla-casos').innerHTML = tablaCasos(d.casos);
+}
+
+$('#btn-actualizar').addEventListener('click', cargar);
+$('#btn-imprimir').addEventListener('click', () => window.print());
+
+cargar();
+</script>
+</body>
+</html>

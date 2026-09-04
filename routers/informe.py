@@ -10,15 +10,15 @@ Sin `desde`/`hasta` el endpoint se comporta exactamente como antes de que existi
 el informe PDF: todo el histórico, y la serie diaria acotada a los últimos 90 días.
 """
 from collections import Counter
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 
 from db import engine, cuits_duplicados
-from auth import require_login
-from formatos import _monto, _dmy, _parse_fecha
-from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS, TOPE_LINEA
+from auth import require_login, require_coordinador
+from formatos import _monto, _dmy, _parse_fecha, _hora_local
+from constantes import grupo_de, GRUPOS, GRUPOS_ACTIVOS, TOPE_LINEA, ESTADOS_AVANZADOS
 from clasificacion import clasificar_motivo, ORDEN_CATEGORIAS
 import genero as genero_mod
 
@@ -466,4 +466,46 @@ def informe(desde: str = "", hasta: str = "", excluir_repetidas: bool = False,
         "casos_tramite": casos_tramite,
         "casos_tramite_total": casos_tramite_total,
         "casos_tramite_total_fmt": _monto(casos_tramite_total),
+    }
+
+
+@router.get("/avanzados")
+def avanzados(_=Depends(require_coordinador)):
+    """Casos avanzados: desde que se remite la documentación a firma del
+    representante hasta que el crédito queda desembolsado. Foto del estado
+    actual — a diferencia del informe general, no depende de un rango de
+    fechas: lo que importa es qué hay ahora mismo por cerrarse, sin importar
+    cuándo entró la consulta originalmente."""
+    rank = {estado: i for i, estado in enumerate(ESTADOS_AVANZADOS)}
+    with engine.connect() as conn:
+        rows = conn.execute(text(f"""
+            SELECT codigo, nombre, cuit, tecnico, estado, linea, programa,
+                   {_MONTO_EFECTIVO} AS monto, fecha_recepcion
+            FROM sde_consultas
+            WHERE UPPER(TRIM(COALESCE(estado, ''))) = ANY(:estados)
+        """), {"estados": ESTADOS_AVANZADOS}).mappings().all()
+
+    hoy = date.today()
+    casos = []
+    for r in rows:
+        dias = (hoy - r["fecha_recepcion"].date()).days if r["fecha_recepcion"] else None
+        casos.append({
+            "codigo": r["codigo"], "nombre": r["nombre"], "cuit": r["cuit"],
+            "tecnico": r["tecnico"] or "Sin asignar",
+            "estado": r["estado"],
+            "linea": r["linea"] or "—", "programa": r["programa"] or "—",
+            "monto_fmt": _monto(r["monto"]),
+            "fecha_recepcion_fmt": _dmy(r["fecha_recepcion"]),
+            "dias_desde_recepcion": dias,
+        })
+    # Dentro de un mismo estado, primero el que lleva más tiempo esperando —
+    # es el candidato más urgente para destrabar.
+    casos.sort(key=lambda c: (rank.get(c["estado"], len(ESTADOS_AVANZADOS)), -(c["dias_desde_recepcion"] or 0)))
+
+    resumen = Counter(c["estado"] for c in casos)
+    return {
+        "generado_en": _hora_local(datetime.utcnow()),
+        "resumen": [{"estado": e, "n": resumen.get(e, 0)} for e in ESTADOS_AVANZADOS],
+        "total": len(casos),
+        "casos": casos,
     }

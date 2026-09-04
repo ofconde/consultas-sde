@@ -58,6 +58,18 @@ GRUPO_COLOR = {
     "INACTIVAS":     "#8891a8",
 }
 
+# Estados que integran el informe de "Casos avanzados" (/informe/avanzados):
+# desde que se remite la documentación a firma del representante hasta que
+# el crédito queda efectivamente desembolsado. Orden real del circuito, no
+# el de sde_catalogos (ahí REMITIDO PARA FIRMA quedó al final por motivos
+# históricos de cuándo se cargó cada estado, no por su posición real).
+ESTADOS_AVANZADOS = [
+    "REMITIDO PARA FIRMA DE REPRESENTANTE",
+    "INGRESADO EN CFI SEDE",
+    "EN TRAMITE DE DESEMBOLSO",
+    "DESEMBOLSADO",
+]
+
 ROL_COORDINADOR = "coordinador"
 ROL_TECNICO = "tecnico"
 

@@ -201,6 +201,18 @@ def informe_pdf_page(request: Request):
     })
 
 
+@app.get("/informe/avanzados", response_class=HTMLResponse)
+def informe_avanzados_page(request: Request):
+    """Informe imprimible de una hoja: casos desde que se remiten a firma del
+    representante hasta que quedan desembolsados. Mismo acceso que /informe/pdf."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    if u["rol"] != "coordinador":
+        return RedirectResponse("/panel")
+    return templates.TemplateResponse("informe_avanzados.html", {"request": request, "usuario": u})
+
+
 @app.get("/admin", response_class=HTMLResponse)
 def admin_page(request: Request):
     u = usuario_actual(request)
