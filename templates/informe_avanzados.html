@@ -89,7 +89,7 @@ function pintarKpis(resumen){
     </div>`).join('');
 }
 
-function tablaCasos(casos){
+function tablaCasos(casos, totalFmt){
   if(!casos.length) return '<div class="vacio">No hay casos en estas etapas al día de emisión.</div>';
   // Programa es el dato más específico de los dos cuando está confirmado
   // (línea es la categoría amplia); si no hay programa se muestra la línea.
@@ -112,7 +112,8 @@ function tablaCasos(casos){
         <td class="money">${escapeHtml(c.monto_fmt)}</td>
         <td class="num">${c.dias_desde_recepcion ?? '—'}</td>
         <td><span class="estado-linea" style="color:${colorEstado(c.estado)}">${escapeHtml(_ESTADO_CORTO[c.estado] || etiqueta(c.estado))}</span></td>
-      </tr>`).join('')}</tbody></table>`;
+      </tr>`).join('')}</tbody></table>
+    <div class="tramite-total">Total comprometido en estos ${casos.length} casos: ${escapeHtml(totalFmt)}</div>`;
 }
 
 async function cargar(){
@@ -121,7 +122,7 @@ async function cargar(){
   $('#emitido').textContent = 'Emitido: ' + d.generado_en;
   $('#foot-emitido').textContent = 'Emitido: ' + d.generado_en;
   pintarKpis(d.resumen);
-  $('#tabla-casos').innerHTML = tablaCasos(d.casos);
+  $('#tabla-casos').innerHTML = tablaCasos(d.casos, d.monto_total_fmt);
 }
 
 $('#btn-actualizar').addEventListener('click', cargar);

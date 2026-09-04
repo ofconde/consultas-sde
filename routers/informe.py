@@ -489,12 +489,13 @@ def avanzados(_=Depends(require_coordinador)):
     casos = []
     for r in rows:
         dias = (hoy - r["fecha_recepcion"].date()).days if r["fecha_recepcion"] else None
+        monto = int(r["monto"] or 0)
         casos.append({
             "codigo": r["codigo"], "nombre": r["nombre"], "cuit": r["cuit"],
             "tecnico": r["tecnico"] or "Sin asignar",
             "estado": r["estado"],
             "linea": r["linea"] or "—", "programa": r["programa"] or "—",
-            "monto_fmt": _monto(r["monto"]),
+            "monto": monto, "monto_fmt": _monto(monto),
             "fecha_recepcion_fmt": _dmy(r["fecha_recepcion"]),
             "dias_desde_recepcion": dias,
         })
@@ -503,9 +504,12 @@ def avanzados(_=Depends(require_coordinador)):
     casos.sort(key=lambda c: (rank.get(c["estado"], len(ESTADOS_AVANZADOS)), -(c["dias_desde_recepcion"] or 0)))
 
     resumen = Counter(c["estado"] for c in casos)
+    monto_total = sum(c["monto"] for c in casos)
     return {
         "generado_en": _hora_local(datetime.utcnow()),
         "resumen": [{"estado": e, "n": resumen.get(e, 0)} for e in ESTADOS_AVANZADOS],
         "total": len(casos),
+        "monto_total": monto_total,
+        "monto_total_fmt": _monto(monto_total),
         "casos": casos,
     }
