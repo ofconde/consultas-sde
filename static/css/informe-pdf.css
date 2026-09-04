@@ -132,6 +132,7 @@ body{
 /* KPIs */
 .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
 .kpi-row.k3{grid-template-columns:repeat(3,1fr)}
+.kpi-row.k5{grid-template-columns:repeat(5,1fr)}
 .kpi{border:1px solid var(--border);border-radius:8px;padding:11px 13px;border-top:3px solid var(--gray)}
 .kpi .n{font-size:22px;font-weight:800;color:var(--navy);line-height:1.1}
 .kpi .l{font-size:9.5px;color:var(--muted);font-weight:600;margin-top:3px;text-transform:uppercase;letter-spacing:.04em}

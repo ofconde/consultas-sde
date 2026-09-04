@@ -425,8 +425,12 @@ function resumenEjecutivo(d, cmp, gc, porGrupo){
   // algo aparte, así que decirlo con 0 al lado del % activo quedaba incongruente).
   const sede = porGrupo.EN_SEDE || 0;
   const inactivas = porGrupo.INACTIVAS || 0;
+  const desembolsadas = porGrupo.DESEMBOLSADAS || 0;
   const clauseSede = sede > 0 ? `, ${sede} ya derivadas a CFI Sede,` : ',';
   frases.push(`El <strong>${d.situacion.activas_pct}%</strong> está en gestión activa${clauseSede} y ${inactivas} no prosperaron (no financiables o desisten).`);
+  if(desembolsadas > 0){
+    frases.push(`<strong>${desembolsadas} consulta${desembolsadas===1?'':'s'}</strong> ya terminó${desembolsadas===1?'':'ron'} con el crédito efectivamente desembolsado.`);
+  }
 
   frases.push(`El promedio solicitado por consulta es de <strong>${escapeHtml(d.montos.promedio_fmt)}</strong>.`);
 
@@ -506,13 +510,15 @@ function render(d){
   // aparte según cuáles queden prendidas (ver SECCIONES_DEF/pintarToggleSecciones).
   const CUERPO = {
     general: () => `
-      <div class="kpi-row">
+      <div class="kpi-row k5">
         <div class="kpi c-navy"><div class="n">${d.total}</div><div class="l">Consultas recibidas</div>
           <div class="sub">${d.promedio_diario.periodo} por día${(cmp.disponible && variacion(d.total, cmp.total))?' · '+variacion(d.total, cmp.total):''}</div></div>
         <div class="kpi c-green"><div class="n">${d.activas}</div><div class="l">En gestión activa</div>
           <div class="sub">${d.situacion.activas_pct}% del total</div></div>
         <div class="kpi c-blue"><div class="n">${porGrupo.EN_SEDE||0}</div><div class="l">Derivadas a CFI Sede</div>
           <div class="sub">ingresadas al circuito</div></div>
+        <div class="kpi c-amber"><div class="n">${porGrupo.DESEMBOLSADAS||0}</div><div class="l">Desembolsadas</div>
+          <div class="sub">crédito efectivamente entregado</div></div>
         <div class="kpi c-gray"><div class="n">${porGrupo.INACTIVAS||0}</div><div class="l">No prosperaron</div>
           <div class="sub">no financiables o desisten</div></div>
       </div>
