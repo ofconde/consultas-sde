@@ -317,16 +317,18 @@ def instancia_superior(_=Depends(require_login)):
     casos.sort(key=lambda c: rank.get(c["estado_carpeta"], -1))
 
     monto_total = sum(c["monto"] for c in casos)
-    resumen_por_estado = {e: 0 for e in ESTADOS_CARPETA}
+    resumen_por_estado = {e: {"n": 0, "monto": 0} for e in ESTADOS_CARPETA}
     for c in casos:
         if c["estado_carpeta"] in resumen_por_estado:
-            resumen_por_estado[c["estado_carpeta"]] += c["monto"]
+            resumen_por_estado[c["estado_carpeta"]]["n"] += 1
+            resumen_por_estado[c["estado_carpeta"]]["monto"] += c["monto"]
     desembolsados = [c for c in casos if c["estado_carpeta"] == "DESEMBOLSADO"]
 
     return {
         "total": len(casos),
         "monto_total": monto_total, "monto_total_fmt": _monto(monto_total),
-        "resumen": [{"estado": e, "monto": resumen_por_estado[e], "monto_fmt": _monto(resumen_por_estado[e])}
+        "resumen": [{"estado": e, "n": resumen_por_estado[e]["n"],
+                     "monto": resumen_por_estado[e]["monto"], "monto_fmt": _monto(resumen_por_estado[e]["monto"])}
                     for e in ESTADOS_CARPETA],
         "desembolsados": [{"nombre": c["nombre"], "monto_fmt": c["monto_fmt"]} for c in desembolsados],
         "desembolsados_total_fmt": _monto(sum(c["monto"] for c in desembolsados)),

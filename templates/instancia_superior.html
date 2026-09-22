@@ -16,7 +16,11 @@
 {% include "_topbar.html" %}
 
   <div class="wrap">
-    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">Instancia Superior</h1>
+    <div style="display:flex;align-items:baseline;gap:0.875rem;flex-wrap:wrap">
+      <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">Instancia Superior</h1>
+      <div class="spacer" style="flex:1"></div>
+      <a class="btn" href="/informe/instancia-superior" target="_blank">Armar informe</a>
+    </div>
     <p class="muted" style="margin:0 0 1.25rem">Casos remitidos a firma de representante en adelante — el circuito hasta el desembolso, con seguimiento más fino que el estado general.</p>
 
     <div class="tabla-wrap card" style="margin-bottom:1.5rem">
@@ -34,9 +38,9 @@
     <div class="is-resumen">
       <div class="tabla-wrap card">
         <table>
-          <thead><tr><th>Estado</th><th style="text-align:right">Monto</th></tr></thead>
+          <thead><tr><th>Estado</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Monto</th></tr></thead>
           <tbody id="is-resumen-tbody"></tbody>
-          <tfoot><tr><td class="is-total">TOTAL</td><td class="is-total" style="text-align:right" id="is-total"></td></tr></tfoot>
+          <tfoot><tr><td class="is-total">TOTAL</td><td class="is-total" style="text-align:right" id="is-total-n"></td><td class="is-total" style="text-align:right" id="is-total"></td></tr></tfoot>
         </table>
       </div>
       <div class="tabla-wrap card">
@@ -101,8 +105,9 @@ async function cargar(){
   });
 
   $('#is-resumen-tbody').innerHTML = d.resumen.map(r => `
-    <tr><td>${escapeHtml(etiqueta(r.estado))}</td><td style="text-align:right">${escapeHtml(r.monto_fmt)}</td></tr>
+    <tr><td>${escapeHtml(etiqueta(r.estado))}</td><td style="text-align:right">${r.n}</td><td style="text-align:right">${escapeHtml(r.monto_fmt)}</td></tr>
   `).join('');
+  $('#is-total-n').textContent = d.total;
   $('#is-total').textContent = d.monto_total_fmt;
 
   $('#is-desembolsados-tbody').innerHTML = d.desembolsados.length

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+{# Documento imprimible standalone — mismo criterio que informe_avanzados.html
+   (no extiende base.html, reusa static/css/informe-pdf.css). Snapshot de
+   /panel/instancia-superior para elevar/compartir, la gestión día a día sigue
+   viviendo en esa pantalla, acá solo se lee. #}
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/img/favicon.png">
+<title>Instancia Superior · Consultas SDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Raleway:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/informe-pdf.css">
+<script src="/static/js/util.js"></script>
+</head>
+<body>
+
+<div class="toolbar">
+  <img class="tl-logo" src="/static/img/logo-cfi.png" alt="CFI">
+  <span class="tl-tit">Instancia Superior</span>
+  <span class="spacer"></span>
+  <button class="tbtn" id="btn-actualizar">Actualizar</button>
+  <button class="tbtn primary" id="btn-imprimir">Imprimir / Guardar PDF</button>
+</div>
+
+<div id="doc">
+  <div class="doc-head">
+    <img class="doc-escudo" src="/static/img/escudo-sde.svg" alt="Escudo de la Provincia de Santiago del Estero">
+    <div class="doc-head-txt">
+      <div class="doc-gob">Gobierno de la Provincia<br>de Santiago del Estero</div>
+      <div class="doc-casa">Casa de Santiago del Estero</div>
+      <div class="doc-casa-sub">Representación Oficial del Gobierno de la Provincia
+        en la Ciudad de Buenos Aires y Relaciones Internacionales</div>
+    </div>
+    <div class="doc-cfi">
+      <img src="/static/img/logo-cfi.png" alt="Consejo Federal de Inversiones">
+      <div class="emitido" id="emitido"></div>
+    </div>
+  </div>
+
+  <div class="doc-titulo-wrap">
+    <h1 class="doc-titulo brand-font">Instancia Superior</h1>
+    <div class="doc-sub">Casos remitidos a firma de representante en adelante — foto del estado actual, Unidad de Enlace Provincial Santiago del Estero</div>
+  </div>
+
+  <div class="kpi-row" id="kpis"></div>
+
+  <div class="sec" style="margin-top:16px">
+    <div class="sec-title">Resumen por estado</div>
+    <div id="tabla-resumen"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Detalle por caso</div>
+    <div id="tabla-casos"></div>
+  </div>
+
+  <div class="doc-foot">
+    <span>Consejo Federal de Inversiones · UEP Santiago del Estero · {{ usuario.nombre }}</span>
+    <span id="foot-emitido"></span>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let META = { estado_carpeta_color: {} };
+
+function etiqueta(s){
+  return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+}
+function colorEstado(estado){
+  return (META.estado_carpeta_color[estado] || {fg:'var(--navy)'}).fg;
+}
+
+function pintarKpis(d){
+  const desembolsado = d.resumen.find(r => r.estado === 'DESEMBOLSADO') || {n:0, monto_fmt:'$ 0'};
+  const enCurso = d.total - desembolsado.n;
+  $('#kpis').innerHTML = `
+    <div class="kpi c-navy"><div class="n">${d.total}</div><div class="l">Casos totales</div></div>
+    <div class="kpi c-violet"><div class="n">${enCurso}</div><div class="l">En curso</div></div>
+    <div class="kpi c-green"><div class="n">${desembolsado.n}</div><div class="l">Desembolsados</div>
+      <div class="sub">${escapeHtml(desembolsado.monto_fmt)}</div></div>
+    <div class="kpi c-amber"><div class="n" style="font-size:16px">${escapeHtml(d.monto_total_fmt)}</div><div class="l">Monto total</div></div>`;
+}
+
+function tablaResumen(resumen, totalN, totalFmt){
+  return `<table><thead><tr>
+      <th>Estado</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Monto</th>
+    </tr></thead><tbody>${resumen.map(r => `
+      <tr>
+        <td><span class="estado-linea" style="color:${colorEstado(r.estado)}">${escapeHtml(etiqueta(r.estado))}</span></td>
+        <td class="num">${r.n}</td>
+        <td class="money">${escapeHtml(r.monto_fmt)}</td>
+      </tr>`).join('')}</tbody>
+    <tfoot><tr style="font-weight:700"><td>TOTAL</td><td class="num">${totalN}</td><td class="money">${escapeHtml(totalFmt)}</td></tr></tfoot></table>`;
+}
+
+function tablaCasos(casos){
+  if(!casos.length) return '<div class="vacio">Todavía no hay casos en instancia superior.</div>';
+  return `<table class="tabla-avanzados"><colgroup>
+      <col style="width:10%"><col style="width:24%"><col style="width:14%">
+      <col style="width:16%"><col style="width:10%"><col style="width:26%">
+    </colgroup><thead><tr>
+      <th>Código</th><th>Solicitante</th><th>Técnico</th>
+      <th style="text-align:right">Monto</th><th style="text-align:center">Firmado</th><th>Estado</th>
+    </tr></thead><tbody>${casos.map(c => `
+      <tr>
+        <td>${escapeHtml(c.codigo)}</td>
+        <td>${escapeHtml(c.nombre)||'—'}</td>
+        <td>${escapeHtml(c.tecnico)}</td>
+        <td class="money">${escapeHtml(c.monto_fmt)}</td>
+        <td style="text-align:center">${c.firmado ? 'Sí' : 'No'}</td>
+        <td><span class="estado-linea" style="color:${colorEstado(c.estado_carpeta)}">${escapeHtml(etiqueta(c.estado_carpeta)||'Sin clasificar')}</span></td>
+      </tr>`).join('')}</tbody></table>`;
+}
+
+async function cargar(){
+  const meta = await (await fetch('/api/catalogos/estado-grupo')).json();
+  META = { estado_carpeta_color: meta.estado_carpeta_color };
+  const d = await (await fetch('/api/consultas/instancia-superior')).json();
+  const ahora = new Date().toLocaleString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+  $('#emitido').textContent = 'Emitido: ' + ahora;
+  $('#foot-emitido').textContent = 'Emitido: ' + ahora;
+  pintarKpis(d);
+  $('#tabla-resumen').innerHTML = tablaResumen(d.resumen, d.total, d.monto_total_fmt);
+  $('#tabla-casos').innerHTML = tablaCasos(d.casos);
+}
+
+$('#btn-actualizar').addEventListener('click', cargar);
+$('#btn-imprimir').addEventListener('click', () => window.print());
+
+cargar();
+</script>
+</body>
+</html>

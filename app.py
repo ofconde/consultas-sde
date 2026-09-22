@@ -165,6 +165,17 @@ def panel_instancia_superior(request: Request):
     return templates.TemplateResponse("instancia_superior.html", {"request": request, "usuario": u, "activo": "instancia-superior"})
 
 
+@app.get("/informe/instancia-superior", response_class=HTMLResponse)
+def informe_instancia_superior_page(request: Request):
+    """Snapshot imprimible de /panel/instancia-superior — mismo acceso que la
+    pantalla de gestión (técnico y coordinador), no es exclusivo del coordinador
+    como /informe/pdf o /informe/avanzados."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("informe_instancia_superior.html", {"request": request, "usuario": u})
+
+
 @app.get("/consulta/nueva", response_class=HTMLResponse)
 def consulta_nueva_page(request: Request):
     # esta ruta debe registrarse ANTES que /consulta/{cid}: si no, FastAPI intenta
