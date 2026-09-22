@@ -88,7 +88,13 @@ function etiqueta(s){
   return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 }
 function colorEstado(estado){
-  return (META.estado_carpeta_color[estado] || {fg:'var(--navy)'}).fg;
+  // Acá el estado se pinta como texto plano sobre fondo blanco, no como
+  // insignia (a diferencia del panel de gestión) — un fg blanco pensado para
+  // ir sobre el bg sólido (caso "Desembolsado") queda invisible, así que en
+  // ese caso se usa directamente el bg como color de texto.
+  const c = META.estado_carpeta_color[estado];
+  if(!c) return 'var(--navy)';
+  return c.fg === '#ffffff' ? c.bg : c.fg;
 }
 
 function pintarKpis(d){
