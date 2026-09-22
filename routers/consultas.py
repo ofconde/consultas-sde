@@ -324,12 +324,29 @@ def instancia_superior(_=Depends(require_login)):
             resumen_por_estado[c["estado_carpeta"]]["monto"] += c["monto"]
     desembolsados = [c for c in casos if c["estado_carpeta"] == "DESEMBOLSADO"]
 
+    def _agrupar(clave):
+        """Cantidad y monto por valor de `clave` (linea/garantia), de mayor a
+        menor monto — mismo criterio que los desgloses del informe general."""
+        acc = {}
+        for c in casos:
+            k = c[clave]
+            if k not in acc:
+                acc[k] = {"n": 0, "monto": 0}
+            acc[k]["n"] += 1
+            acc[k]["monto"] += c["monto"]
+        filas = [{"clave": k, "n": v["n"], "monto": v["monto"], "monto_fmt": _monto(v["monto"])}
+                 for k, v in acc.items()]
+        filas.sort(key=lambda f: f["monto"], reverse=True)
+        return filas
+
     return {
         "total": len(casos),
         "monto_total": monto_total, "monto_total_fmt": _monto(monto_total),
         "resumen": [{"estado": e, "n": resumen_por_estado[e]["n"],
                      "monto": resumen_por_estado[e]["monto"], "monto_fmt": _monto(resumen_por_estado[e]["monto"])}
                     for e in ESTADOS_CARPETA],
+        "resumen_linea": _agrupar("linea"),
+        "resumen_garantia": _agrupar("garantia"),
         "desembolsados": [{"nombre": c["nombre"], "monto_fmt": c["monto_fmt"]} for c in desembolsados],
         "desembolsados_total_fmt": _monto(sum(c["monto"] for c in desembolsados)),
         "casos": casos,

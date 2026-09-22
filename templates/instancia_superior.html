@@ -50,6 +50,20 @@
           <tfoot><tr><td class="is-total">TOTAL</td><td class="is-total" style="text-align:right" id="is-desembolsados-total"></td></tr></tfoot>
         </table>
       </div>
+      <div class="tabla-wrap card">
+        <div class="sec-title" style="margin:0.75rem 0.875rem 0">Por línea</div>
+        <table>
+          <thead><tr><th>Línea</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Monto</th></tr></thead>
+          <tbody id="is-linea-tbody"></tbody>
+        </table>
+      </div>
+      <div class="tabla-wrap card">
+        <div class="sec-title" style="margin:0.75rem 0.875rem 0">Por garantía</div>
+        <table>
+          <thead><tr><th>Garantía</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Monto</th></tr></thead>
+          <tbody id="is-garantia-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 {% endblock %}
@@ -112,6 +126,14 @@ async function cargar(){
     ? d.desembolsados.map(x => `<tr><td>${escapeHtml(x.nombre)}</td><td style="text-align:right">${escapeHtml(x.monto_fmt)}</td></tr>`).join('')
     : '<tr><td class="muted" colspan="2">Sin desembolsos todavía.</td></tr>';
   $('#is-desembolsados-total').textContent = d.desembolsados_total_fmt;
+
+  const filaAgrupada = f => `<tr><td>${escapeHtml(f.clave)}</td><td style="text-align:right">${f.n}</td><td style="text-align:right">${escapeHtml(f.monto_fmt)}</td></tr>`;
+  $('#is-linea-tbody').innerHTML = d.resumen_linea.length
+    ? d.resumen_linea.map(filaAgrupada).join('')
+    : '<tr><td class="muted" colspan="3">Sin datos.</td></tr>';
+  $('#is-garantia-tbody').innerHTML = d.resumen_garantia.length
+    ? d.resumen_garantia.map(filaAgrupada).join('')
+    : '<tr><td class="muted" colspan="3">Sin datos.</td></tr>';
 }
 
 async function cambiarEstadoCarpeta(id, valor){

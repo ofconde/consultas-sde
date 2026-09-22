@@ -52,6 +52,19 @@
   </div>
 
   <div class="sec">
+    <div class="grid2">
+      <div>
+        <div class="sec-title">Por línea</div>
+        <div id="tabla-linea"></div>
+      </div>
+      <div>
+        <div class="sec-title">Por garantía</div>
+        <div id="tabla-garantia"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
     <div class="sec-title">Detalle por caso</div>
     <div id="tabla-casos"></div>
   </div>
@@ -96,6 +109,14 @@ function tablaResumen(resumen, totalN, totalFmt){
     <tfoot><tr style="font-weight:700"><td>TOTAL</td><td class="num">${totalN}</td><td class="money">${escapeHtml(totalFmt)}</td></tr></tfoot></table>`;
 }
 
+function tablaAgrupada(encabezado, filas){
+  if(!filas.length) return '<div class="vacio">Sin datos.</div>';
+  return `<table><thead><tr>
+      <th>${escapeHtml(encabezado)}</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Monto</th>
+    </tr></thead><tbody>${filas.map(f => `
+      <tr><td>${escapeHtml(f.clave)}</td><td class="num">${f.n}</td><td class="money">${escapeHtml(f.monto_fmt)}</td></tr>`).join('')}</tbody></table>`;
+}
+
 function tablaCasos(casos){
   if(!casos.length) return '<div class="vacio">Todavía no hay casos en instancia superior.</div>';
   return `<table class="tabla-avanzados"><colgroup>
@@ -124,6 +145,8 @@ async function cargar(){
   $('#foot-emitido').textContent = 'Emitido: ' + ahora;
   pintarKpis(d);
   $('#tabla-resumen').innerHTML = tablaResumen(d.resumen, d.total, d.monto_total_fmt);
+  $('#tabla-linea').innerHTML = tablaAgrupada('Línea', d.resumen_linea);
+  $('#tabla-garantia').innerHTML = tablaAgrupada('Garantía', d.resumen_garantia);
   $('#tabla-casos').innerHTML = tablaCasos(d.casos);
 }
 
