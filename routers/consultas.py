@@ -297,9 +297,14 @@ def instancia_superior(_=Depends(require_login)):
     /api/informe/avanzados que es el snapshot imprimible solo del coordinador)."""
     rank = {estado: i for i, estado in enumerate(ESTADOS_CARPETA)}
     with engine.connect() as conn:
+        # El monto de la consulta original (declarado o confirmado en la gestión
+        # normal) puede no coincidir con lo que efectivamente se mandó a firmar
+        # — monto_instancia_superior es editable desde esta pantalla justamente
+        # para corregir eso, y manda por sobre el resto cuando está cargado.
         rows = conn.execute(text("""
             SELECT id, codigo, nombre, tecnico,
-                   COALESCE(NULLIF(monto_confirmado, 0), monto) AS monto,
+                   COALESCE(monto_instancia_superior, NULLIF(monto_confirmado, 0), monto) AS monto,
+                   monto_instancia_superior,
                    linea, programa, garantia, firmado, estado_carpeta
             FROM sde_consultas WHERE instancia_superior = TRUE
         """)).mappings().all()
@@ -308,6 +313,7 @@ def instancia_superior(_=Depends(require_login)):
         "id": r["id"], "codigo": r["codigo"], "nombre": r["nombre"],
         "tecnico": r["tecnico"] or "Sin asignar",
         "monto": int(r["monto"] or 0), "monto_fmt": _monto(r["monto"]),
+        "monto_editado": r["monto_instancia_superior"] is not None,
         "linea": r["linea"] or "—", "programa": r["programa"] or "—",
         "garantia": r["garantia"] or "—", "firmado": bool(r["firmado"]),
         "estado_carpeta": r["estado_carpeta"],
@@ -548,6 +554,9 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
     if "monto" in campos:
         sets.append("monto = :monto")
         params["monto"] = _parse_monto(campos["monto"])
+    if "monto_instancia_superior" in campos:
+        sets.append("monto_instancia_superior = :monto_instancia_superior")
+        params["monto_instancia_superior"] = _parse_monto(campos["monto_instancia_superior"])
     if not sets:
         return {"ok": True, "sin_cambios": True}
     sets.append("updated_at = NOW()")

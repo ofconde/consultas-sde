@@ -79,6 +79,9 @@ def init_db():
                 instancia_superior   BOOLEAN DEFAULT FALSE,
                 estado_carpeta       TEXT,
                 firmado              BOOLEAN DEFAULT FALSE,
+                -- monto real que se mandó a firmar — puede diferir del monto
+                -- solicitado/confirmado de la consulta original (ver abajo).
+                monto_instancia_superior BIGINT,
                 created_at           TIMESTAMP DEFAULT NOW(),
                 updated_at           TIMESTAMP DEFAULT NOW()
             )
@@ -88,6 +91,7 @@ def init_db():
         conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS instancia_superior BOOLEAN DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS estado_carpeta TEXT"))
         conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS firmado BOOLEAN DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS monto_instancia_superior BIGINT"))
 
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS sde_acciones (

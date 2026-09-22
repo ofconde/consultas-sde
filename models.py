@@ -46,6 +46,7 @@ class GestionIn(ConsultaIngesta):
     instancia_superior:   Optional[bool] = None
     estado_carpeta:       Optional[str] = _TXT
     firmado:              Optional[bool] = None
+    monto_instancia_superior: Optional[str] = _TXT
 
 
 class ConsultaManualIn(GestionIn):
