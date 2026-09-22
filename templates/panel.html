@@ -485,7 +485,6 @@ async function cambiarTecnico(id, tecnico){
 // /panel/instancia-superior (remitido a firma de representante → desembolso).
 // Reusa el mismo PATCH genérico — no hay endpoint nuevo para esto.
 async function pasarAInstanciaSuperior(id, btn){
-  if(!confirm('¿Este caso pasa a instancia superior? A partir de ahora se hace seguimiento fino en esa pantalla.')) return;
   btn.disabled = true;
   const r = await fetch('/api/consultas/'+id, {
     method: 'PATCH', headers: {'Content-Type':'application/json'},
