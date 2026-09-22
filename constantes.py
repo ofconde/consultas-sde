@@ -70,6 +70,39 @@ ESTADOS_AVANZADOS = [
     "DESEMBOLSADO",
 ]
 
+# Estados de "instancia superior" (agregado 22/09/2026, pedido de Omar): casos
+# que ya se remitieron a firma de representante y siguen un circuito más fino
+# que el `estado` general hasta el desembolso — reemplaza la planilla Excel que
+# se llevaba a mano. Orden real del circuito, confirmado con Omar.
+ESTADOS_CARPETA = [
+    "JUNTANDO DOCUMENTACION O SGR",
+    "ENVIADO A FIRMA DE REPRESENTANTE",
+    "FIRMADO",
+    "EN TRAMITE PARA INGRESAR A CFI",
+    "ENVIADO A CARGA",
+    "CARGADO",
+    "EN TRAMITE EN CFI SEDE",
+    "FIRMADO POR DIRECTOR",
+    "EN TRAMITE DE DESEMBOLSO",
+    "DESEMBOLSADO",
+]
+
+# Colores por estado de carpeta — progresión de rojo (recién entra) a verde
+# (desembolsado), reusando los tokens ya definidos en panel.css (--red/--rosa/
+# --amber/--celeste/--blue/--violet/--green) en vez de inventar hex nuevos.
+ESTADO_CARPETA_COLOR = {
+    "JUNTANDO DOCUMENTACION O SGR":     {"bg": "#fdecea", "fg": "#d0402c"},
+    "ENVIADO A FIRMA DE REPRESENTANTE": {"bg": "#fbe7ef", "fg": "#c2255c"},
+    "FIRMADO":                          {"bg": "#fdf3e0", "fg": "#d98a00"},
+    "EN TRAMITE PARA INGRESAR A CFI":   {"bg": "#f6e2b8", "fg": "#8a5a00"},
+    "ENVIADO A CARGA":                  {"bg": "#D6E6ED", "fg": "#00A7E1"},
+    "CARGADO":                          {"bg": "#e8f1ff", "fg": "#2f6fd0"},
+    "EN TRAMITE EN CFI SEDE":           {"bg": "#efe9fb", "fg": "#6c4bd0"},
+    "FIRMADO POR DIRECTOR":             {"bg": "#e5f7ee", "fg": "#1a9e57"},
+    "EN TRAMITE DE DESEMBOLSO":         {"bg": "#cceee0", "fg": "#0f7a3f"},
+    "DESEMBOLSADO":                     {"bg": "#1a9e57", "fg": "#ffffff"},
+}
+
 ROL_COORDINADOR = "coordinador"
 ROL_TECNICO = "tecnico"
 

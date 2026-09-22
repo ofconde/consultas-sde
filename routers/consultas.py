@@ -9,7 +9,8 @@ from auth import require_login, require_coordinador, puede_editar
 from models import GestionIn, ConsultaManualIn, BulkGestionIn, BulkAccionIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto, _parse_fecha
 from constantes import (grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS, TOPE_LINEA, excede_tope,
-                         ACCION_NO_FINANCIABLE, ESTADO_NO_FINANCIABLE, TOPES_FIANZA_TERCERO)
+                         ACCION_NO_FINANCIABLE, ESTADO_NO_FINANCIABLE, TOPES_FIANZA_TERCERO,
+                         ESTADOS_CARPETA)
 import genero as genero_mod
 
 router = APIRouter(prefix="/api/consultas", tags=["consultas"])
@@ -20,6 +21,7 @@ _GESTION_COLS = [
     "tecnico", "departamento", "localidad_confirmada", "garantia", "linea",
     "programa", "arca_confirmado", "actividad_inscripta", "situacion_bcra",
     "estado", "observaciones", "informacion_extra", "genero",
+    "instancia_superior", "estado_carpeta", "firmado",
 ]
 
 # datos que carga el propio solicitante en el formulario público — a diferencia
@@ -85,6 +87,9 @@ def _fila_resumen(r):
         "n_acciones": r["n_acciones"],
         "ultima_accion": r["ultima_accion"],
         "ultima_accion_fecha": _dmy(r["ultima_accion_fecha"]),
+        "instancia_superior": bool(r["instancia_superior"]),
+        "estado_carpeta": r["estado_carpeta"],
+        "firmado": bool(r["firmado"]),
         # 'F'/'M'/None — heurística para priorizar candidatas a la línea Mujeres,
         # no un dato confirmado (ver genero.py). Si el campo genero llegara a
         # cargarse alguna vez a mano, ese manda por sobre la estimación.
@@ -280,6 +285,52 @@ def resumen(_=Depends(require_login)):
         "fianza_tercero": fianza_tercero,
         "estados": estados_out,
         "sectores": [{"clave": r[0]} for r in sectores],
+    }
+
+
+@router.get("/instancia-superior")
+def instancia_superior(_=Depends(require_login)):
+    """Casos marcados 'pasa a instancia superior': reemplaza la planilla Excel
+    que se llevaba a mano para el seguimiento fino desde que se remiten a firma
+    de representante hasta el desembolso. Visible a cualquier usuario logueado
+    (técnico y coordinador trabajan estos casos día a día, a diferencia de
+    /api/informe/avanzados que es el snapshot imprimible solo del coordinador)."""
+    rank = {estado: i for i, estado in enumerate(ESTADOS_CARPETA)}
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT id, codigo, nombre, tecnico,
+                   COALESCE(NULLIF(monto_confirmado, 0), monto) AS monto,
+                   linea, programa, garantia, firmado, estado_carpeta
+            FROM sde_consultas WHERE instancia_superior = TRUE
+        """)).mappings().all()
+
+    casos = [{
+        "id": r["id"], "codigo": r["codigo"], "nombre": r["nombre"],
+        "tecnico": r["tecnico"] or "Sin asignar",
+        "monto": int(r["monto"] or 0), "monto_fmt": _monto(r["monto"]),
+        "linea": r["linea"] or "—", "programa": r["programa"] or "—",
+        "garantia": r["garantia"] or "—", "firmado": bool(r["firmado"]),
+        "estado_carpeta": r["estado_carpeta"],
+    } for r in rows]
+    # Sin estado_carpeta todavía (recién pasó a instancia superior) va primero,
+    # es lo más urgente de clasificar; después el orden real del circuito.
+    casos.sort(key=lambda c: rank.get(c["estado_carpeta"], -1))
+
+    monto_total = sum(c["monto"] for c in casos)
+    resumen_por_estado = {e: 0 for e in ESTADOS_CARPETA}
+    for c in casos:
+        if c["estado_carpeta"] in resumen_por_estado:
+            resumen_por_estado[c["estado_carpeta"]] += c["monto"]
+    desembolsados = [c for c in casos if c["estado_carpeta"] == "DESEMBOLSADO"]
+
+    return {
+        "total": len(casos),
+        "monto_total": monto_total, "monto_total_fmt": _monto(monto_total),
+        "resumen": [{"estado": e, "monto": resumen_por_estado[e], "monto_fmt": _monto(resumen_por_estado[e])}
+                    for e in ESTADOS_CARPETA],
+        "desembolsados": [{"nombre": c["nombre"], "monto_fmt": c["monto_fmt"]} for c in desembolsados],
+        "desembolsados_total_fmt": _monto(sum(c["monto"] for c in desembolsados)),
+        "casos": casos,
     }
 
 

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Instancia Superior · Consultas SDE{% endblock %}
+{% block extra_head %}
+<style>
+  .is-resumen{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem}
+  @media (max-width:900px){.is-resumen{grid-template-columns:1fr}}
+  .is-total{font-weight:700;color:var(--navy)}
+  .is-estado-sel{border:none;font-weight:700;padding:0.25rem 0.625rem;border-radius:1.25rem;
+    font-size:0.8125rem;cursor:pointer;appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%236b7590'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 0.5rem center;padding-right:1.5rem}
+  .is-firmado{cursor:pointer;width:1.125rem;height:1.125rem}
+</style>
+{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+
+  <div class="wrap">
+    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">Instancia Superior</h1>
+    <p class="muted" style="margin:0 0 1.25rem">Casos remitidos a firma de representante en adelante — el circuito hasta el desembolso, con seguimiento más fino que el estado general.</p>
+
+    <div class="tabla-wrap card" style="margin-bottom:1.5rem">
+      <table>
+        <thead><tr>
+          <th>Técnico</th><th>Solicitante</th><th style="text-align:right">Monto</th>
+          <th>Línea / Programa</th><th>Garantía</th><th style="text-align:center">Firmado</th>
+          <th>Estado carpeta</th>
+        </tr></thead>
+        <tbody id="is-tbody"></tbody>
+      </table>
+    </div>
+    <div class="muted" id="is-vacio" style="display:none;padding:1.25rem;text-align:center">Todavía no hay casos en instancia superior — se agregan desde el botón "→ Instancia superior" en el panel.</div>
+
+    <div class="is-resumen">
+      <div class="tabla-wrap card">
+        <table>
+          <thead><tr><th>Estado</th><th style="text-align:right">Monto</th></tr></thead>
+          <tbody id="is-resumen-tbody"></tbody>
+          <tfoot><tr><td class="is-total">TOTAL</td><td class="is-total" style="text-align:right" id="is-total"></td></tr></tfoot>
+        </table>
+      </div>
+      <div class="tabla-wrap card">
+        <div class="sec-title" style="margin:0.75rem 0.875rem 0">Desembolsados</div>
+        <table>
+          <tbody id="is-desembolsados-tbody"></tbody>
+          <tfoot><tr><td class="is-total">TOTAL</td><td class="is-total" style="text-align:right" id="is-desembolsados-total"></td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = s => document.querySelector(s);
+let META = { estado_carpeta_color: {} };
+const ESTADOS_CARPETA = [
+  "JUNTANDO DOCUMENTACION O SGR", "ENVIADO A FIRMA DE REPRESENTANTE", "FIRMADO",
+  "EN TRAMITE PARA INGRESAR A CFI", "ENVIADO A CARGA", "CARGADO",
+  "EN TRAMITE EN CFI SEDE", "FIRMADO POR DIRECTOR", "EN TRAMITE DE DESEMBOLSO", "DESEMBOLSADO",
+];
+
+function etiqueta(s){
+  return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+}
+
+function selEstadoCarpeta(c){
+  const color = META.estado_carpeta_color[c.estado_carpeta] || {bg:'#f0f1f5', fg:'#6b7590'};
+  const opciones = ESTADOS_CARPETA.map(e =>
+    `<option value="${e}" ${c.estado_carpeta===e?'selected':''}>${escapeHtml(etiqueta(e))}</option>`).join('');
+  return `<select class="is-estado-sel" style="background-color:${color.bg};color:${color.fg}"
+      onchange="cambiarEstadoCarpeta(${c.id}, this.value)">
+      <option value="" ${!c.estado_carpeta?'selected':''}>— Sin clasificar —</option>
+      ${opciones}
+    </select>`;
+}
+
+function filaHTML(c){
+  return `<tr>
+      <td>${escapeHtml(c.tecnico)}</td>
+      <td class="cod-abrir" data-id="${c.id}" style="cursor:pointer">${escapeHtml(c.nombre)||'—'}
+        <div class="cod">${escapeHtml(c.codigo)}</div></td>
+      <td class="money" style="text-align:right">${escapeHtml(c.monto_fmt)}</td>
+      <td>${escapeHtml(c.linea)}${c.programa && c.programa!=='—' ? `<div class="cod">${escapeHtml(c.programa)}</div>` : ''}</td>
+      <td>${escapeHtml(c.garantia)}</td>
+      <td style="text-align:center"><input type="checkbox" class="is-firmado" data-id="${c.id}" ${c.firmado?'checked':''}></td>
+      <td>${selEstadoCarpeta(c)}</td>
+    </tr>`;
+}
+
+async function cargar(){
+  META = await (await fetch('/api/catalogos/estado-grupo')).json();
+  const d = await (await fetch('/api/consultas/instancia-superior')).json();
+
+  $('#is-vacio').style.display = d.casos.length ? 'none' : '';
+  $('#is-tbody').innerHTML = d.casos.map(filaHTML).join('');
+  document.querySelectorAll('.cod-abrir').forEach(el => {
+    el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
+  });
+  document.querySelectorAll('.is-firmado').forEach(el => {
+    el.addEventListener('change', () => cambiarFirmado(el.dataset.id, el.checked));
+  });
+
+  $('#is-resumen-tbody').innerHTML = d.resumen.map(r => `
+    <tr><td>${escapeHtml(etiqueta(r.estado))}</td><td style="text-align:right">${escapeHtml(r.monto_fmt)}</td></tr>
+  `).join('');
+  $('#is-total').textContent = d.monto_total_fmt;
+
+  $('#is-desembolsados-tbody').innerHTML = d.desembolsados.length
+    ? d.desembolsados.map(x => `<tr><td>${escapeHtml(x.nombre)}</td><td style="text-align:right">${escapeHtml(x.monto_fmt)}</td></tr>`).join('')
+    : '<tr><td class="muted" colspan="2">Sin desembolsos todavía.</td></tr>';
+  $('#is-desembolsados-total').textContent = d.desembolsados_total_fmt;
+}
+
+async function cambiarEstadoCarpeta(id, valor){
+  // '' en vez de null: el PATCH genérico usa exclude_none (así una edición
+  // parcial no pisa el resto de los campos), así que mandar null se
+  // interpretaría como "no tocar este campo" y nunca limpiaría la selección.
+  await fetch('/api/consultas/'+id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({estado_carpeta: valor}),
+  });
+  cargar();
+}
+
+async function cambiarFirmado(id, checked){
+  await fetch('/api/consultas/'+id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({firmado: checked}),
+  });
+  cargar();
+}
+
+cargar();
+</script>
+{% endblock %}

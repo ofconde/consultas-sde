@@ -2,12 +2,12 @@
 from fastapi import APIRouter, Depends
 from auth import require_login
 from db import catalogo
-from constantes import ESTADO_GRUPO, GRUPO_COLOR, GRUPOS
+from constantes import ESTADO_GRUPO, GRUPO_COLOR, GRUPOS, ESTADO_CARPETA_COLOR
 
 router = APIRouter(prefix="/api/catalogos", tags=["catalogos"])
 
 _TIPOS = ["DEPARTAMENTO", "LOCALIDAD", "SECTOR", "SITUACION_AFIP",
-          "GARANTIA", "LINEA", "PROGRAMA", "ESTADO", "ACCION"]
+          "GARANTIA", "LINEA", "PROGRAMA", "ESTADO", "ACCION", "ESTADO_CARPETA"]
 
 
 @router.get("")
@@ -24,4 +24,5 @@ def estado_grupo(_=Depends(require_login)):
         "estado_grupo": ESTADO_GRUPO,
         "grupo_color": GRUPO_COLOR,
         "grupos": [{"clave": k, "label": lbl} for k, lbl in GRUPOS],
+        "estado_carpeta_color": ESTADO_CARPETA_COLOR,
     }

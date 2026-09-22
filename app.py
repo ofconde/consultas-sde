@@ -154,6 +154,17 @@ def panel_seguimiento(request: Request):
     return templates.TemplateResponse("seguimiento.html", {"request": request, "usuario": u, "activo": "seguimiento"})
 
 
+@app.get("/panel/instancia-superior", response_class=HTMLResponse)
+def panel_instancia_superior(request: Request):
+    """Casos que ya pasaron a instancia superior (remitidos a firma de
+    representante en adelante) — visible a cualquier usuario logueado, técnico
+    y coordinador trabajan estos casos día a día."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("instancia_superior.html", {"request": request, "usuario": u, "activo": "instancia-superior"})
+
+
 @app.get("/consulta/nueva", response_class=HTMLResponse)
 def consulta_nueva_page(request: Request):
     # esta ruta debe registrarse ANTES que /consulta/{cid}: si no, FastAPI intenta

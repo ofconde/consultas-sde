@@ -43,6 +43,9 @@ class GestionIn(ConsultaIngesta):
     estado:               Optional[str] = _TXT
     observaciones:        Optional[str] = _TXT
     informacion_extra:    Optional[str] = _TXT
+    instancia_superior:   Optional[bool] = None
+    estado_carpeta:       Optional[str] = _TXT
+    firmado:              Optional[bool] = None
 
 
 class ConsultaManualIn(GestionIn):

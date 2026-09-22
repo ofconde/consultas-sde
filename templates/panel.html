@@ -435,7 +435,10 @@ function filaHTML(c, numeroFila){
         ${state.seleccion.has(c.id)?'checked':''} onchange="toggleSeleccion(${c.id}, this.checked)"></td>
       <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">${escapeHtml(c.codigo)||'#'+numeroFila}</div></td>
       <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>${
-          c.genero_estimado==='F' ? '<span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : ''}
+          c.genero_estimado==='F' ? '<span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : ''}${
+          c.instancia_superior
+            ? ` <span class="badge-instancia-superior" title="Seguimiento fino en Instancia Superior" onclick="event.stopPropagation();location.href='/panel/instancia-superior'">↑ Instancia superior</span>`
+            : ` <button class="btn sm btn-instancia-superior" onclick="event.stopPropagation();pasarAInstanciaSuperior(${c.id},this)">→ Instancia superior</button>`}
         <div class="cod cod-cuit-row">${escapeHtml(c.cuit)}${c.cuit
           ? `<button class="copy-btn copy-btn-xs" data-cuit="${escapeHtml(c.cuit)}"
                onclick="event.stopPropagation();copiar(this.dataset.cuit,this)" title="Copiar CUIT">copiar cuit</button>`
@@ -476,6 +479,25 @@ async function cambiarTecnico(id, tecnico){
     alert(e.detail || 'No se pudo asignar.');
   }
   await cargarResumen(); await cargarTabla();
+}
+
+// "Pasa a instancia superior": marca el caso para el seguimiento fino de
+// /panel/instancia-superior (remitido a firma de representante → desembolso).
+// Reusa el mismo PATCH genérico — no hay endpoint nuevo para esto.
+async function pasarAInstanciaSuperior(id, btn){
+  if(!confirm('¿Este caso pasa a instancia superior? A partir de ahora se hace seguimiento fino en esa pantalla.')) return;
+  btn.disabled = true;
+  const r = await fetch('/api/consultas/'+id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({instancia_superior: true}),
+  });
+  if(!r.ok){
+    const e = await r.json().catch(()=>({}));
+    alert(e.detail || 'No se pudo marcar el caso.');
+    btn.disabled = false;
+    return;
+  }
+  location.href = '/panel/instancia-superior';
 }
 
 // Acción rápida desde el panel — mismo POST que usa el detalle. Si la acción

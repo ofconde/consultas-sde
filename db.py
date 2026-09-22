@@ -73,10 +73,21 @@ def init_db():
                 observaciones        TEXT,
                 informacion_extra    TEXT,
                 genero               TEXT,
+                -- instancia superior: casos que ya se remitieron a firma de
+                -- representante y siguen su circuito hasta el desembolso, con
+                -- seguimiento más fino que el estado general (ver estado_carpeta).
+                instancia_superior   BOOLEAN DEFAULT FALSE,
+                estado_carpeta       TEXT,
+                firmado              BOOLEAN DEFAULT FALSE,
                 created_at           TIMESTAMP DEFAULT NOW(),
                 updated_at           TIMESTAMP DEFAULT NOW()
             )
         """))
+        # Alta de columnas sobre una tabla ya desplegada en prod — CREATE TABLE
+        # IF NOT EXISTS de arriba no las agrega si la tabla ya existe.
+        conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS instancia_superior BOOLEAN DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS estado_carpeta TEXT"))
+        conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS firmado BOOLEAN DEFAULT FALSE"))
 
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS sde_acciones (
@@ -110,6 +121,10 @@ def init_db():
         # Índices sobre las columnas más filtradas/ordenadas del panel. Baratos de
         # crear ahora (tabla chica); preparan el crecimiento futuro sin costo hoy.
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_consultas_estado ON sde_consultas (estado)"))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_sde_consultas_instancia_superior
+            ON sde_consultas (instancia_superior) WHERE instancia_superior = TRUE
+        """))
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_consultas_tecnico ON sde_consultas (tecnico)"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sde_consultas_cuit ON sde_consultas (cuit)"))
         conn.execute(text("""
