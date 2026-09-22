@@ -74,16 +74,16 @@ ESTADOS_AVANZADOS = [
 # que ya se remitieron a firma de representante y siguen un circuito más fino
 # que el `estado` general hasta el desembolso — reemplaza la planilla Excel que
 # se llevaba a mano. Orden real del circuito, confirmado con Omar.
-# Recortado de 10 a 6 el 22/09: "Juntando documentación o SGR" se fusionó con
+# Recortado de 10 a 5 el 22/09: "Juntando documentación o SGR" se fusionó con
 # "En trámite para ingresar a CFI" (mismo bloqueo en la práctica); "Enviado a
 # carga"/"Cargado" se sacaron — duran ~30 min y "cargado" ya implica que pasó a
-# la instancia siguiente; y "Firmado" se fusionó con el paso de entrar a CFI
-# (una vez firmado, lo único que sigue es preparar el ingreso).
+# la instancia siguiente; "Firmado" se fusionó con el paso de entrar a CFI; y
+# "Firmado por director" se sacó — una vez firmado por el director ya pasa a
+# tramitarse el desembolso, no aporta como paso propio.
 ESTADOS_CARPETA = [
     "ENVIADO A FIRMA DE REPRESENTANTE",
     "FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)",
     "EN TRAMITE EN CFI SEDE",
-    "FIRMADO DR.",
     "EN TRAMITE DE DESEMBOLSO",
     "DESEMBOLSADO",
 ]
@@ -95,7 +95,6 @@ ESTADO_CARPETA_COLOR = {
     "ENVIADO A FIRMA DE REPRESENTANTE":                                {"bg": "#fbe7ef", "fg": "#c2255c"},
     "FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)":  {"bg": "#f6e2b8", "fg": "#8a5a00"},
     "EN TRAMITE EN CFI SEDE":                                          {"bg": "#efe9fb", "fg": "#6c4bd0"},
-    "FIRMADO DR.":                                                     {"bg": "#e5f7ee", "fg": "#1a9e57"},
     "EN TRAMITE DE DESEMBOLSO":                                        {"bg": "#cceee0", "fg": "#0f7a3f"},
     "DESEMBOLSADO":                                                    {"bg": "#1a9e57", "fg": "#ffffff"},
 }
