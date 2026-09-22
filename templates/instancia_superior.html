@@ -64,6 +64,13 @@
           <tbody id="is-garantia-tbody"></tbody>
         </table>
       </div>
+      <div class="tabla-wrap card">
+        <div class="sec-title" style="margin:0.75rem 0.875rem 0">Por programática</div>
+        <table>
+          <thead><tr><th>Programa</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Monto</th></tr></thead>
+          <tbody id="is-programa-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 {% endblock %}
@@ -157,6 +164,9 @@ async function cargar(){
     : '<tr><td class="muted" colspan="3">Sin datos.</td></tr>';
   $('#is-garantia-tbody').innerHTML = d.resumen_garantia.length
     ? d.resumen_garantia.map(filaAgrupada).join('')
+    : '<tr><td class="muted" colspan="3">Sin datos.</td></tr>';
+  $('#is-programa-tbody').innerHTML = d.resumen_programa.length
+    ? d.resumen_programa.map(filaAgrupada).join('')
     : '<tr><td class="muted" colspan="3">Sin datos.</td></tr>';
 }
 

@@ -65,6 +65,11 @@
   </div>
 
   <div class="sec">
+    <div class="sec-title">Por programática</div>
+    <div id="tabla-programa"></div>
+  </div>
+
+  <div class="sec">
     <div class="sec-title">Detalle por caso</div>
     <div id="tabla-casos"></div>
   </div>
@@ -147,6 +152,7 @@ async function cargar(){
   $('#tabla-resumen').innerHTML = tablaResumen(d.resumen, d.total, d.monto_total_fmt);
   $('#tabla-linea').innerHTML = tablaAgrupada('Línea', d.resumen_linea);
   $('#tabla-garantia').innerHTML = tablaAgrupada('Garantía', d.resumen_garantia);
+  $('#tabla-programa').innerHTML = tablaAgrupada('Programa', d.resumen_programa);
   $('#tabla-casos').innerHTML = tablaCasos(d.casos);
 }
 

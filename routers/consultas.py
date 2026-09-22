@@ -352,6 +352,7 @@ def instancia_superior(_=Depends(require_login)):
                      "monto": resumen_por_estado[e]["monto"], "monto_fmt": _monto(resumen_por_estado[e]["monto"])}
                     for e in ESTADOS_CARPETA],
         "resumen_linea": _agrupar("linea"),
+        "resumen_programa": _agrupar("programa"),
         "resumen_garantia": _agrupar("garantia"),
         "desembolsados": [{"nombre": c["nombre"], "monto_fmt": c["monto_fmt"]} for c in desembolsados],
         "desembolsados_total_fmt": _monto(sum(c["monto"] for c in desembolsados)),
