@@ -125,11 +125,11 @@ function tablaAgrupada(encabezado, filas){
 function tablaCasos(casos){
   if(!casos.length) return '<div class="vacio">Todavía no hay casos en instancia superior.</div>';
   return `<table class="tabla-avanzados"><colgroup>
-      <col style="width:10%"><col style="width:24%"><col style="width:14%">
-      <col style="width:16%"><col style="width:10%"><col style="width:26%">
+      <col style="width:9%"><col style="width:17%"><col style="width:11%">
+      <col style="width:17%"><col style="width:11%"><col style="width:35%">
     </colgroup><thead><tr>
-      <th>Código</th><th>Solicitante</th><th>Técnico</th>
-      <th style="text-align:right">Monto</th><th style="text-align:center">Firmado</th><th>Estado</th>
+      <th style="white-space:normal">Código</th><th style="white-space:normal">Solicitante</th><th style="white-space:normal">Técnico</th>
+      <th style="text-align:right;white-space:normal">Monto</th><th style="text-align:center;white-space:normal">Firmado</th><th style="white-space:normal">Estado</th>
     </tr></thead><tbody>${casos.map(c => `
       <tr>
         <td>${escapeHtml(c.codigo)}</td>
@@ -137,7 +137,7 @@ function tablaCasos(casos){
         <td>${escapeHtml(c.tecnico)}</td>
         <td class="money">${escapeHtml(c.monto_fmt)}</td>
         <td style="text-align:center">${c.firmado ? 'Sí' : 'No'}</td>
-        <td><span class="estado-linea" style="color:${colorEstado(c.estado_carpeta)}">${escapeHtml(etiqueta(c.estado_carpeta)||'Sin clasificar')}</span></td>
+        <td><span class="estado-linea" style="color:${colorEstado(c.estado_carpeta)};white-space:normal">${escapeHtml(etiqueta(c.estado_carpeta)||'Sin clasificar')}</span></td>
       </tr>`).join('')}</tbody></table>`;
 }
 
