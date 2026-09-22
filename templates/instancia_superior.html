@@ -57,11 +57,7 @@
 <script>
 const $ = s => document.querySelector(s);
 let META = { estado_carpeta_color: {} };
-const ESTADOS_CARPETA = [
-  "JUNTANDO DOCUMENTACION O SGR", "ENVIADO A FIRMA DE REPRESENTANTE", "FIRMADO",
-  "EN TRAMITE PARA INGRESAR A CFI", "ENVIADO A CARGA", "CARGADO",
-  "EN TRAMITE EN CFI SEDE", "FIRMADO POR DIRECTOR", "EN TRAMITE DE DESEMBOLSO", "DESEMBOLSADO",
-];
+let ESTADOS_CARPETA = [];
 
 function etiqueta(s){
   return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
@@ -93,6 +89,8 @@ function filaHTML(c){
 
 async function cargar(){
   META = await (await fetch('/api/catalogos/estado-grupo')).json();
+  const cat = await (await fetch('/api/catalogos')).json();
+  ESTADOS_CARPETA = cat.ESTADO_CARPETA || [];
   const d = await (await fetch('/api/consultas/instancia-superior')).json();
 
   $('#is-vacio').style.display = d.casos.length ? 'none' : '';
