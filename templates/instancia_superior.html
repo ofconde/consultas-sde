@@ -10,6 +10,11 @@
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%236b7590'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 0.5rem center;padding-right:1.5rem}
   .is-firmado{cursor:pointer;width:1.125rem;height:1.125rem}
+  .is-sel-plain{border:1px solid transparent;border-radius:0.375rem;padding:0.1875rem 0.3125rem;
+    font:inherit;background:transparent;cursor:pointer;width:100%;color:inherit}
+  .is-sel-plain:hover{border-color:var(--border)}
+  .is-sel-plain.is-linea{font-weight:600;margin-bottom:0.125rem}
+  .is-sel-plain.is-programa{font-size:0.8125rem;color:var(--muted)}
 </style>
 {% endblock %}
 {% block body %}
@@ -79,6 +84,8 @@
 const $ = s => document.querySelector(s);
 let META = { estado_carpeta_color: {} };
 let ESTADOS_CARPETA = [];
+let LINEAS = [];
+let PROGRAMAS = [];
 
 // Puntos de miles mientras se escribe el monto — se manda igual sin
 // formatear (_parse_monto del backend ya limpia cualquier "." o "$").
@@ -103,6 +110,24 @@ function selEstadoCarpeta(c){
     </select>`;
 }
 
+function selLinea(c){
+  const opciones = LINEAS.map(l =>
+    `<option value="${l}" ${c.linea===l?'selected':''}>${escapeHtml(etiqueta(l))}</option>`).join('');
+  return `<select class="is-sel-plain is-linea" onchange="cambiarLinea(${c.id}, this.value)">
+      <option value="" ${!c.linea || c.linea==='—' ?'selected':''}>— Sin línea —</option>
+      ${opciones}
+    </select>`;
+}
+
+function selPrograma(c){
+  const opciones = PROGRAMAS.map(p =>
+    `<option value="${p}" ${c.programa===p?'selected':''}>${escapeHtml(etiqueta(p))}</option>`).join('');
+  return `<select class="is-sel-plain is-programa" onchange="cambiarPrograma(${c.id}, this.value)">
+      <option value="" ${!c.programa || c.programa==='—' ?'selected':''}>— Sin programa —</option>
+      ${opciones}
+    </select>`;
+}
+
 function filaHTML(c){
   return `<tr>
       <td>${escapeHtml(c.tecnico)}</td>
@@ -113,7 +138,7 @@ function filaHTML(c){
           value="${formatearMiles(c.monto)}" title="${c.monto_editado ? 'Monto corregido — puede diferir del solicitado en la consulta' : 'Monto de la consulta original — corregilo si difiere de lo que se mandó a firmar'}"
           style="text-align:right;width:100%;border:1px solid ${c.monto_editado ? 'var(--amber)' : 'transparent'};border-radius:0.375rem;padding:0.25rem 0.375rem;font:inherit;background:${c.monto_editado ? '#fdf3e0' : 'transparent'}">
       </td>
-      <td>${escapeHtml(c.linea)}${c.programa && c.programa!=='—' ? `<div class="cod">${escapeHtml(c.programa)}</div>` : ''}</td>
+      <td>${selLinea(c)}${selPrograma(c)}</td>
       <td>${escapeHtml(c.garantia)}</td>
       <td style="text-align:center"><input type="checkbox" class="is-firmado" data-id="${c.id}" ${c.firmado?'checked':''}></td>
       <td>${selEstadoCarpeta(c)}</td>
@@ -124,6 +149,8 @@ async function cargar(){
   META = await (await fetch('/api/catalogos/estado-grupo')).json();
   const cat = await (await fetch('/api/catalogos')).json();
   ESTADOS_CARPETA = cat.ESTADO_CARPETA || [];
+  LINEAS = cat.LINEA || [];
+  PROGRAMAS = cat.PROGRAMA || [];
   const d = await (await fetch('/api/consultas/instancia-superior')).json();
 
   $('#is-vacio').style.display = d.casos.length ? 'none' : '';
@@ -177,6 +204,22 @@ async function cambiarEstadoCarpeta(id, valor){
   await fetch('/api/consultas/'+id, {
     method: 'PATCH', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({estado_carpeta: valor}),
+  });
+  cargar();
+}
+
+async function cambiarLinea(id, valor){
+  await fetch('/api/consultas/'+id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({linea: valor}),
+  });
+  cargar();
+}
+
+async function cambiarPrograma(id, valor){
+  await fetch('/api/consultas/'+id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({programa: valor}),
   });
   cargar();
 }
