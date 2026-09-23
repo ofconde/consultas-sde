@@ -224,6 +224,23 @@ def init_db():
         # dos altas concurrentes (ej. Power Automate reintentando un webhook).
         # setval() es idempotente: nunca retrocede, arranca desde el máximo código
         # ya existente (importante para no colisionar con las 256 filas migradas).
+        # OK CASFOG: casos aprobados por el fondo de garantía, cargados a mano
+        # desde las planillas de CASFOG (hoy no hay import automático — son
+        # varias planillas sueltas que se van consolidando de a poco). El monto
+        # solicitado NO se guarda acá: sale en vivo de sde_consultas porque el
+        # de esas planillas es un genérico ($50.000.000 fijo) que no refleja lo
+        # que la consulta pidió realmente.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sde_casfog_ok (
+                id              SERIAL PRIMARY KEY,
+                cuit            TEXT NOT NULL UNIQUE,
+                monto_aprobado  BIGINT,
+                fuente          TEXT,
+                alerta          TEXT,
+                creado_en       TIMESTAMP DEFAULT NOW()
+            )
+        """))
+
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS sde_consultas_codigo_seq"))
         conn.execute(text("""
             SELECT setval('sde_consultas_codigo_seq',

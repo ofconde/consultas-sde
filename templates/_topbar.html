@@ -14,6 +14,7 @@
       {% if usuario.rol == 'coordinador' %}
       <a href="/admin" class="{% if activo=='admin' %}active{% endif %}">Admin</a>
       <a href="/admin/auditoria" class="{% if activo=='auditoria' %}active{% endif %}" title="Registro de acciones y actividad diaria por usuario">Auditoría</a>
+      <a href="/panel/ok-casfog" class="{% if activo=='ok-casfog' %}active{% endif %}" title="Casos aprobados por el fondo de garantía CASFOG">OK CASFOG</a>
       {% endif %}
     </nav>
     <div class="spacer"></div>

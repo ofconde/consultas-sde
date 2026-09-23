@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}OK CASFOG · Consultas SDE{% endblock %}
+{% block extra_head %}
+<style>
+  .ck-resumen{display:grid;grid-template-columns:repeat(3, 1fr);gap:1.25rem;margin-bottom:1.25rem}
+  @media (max-width:900px){.ck-resumen{grid-template-columns:1fr}}
+  .ck-kpi{padding:1rem 1.25rem}
+  .ck-kpi .n{font-size:1.5rem;font-weight:800;color:var(--navy)}
+  .ck-kpi .l{font-size:0.8125rem;color:var(--muted)}
+  tr.ck-alerta{background:var(--red-bg)}
+  .ck-alerta-txt{font-size:0.75rem;color:var(--red);font-weight:600}
+  .ck-fuente{font-size:0.75rem;color:var(--muted)}
+</style>
+{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+
+  <div class="wrap">
+    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">OK CASFOG</h1>
+    <p class="muted" style="margin:0 0 1.25rem">Casos aprobados por el fondo de garantía CASFOG, consolidados a mano desde las planillas del fondo. El monto solicitado sale de la consulta real en el sistema, no del genérico de esas planillas.</p>
+
+    <div class="ck-resumen">
+      <div class="tabla-wrap card ck-kpi"><div class="n" id="ck-total"></div><div class="l">Casos aprobados</div></div>
+      <div class="tabla-wrap card ck-kpi"><div class="n" id="ck-solicitado"></div><div class="l">Monto solicitado (real, en sistema)</div></div>
+      <div class="tabla-wrap card ck-kpi"><div class="n" id="ck-aprobado"></div><div class="l">Monto aprobado CASFOG</div></div>
+    </div>
+
+    <div class="tabla-wrap card">
+      <table>
+        <thead><tr>
+          <th>Solicitante</th><th style="text-align:right">Monto solicitado</th>
+          <th style="text-align:right">Monto aprobado CASFOG</th><th>Fuente</th>
+          <th>Actividad</th><th>Técnico</th><th>Estado</th>
+        </tr></thead>
+        <tbody id="ck-tbody"></tbody>
+      </table>
+    </div>
+    <div class="muted" id="ck-vacio" style="display:none;padding:1.25rem;text-align:center">Todavía no hay casos cargados.</div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = s => document.querySelector(s);
+
+function fila(c){
+  const alerta = c.alerta ? `<div class="ck-alerta-txt">⚠ ${escapeHtml(c.alerta)}</div>` : '';
+  return `<tr class="${c.alerta ? 'ck-alerta' : ''}">
+      <td class="cod-abrir" data-id="${c.consulta_id||''}" style="${c.consulta_id?'cursor:pointer':''}">${escapeHtml(c.nombre)}
+        <div class="cod">${escapeHtml(c.codigo||c.cuit)}</div>${alerta}</td>
+      <td style="text-align:right">${escapeHtml(c.monto_solicitado_fmt)}</td>
+      <td style="text-align:right">${c.monto_aprobado_fmt ? escapeHtml(c.monto_aprobado_fmt) : escapeHtml(String(c.monto_aprobado ?? '—'))}</td>
+      <td class="ck-fuente">${escapeHtml(c.fuente)}</td>
+      <td>${escapeHtml(c.actividad)}</td>
+      <td>${escapeHtml(c.tecnico)}</td>
+      <td>${escapeHtml(c.estado)}</td>
+    </tr>`;
+}
+
+async function cargar(){
+  const d = await (await fetch('/api/casfog-ok')).json();
+  $('#ck-vacio').style.display = d.casos.length ? 'none' : '';
+  $('#ck-tbody').innerHTML = d.casos.map(fila).join('');
+  document.querySelectorAll('.cod-abrir[data-id]:not([data-id=""])').forEach(el => {
+    el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
+  });
+  $('#ck-total').textContent = d.total;
+  $('#ck-solicitado').textContent = d.monto_solicitado_total_fmt;
+  $('#ck-aprobado').textContent = d.monto_aprobado_total_fmt;
+}
+
+cargar();
+</script>
+{% endblock %}

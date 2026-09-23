@@ -15,7 +15,7 @@ from sqlalchemy import text
 from db import init_db, engine
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
                   SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
-from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria
+from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria, casfog
 from routers.auditoria import registrar_actividad, registrar_accion
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -72,6 +72,7 @@ app.include_router(usuarios.router)
 app.include_router(bcra.router)
 app.include_router(seguimiento.router)
 app.include_router(auditoria.router)
+app.include_router(casfog.router)
 
 
 # ── Páginas ──────────────────────────────────────────────────────────
@@ -233,6 +234,18 @@ def informe_avanzados_page(request: Request):
     if u["rol"] != "coordinador":
         return RedirectResponse("/panel")
     return templates.TemplateResponse("informe_avanzados.html", {"request": request, "usuario": u})
+
+
+@app.get("/panel/ok-casfog", response_class=HTMLResponse)
+def panel_ok_casfog(request: Request):
+    """Casos aprobados por CASFOG, consolidados a mano desde las planillas del
+    fondo de garantía — mismo acceso que /admin, /informe/pdf, etc."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    if u["rol"] != "coordinador":
+        return RedirectResponse("/panel")
+    return templates.TemplateResponse("casfog_ok.html", {"request": request, "usuario": u, "activo": "ok-casfog"})
 
 
 @app.get("/admin", response_class=HTMLResponse)
