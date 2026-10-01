@@ -97,9 +97,15 @@ function colorEstado(estado){
   return c.fg === '#ffffff' ? c.bg : c.fg;
 }
 
+// Estados que ya salieron del circuito, para bien (desembolsado) o para mal
+// (desistido/rechazado) — "en curso" es todo lo que no cayó en ninguno de
+// estos, no solo lo que todavía no se desembolsó.
+const ESTADOS_CERRADOS = ['DESEMBOLSADO', 'DESISTIDO POR SOLICITANTE', 'RECHAZADO POR ANALISIS DE RIESGO'];
+
 function pintarKpis(d){
   const desembolsado = d.resumen.find(r => r.estado === 'DESEMBOLSADO') || {n:0, monto_fmt:'$ 0'};
-  const enCurso = d.total - desembolsado.n;
+  const cerrados = d.resumen.filter(r => ESTADOS_CERRADOS.includes(r.estado)).reduce((acc, r) => acc + r.n, 0);
+  const enCurso = d.total - cerrados;
   $('#kpis').innerHTML = `
     <div class="kpi c-navy"><div class="n">${d.total}</div><div class="l">Casos totales</div></div>
     <div class="kpi c-violet"><div class="n">${enCurso}</div><div class="l">En curso</div></div>
@@ -109,15 +115,17 @@ function pintarKpis(d){
 }
 
 function tablaResumen(resumen, totalN, totalFmt){
+  const pct = n => totalN ? (n / totalN * 100).toFixed(1).replace('.', ',') + '%' : '—';
   return `<table><thead><tr>
-      <th>Estado</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Monto</th>
+      <th>Estado</th><th style="text-align:right">Cantidad</th><th style="text-align:right">%</th><th style="text-align:right">Monto</th>
     </tr></thead><tbody>${resumen.map(r => `
       <tr>
         <td><span class="estado-linea" style="color:${colorEstado(r.estado)}">${escapeHtml(etiqueta(r.estado))}</span></td>
         <td class="num">${r.n}</td>
+        <td class="num">${pct(r.n)}</td>
         <td class="money">${escapeHtml(r.monto_fmt)}</td>
       </tr>`).join('')}</tbody>
-    <tfoot><tr style="font-weight:700"><td>TOTAL</td><td class="num">${totalN}</td><td class="money">${escapeHtml(totalFmt)}</td></tr></tfoot></table>`;
+    <tfoot><tr style="font-weight:700"><td>TOTAL</td><td class="num">${totalN}</td><td class="num">${totalN ? '100%' : '—'}</td><td class="money">${escapeHtml(totalFmt)}</td></tr></tfoot></table>`;
 }
 
 function tablaAgrupada(encabezado, filas){

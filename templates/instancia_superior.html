@@ -43,9 +43,9 @@
     <div class="is-resumen">
       <div class="tabla-wrap card">
         <table>
-          <thead><tr><th>Estado</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Monto</th></tr></thead>
+          <thead><tr><th>Estado</th><th style="text-align:right">Cantidad</th><th style="text-align:right">%</th><th style="text-align:right">Monto</th></tr></thead>
           <tbody id="is-resumen-tbody"></tbody>
-          <tfoot><tr><td class="is-total">TOTAL</td><td class="is-total" style="text-align:right" id="is-total-n"></td><td class="is-total" style="text-align:right" id="is-total"></td></tr></tfoot>
+          <tfoot><tr><td class="is-total">TOTAL</td><td class="is-total" style="text-align:right" id="is-total-n"></td><td class="is-total" style="text-align:right" id="is-total-pct"></td><td class="is-total" style="text-align:right" id="is-total"></td></tr></tfoot>
         </table>
       </div>
       <div class="tabla-wrap card">
@@ -174,10 +174,12 @@ async function cargar(){
     el.addEventListener('keydown', e => { if(e.key === 'Enter') el.blur(); });
   });
 
+  const pct = n => d.total ? (n / d.total * 100).toFixed(1).replace('.', ',') + '%' : '—';
   $('#is-resumen-tbody').innerHTML = d.resumen.map(r => `
-    <tr><td>${escapeHtml(etiqueta(r.estado))}</td><td style="text-align:right">${r.n}</td><td style="text-align:right">${escapeHtml(r.monto_fmt)}</td></tr>
+    <tr><td>${escapeHtml(etiqueta(r.estado))}</td><td style="text-align:right">${r.n}</td><td style="text-align:right">${pct(r.n)}</td><td style="text-align:right">${escapeHtml(r.monto_fmt)}</td></tr>
   `).join('');
   $('#is-total-n').textContent = d.total;
+  $('#is-total-pct').textContent = d.total ? '100%' : '—';
   $('#is-total').textContent = d.monto_total_fmt;
 
   $('#is-desembolsados-tbody').innerHTML = d.desembolsados.length

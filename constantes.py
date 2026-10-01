@@ -86,17 +86,23 @@ ESTADOS_CARPETA = [
     "EN TRAMITE EN CFI SEDE",
     "EN TRAMITE DE DESEMBOLSO",
     "DESEMBOLSADO",
+    "DESISTIDO POR SOLICITANTE",
+    "RECHAZADO POR ANALISIS DE RIESGO",
 ]
 
 # Colores por estado de carpeta — progresión de rosa (recién entra) a verde
 # (desembolsado), reusando los tokens ya definidos en panel.css (--rosa/
-# --amber/--violet/--green) en vez de inventar hex nuevos.
+# --amber/--violet/--green) en vez de inventar hex nuevos. Los dos últimos son
+# salidas del circuito (no se llega a desembolsar), no un paso más del
+# progreso normal — por eso van en gris/rojo en vez de seguir la escala.
 ESTADO_CARPETA_COLOR = {
     "ENVIADO A FIRMA DE REPRESENTANTE":                                {"bg": "#fbe7ef", "fg": "#c2255c"},
     "FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)":  {"bg": "#f6e2b8", "fg": "#8a5a00"},
     "EN TRAMITE EN CFI SEDE":                                          {"bg": "#efe9fb", "fg": "#6c4bd0"},
     "EN TRAMITE DE DESEMBOLSO":                                        {"bg": "#cceee0", "fg": "#0f7a3f"},
     "DESEMBOLSADO":                                                    {"bg": "#1a9e57", "fg": "#ffffff"},
+    "DESISTIDO POR SOLICITANTE":                                       {"bg": "#eef0f4", "fg": "#8891a8"},
+    "RECHAZADO POR ANALISIS DE RIESGO":                                {"bg": "#fdecea", "fg": "#d0402c"},
 }
 
 ROL_COORDINADOR = "coordinador"
