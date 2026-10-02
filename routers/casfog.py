@@ -7,12 +7,13 @@ sde_casfog_ok; el monto SOLICITADO nunca sale de ahí — se lee en vivo de
 sde_consultas, porque el de esas planillas es un genérico ($50.000.000 fijo)
 que no refleja lo que la consulta pidió realmente.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy import text
 
 from db import engine
 from auth import require_coordinador
 from formatos import _monto
+from constantes import ESTADOS_TRAMITE_CASFOG, ESTADO_TRAMITE_CASFOG_COLOR
 
 router = APIRouter(prefix="/api/casfog-ok", tags=["casfog"])
 
@@ -24,7 +25,7 @@ def listar(usuario=Depends(require_coordinador)):
         # una consulta cargada (reingresos), y un JOIN plano duplicaría la fila
         # de OK CASFOG una vez por cada una — acá se toma solo la más reciente.
         rows = conn.execute(text("""
-            SELECT k.cuit, k.monto_aprobado, k.fuente, k.alerta,
+            SELECT k.cuit, k.monto_aprobado, k.fuente, k.alerta, k.estado_tramite,
                    c.id AS consulta_id, c.codigo, c.nombre, c.mail, c.telefono,
                    COALESCE(NULLIF(c.actividad_economica, ''), c.actividad_inscripta) AS actividad,
                    c.destino, c.estado, c.situacion_arca, c.tecnico,
@@ -49,6 +50,7 @@ def listar(usuario=Depends(require_coordinador)):
         "monto_aprobado_fmt": _monto(r["monto_aprobado"]) if r["monto_aprobado"] is not None else None,
         "fuente": r["fuente"] or "—",
         "alerta": r["alerta"] or "",
+        "estado_tramite": r["estado_tramite"] or "",
         "mail": r["mail"] or "—",
         "telefono": r["telefono"] or "—",
         "actividad": r["actividad"] or "—",
@@ -64,5 +66,23 @@ def listar(usuario=Depends(require_coordinador)):
         "con_alerta": sum(1 for c in casos if c["alerta"]),
         "monto_solicitado_total_fmt": _monto(sum(c["monto_solicitado"] for c in con_match)),
         "monto_aprobado_total_fmt": _monto(sum(c["monto_aprobado"] or 0 for c in casos)),
+        "estados_tramite": ESTADOS_TRAMITE_CASFOG,
+        "estado_tramite_color": ESTADO_TRAMITE_CASFOG_COLOR,
         "casos": casos,
     }
+
+
+@router.patch("/{cuit}")
+def marcar_tramite(cuit: str, body: dict = Body(...), usuario=Depends(require_coordinador)):
+    """Si ya se inició o se terminó de tramitar en CFI el caso aprobado por
+    CASFOG — valor vacío limpia la marca (vuelve a "sin iniciar")."""
+    estado_tramite = (body.get("estado_tramite") or "").strip()
+    if estado_tramite and estado_tramite not in ESTADOS_TRAMITE_CASFOG:
+        raise HTTPException(422, "Estado de trámite inválido")
+    with engine.begin() as conn:
+        r = conn.execute(text("""
+            UPDATE sde_casfog_ok SET estado_tramite = :et WHERE cuit = :cuit RETURNING id
+        """), {"et": estado_tramite or None, "cuit": cuit}).first()
+    if not r:
+        raise HTTPException(404, "CUIT no encontrado en OK CASFOG")
+    return {"ok": True}

@@ -105,6 +105,17 @@ ESTADO_CARPETA_COLOR = {
     "RECHAZADO POR ANALISIS DE RIESGO":                                {"bg": "#fdecea", "fg": "#d0402c"},
 }
 
+# Estado de trámite en OK CASFOG: una vez aprobado por CASFOG, si ya se inició
+# o se terminó de tramitar en el circuito normal de CFI. Catálogo chico y fijo
+# (no vive en sde_catalogos como el resto): es un detalle interno de esa única
+# pantalla, no un campo que compartan otros módulos.
+ESTADOS_TRAMITE_CASFOG = ["EN TRAMITE", "TRAMITADO", "NO FINANCIABLE"]
+ESTADO_TRAMITE_CASFOG_COLOR = {
+    "EN TRAMITE":     {"bg": "#f6e2b8", "fg": "#8a5a00"},
+    "TRAMITADO":      {"bg": "#cceee0", "fg": "#0f7a3f"},
+    "NO FINANCIABLE": {"bg": "#fdecea", "fg": "#d0402c"},
+}
+
 ROL_COORDINADOR = "coordinador"
 ROL_TECNICO = "tecnico"
 

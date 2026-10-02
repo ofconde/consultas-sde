@@ -237,9 +237,11 @@ def init_db():
                 monto_aprobado  BIGINT,
                 fuente          TEXT,
                 alerta          TEXT,
+                estado_tramite  TEXT,
                 creado_en       TIMESTAMP DEFAULT NOW()
             )
         """))
+        conn.execute(text("ALTER TABLE sde_casfog_ok ADD COLUMN IF NOT EXISTS estado_tramite TEXT"))
 
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS sde_consultas_codigo_seq"))
         conn.execute(text("""

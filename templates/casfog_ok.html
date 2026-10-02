@@ -10,6 +10,10 @@
   tr.ck-alerta{background:var(--red-bg)}
   .ck-alerta-txt{font-size:0.75rem;color:var(--red);font-weight:600}
   .ck-fuente{font-size:0.75rem;color:var(--muted)}
+  .ck-tramite-sel{border:none;font-weight:700;padding:0.25rem 0.625rem;border-radius:1.25rem;
+    font-size:0.75rem;cursor:pointer;appearance:none;-webkit-appearance:none;background-color:#f0f1f5;color:#6b7590;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%236b7590'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 0.5rem center;padding-right:1.5rem}
 </style>
 {% endblock %}
 {% block body %}
@@ -30,7 +34,7 @@
         <thead><tr>
           <th>Solicitante</th><th style="text-align:right">Monto solicitado</th>
           <th style="text-align:right">Monto aprobado CASFOG</th><th>Fuente</th>
-          <th>Actividad</th><th>Técnico</th><th>Estado</th>
+          <th>Actividad</th><th>Técnico</th><th>Estado</th><th>Estado trámite</th>
         </tr></thead>
         <tbody id="ck-tbody"></tbody>
       </table>
@@ -41,6 +45,23 @@
 {% block scripts %}
 <script>
 const $ = s => document.querySelector(s);
+let ESTADOS_TRAMITE = [];
+let ESTADO_TRAMITE_COLOR = {};
+
+function etiqueta(s){
+  return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+}
+
+function selTramite(c){
+  const color = ESTADO_TRAMITE_COLOR[c.estado_tramite] || {bg:'#f0f1f5', fg:'#6b7590'};
+  const opciones = ESTADOS_TRAMITE.map(e =>
+    `<option value="${e}" ${c.estado_tramite===e?'selected':''}>${escapeHtml(etiqueta(e))}</option>`).join('');
+  return `<select class="ck-tramite-sel" style="background-color:${color.bg};color:${color.fg}"
+      onchange="cambiarTramite('${c.cuit}', this.value)">
+      <option value="" ${!c.estado_tramite?'selected':''}>— Sin iniciar —</option>
+      ${opciones}
+    </select>`;
+}
 
 function fila(c){
   const alerta = c.alerta ? `<div class="ck-alerta-txt">⚠ ${escapeHtml(c.alerta)}</div>` : '';
@@ -53,11 +74,14 @@ function fila(c){
       <td>${escapeHtml(c.actividad)}</td>
       <td>${escapeHtml(c.tecnico)}</td>
       <td>${escapeHtml(c.estado)}</td>
+      <td>${selTramite(c)}</td>
     </tr>`;
 }
 
 async function cargar(){
   const d = await (await fetch('/api/casfog-ok')).json();
+  ESTADOS_TRAMITE = d.estados_tramite || [];
+  ESTADO_TRAMITE_COLOR = d.estado_tramite_color || {};
   $('#ck-vacio').style.display = d.casos.length ? 'none' : '';
   $('#ck-tbody').innerHTML = d.casos.map(fila).join('');
   document.querySelectorAll('.cod-abrir[data-id]:not([data-id=""])').forEach(el => {
@@ -66,6 +90,16 @@ async function cargar(){
   $('#ck-total').textContent = d.total;
   $('#ck-solicitado').textContent = d.monto_solicitado_total_fmt;
   $('#ck-aprobado').textContent = d.monto_aprobado_total_fmt;
+}
+
+async function cambiarTramite(cuit, valor){
+  // '' en vez de omitir el campo: así "— Sin iniciar —" limpia la marca en
+  // vez de no tocar nada.
+  await fetch('/api/casfog-ok/' + cuit, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({estado_tramite: valor}),
+  });
+  cargar();
 }
 
 cargar();
