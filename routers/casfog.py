@@ -14,6 +14,7 @@ from db import engine
 from auth import require_coordinador
 from formatos import _monto
 from constantes import ESTADOS_TRAMITE_CASFOG, ESTADO_TRAMITE_CASFOG_COLOR
+import genero as genero_mod
 
 router = APIRouter(prefix="/api/casfog-ok", tags=["casfog"])
 
@@ -26,7 +27,7 @@ def listar(usuario=Depends(require_coordinador)):
         # de OK CASFOG una vez por cada una — acá se toma solo la más reciente.
         rows = conn.execute(text("""
             SELECT k.cuit, k.monto_aprobado, k.fuente, k.alerta, k.estado_tramite,
-                   c.id AS consulta_id, c.codigo, c.nombre, c.mail, c.telefono,
+                   c.id AS consulta_id, c.codigo, c.nombre, c.genero, c.mail, c.telefono,
                    COALESCE(NULLIF(c.actividad_economica, ''), c.actividad_inscripta) AS actividad,
                    c.destino, c.estado, c.situacion_arca, c.tecnico,
                    COALESCE(NULLIF(c.monto_confirmado, 0), c.monto) AS monto_solicitado
@@ -44,6 +45,13 @@ def listar(usuario=Depends(require_coordinador)):
         "consulta_id": r["consulta_id"],
         "codigo": r["codigo"],
         "nombre": r["nombre"] or "— sin match en Consultas SDE —",
+        # Misma heurística que el panel general (ver genero.py): estimado por
+        # CUIT/nombre, no un dato confirmado — no reemplaza revisar el encuadre.
+        "genero_estimado": (
+            "F" if (r["genero"] or "").strip().upper().startswith("F")
+            else "M" if (r["genero"] or "").strip().upper().startswith("M")
+            else genero_mod.estimar_genero(r["nombre"], r["cuit"])
+        ) if r["consulta_id"] else None,
         "monto_solicitado": int(r["monto_solicitado"] or 0) if r["consulta_id"] else None,
         "monto_solicitado_fmt": _monto(r["monto_solicitado"]) if r["consulta_id"] else "—",
         "monto_aprobado": r["monto_aprobado"],

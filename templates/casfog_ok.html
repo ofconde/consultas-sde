@@ -20,7 +20,11 @@
 {% include "_topbar.html" %}
 
   <div class="wrap">
-    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">OK CASFOG</h1>
+    <div style="display:flex;align-items:baseline;gap:0.875rem;flex-wrap:wrap">
+      <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">OK CASFOG</h1>
+      <div class="spacer" style="flex:1"></div>
+      <button class="ebtn mujeres" id="btn-mujeres" title="Estimado por CUIT/nombre — no reemplaza confirmar el encuadre">♀ Mujeres</button>
+    </div>
     <p class="muted" style="margin:0 0 1.25rem">Casos aprobados por el fondo de garantía CASFOG, consolidados a mano desde las planillas del fondo. El monto solicitado sale de la consulta real en el sistema, no del genérico de esas planillas.</p>
 
     <div class="ck-resumen">
@@ -47,6 +51,8 @@
 const $ = s => document.querySelector(s);
 let ESTADOS_TRAMITE = [];
 let ESTADO_TRAMITE_COLOR = {};
+let TODOS = [];
+let soloMujeres = false;
 
 function etiqueta(s){
   return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
@@ -65,8 +71,9 @@ function selTramite(c){
 
 function fila(c){
   const alerta = c.alerta ? `<div class="ck-alerta-txt">⚠ ${escapeHtml(c.alerta)}</div>` : '';
+  const tagMujer = c.genero_estimado === 'F' ? ' <span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : '';
   return `<tr class="${c.alerta ? 'ck-alerta' : ''}">
-      <td class="cod-abrir" data-id="${c.consulta_id||''}" style="${c.consulta_id?'cursor:pointer':''}">${escapeHtml(c.nombre)}
+      <td class="cod-abrir" data-id="${c.consulta_id||''}" style="${c.consulta_id?'cursor:pointer':''}">${escapeHtml(c.nombre)}${tagMujer}
         <div class="cod">${escapeHtml(c.codigo||c.cuit)}</div>${alerta}</td>
       <td style="text-align:right">${escapeHtml(c.monto_solicitado_fmt)}</td>
       <td style="text-align:right">${c.monto_aprobado_fmt ? escapeHtml(c.monto_aprobado_fmt) : escapeHtml(String(c.monto_aprobado ?? '—'))}</td>
@@ -78,18 +85,35 @@ function fila(c){
     </tr>`;
 }
 
+function pintar(){
+  const casos = soloMujeres ? TODOS.filter(c => c.genero_estimado === 'F') : TODOS;
+  $('#btn-mujeres').classList.toggle('active', soloMujeres);
+
+  $('#ck-vacio').style.display = casos.length ? 'none' : '';
+  $('#ck-tbody').innerHTML = casos.map(fila).join('');
+  document.querySelectorAll('.cod-abrir[data-id]:not([data-id=""])').forEach(el => {
+    el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
+  });
+
+  const conMatch = casos.filter(c => c.consulta_id);
+  $('#ck-total').textContent = casos.length;
+  $('#ck-solicitado').textContent = _sumaFmt(conMatch.map(c => c.monto_solicitado));
+  $('#ck-aprobado').textContent = _sumaFmt(casos.map(c => c.monto_aprobado || 0));
+}
+
+// Suma simple en el cliente — el backend ya manda cada monto como número, esto
+// solo evita un roundtrip al servidor para recalcular el total al filtrar.
+function _sumaFmt(valores){
+  const total = valores.reduce((a, v) => a + (v || 0), 0);
+  return '$ ' + total.toLocaleString('es-AR');
+}
+
 async function cargar(){
   const d = await (await fetch('/api/casfog-ok')).json();
   ESTADOS_TRAMITE = d.estados_tramite || [];
   ESTADO_TRAMITE_COLOR = d.estado_tramite_color || {};
-  $('#ck-vacio').style.display = d.casos.length ? 'none' : '';
-  $('#ck-tbody').innerHTML = d.casos.map(fila).join('');
-  document.querySelectorAll('.cod-abrir[data-id]:not([data-id=""])').forEach(el => {
-    el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
-  });
-  $('#ck-total').textContent = d.total;
-  $('#ck-solicitado').textContent = d.monto_solicitado_total_fmt;
-  $('#ck-aprobado').textContent = d.monto_aprobado_total_fmt;
+  TODOS = d.casos;
+  pintar();
 }
 
 async function cambiarTramite(cuit, valor){
@@ -101,6 +125,11 @@ async function cambiarTramite(cuit, valor){
   });
   cargar();
 }
+
+$('#btn-mujeres').addEventListener('click', () => {
+  soloMujeres = !soloMujeres;
+  pintar();
+});
 
 cargar();
 </script>
