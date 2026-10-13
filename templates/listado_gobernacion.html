@@ -134,6 +134,7 @@ function fila(c){
   const abre = c.consulta_id ? `class="cod-abrir" data-id="${c.consulta_id}" style="cursor:pointer"` : '';
   const dif = c.monto_difiere ? `<div class="lg-dif" title="El monto del sistema no coincide con el de la nota de la gobernación">Sistema: ${escapeHtml(c.monto_sistema_fmt)}</div>` : '';
   const nota = c.nota ? `<div class="lg-nota">⚠ ${escapeHtml(c.nota)}</div>` : '';
+  const fueraInf = c.omitir_informe ? '<div class="lg-dif" title="Este renglón no sale en el informe para la gobernación">No sale en el informe para la gobernación</div>' : '';
   const fueraIS = c.consulta_id && !c.en_instancia_superior ? '<div class="lg-dif">No está en Instancia Superior</div>' : '';
   const detalle = c.consulta_id
     ? `<textarea class="lg-detalle" data-id="${c.consulta_id}" data-orig="${escapeHtml(c.detalle_estado)}"
@@ -143,7 +144,7 @@ function fila(c){
   return `<tr>
       <td>${c.nro}</td>
       <td ${abre}>${escapeHtml(c.solicitante)}${c.codigo ? `<div class="cod">${escapeHtml(c.codigo)}</div>` : ''}
-        <div class="lg-proyecto">${escapeHtml(c.proyecto)}</div>${nota}${fueraIS}</td>
+        <div class="lg-proyecto">${escapeHtml(c.proyecto)}</div>${nota}${fueraIS}${fueraInf}</td>
       <td style="text-align:right;white-space:nowrap">${escapeHtml(c.monto_fmt)}${dif}</td>
       <td>${escapeHtml(c.linea)}</td>
       <td style="white-space:nowrap">${escapeHtml(c.fecha_firma)}</td>

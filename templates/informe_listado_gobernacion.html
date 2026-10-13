@@ -149,7 +149,7 @@ function pintarFiltros(estados){
 }
 
 function pintar(){
-  const vigentes = TODOS.filter(c => !c.anulado);
+  const vigentes = TODOS.filter(c => !c.anulado && !c.omitir_informe);
   const presentes = ORDEN.filter(e => vigentes.some(c => (c.estado_carpeta || '') === e));
   pintarFiltros(presentes);
 
