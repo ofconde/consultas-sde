@@ -10,6 +10,7 @@
       <a href="/panel/seguimiento" class="{% if activo=='seguimiento' %}active{% endif %}" title="Casos que elegiste seguir de cerca, con notas privadas">Mi seguimiento</a>
       {% endif %}
       <a href="/panel/instancia-superior" class="{% if activo=='instancia-superior' %}active{% endif %}" title="Casos remitidos a firma de representante en adelante, seguimiento fino">Instancia Superior</a>
+      <a href="/panel/listado-gobernacion" class="{% if activo=='listado-gobernacion' %}active{% endif %}" title="Créditos aprobados que entregó la gobernación, con el detalle del estado de cada expediente">Listado Gobernación</a>
       <a href="/informe" class="{% if activo=='informe' %}active{% endif %}">Estadísticas</a>
       {% if usuario.rol == 'coordinador' %}
       <a href="/admin" class="{% if activo=='admin' %}active{% endif %}">Admin</a>

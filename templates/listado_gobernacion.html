@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Listado Gobernación · Consultas SDE{% endblock %}
+{% block extra_head %}
+<style>
+  .lg-resumen{display:grid;grid-template-columns:repeat(3, 1fr);gap:1.25rem;margin-bottom:1.25rem}
+  @media (max-width:900px){.lg-resumen{grid-template-columns:1fr}}
+  .lg-kpi{padding:1rem 1.25rem}
+  .lg-kpi .n{font-size:1.5rem;font-weight:800;color:var(--navy)}
+  .lg-kpi .l{font-size:0.8125rem;color:var(--muted)}
+  .lg-filtros{display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;margin-bottom:1rem}
+  .lg-filtros input,.lg-filtros select{padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.625rem;
+    font:inherit;background:#fff;color:var(--navy)}
+  .lg-filtros input{min-width:16rem}
+  .lg-proyecto{font-size:0.8125rem;color:var(--muted);margin-top:0.125rem;max-width:26rem}
+  .lg-nota{font-size:0.75rem;color:var(--amber);font-weight:600;margin-top:0.25rem}
+  .lg-dif{font-size:0.75rem;color:var(--amber);font-weight:600}
+  .lg-badge{display:inline-block;font-size:0.75rem;font-weight:700;padding:0.1875rem 0.625rem;border-radius:1.25rem;white-space:nowrap}
+  .lg-detalle{width:100%;min-width:18rem;min-height:3.25rem;padding:0.4375rem 0.625rem;border:1px solid var(--border);
+    border-radius:0.5rem;font:inherit;font-size:0.8125rem;resize:vertical;background:#fff;color:var(--text)}
+  .lg-detalle:focus{outline:none;border-color:var(--celeste)}
+  .lg-detalle.guardado{border-color:var(--green)}
+  .lg-detalle.error{border-color:var(--red)}
+  .lg-estado-guardado{font-size:0.6875rem;color:var(--green);height:0.875rem}
+  .lg-estado-guardado.error{color:var(--red)}
+</style>
+{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+
+  <div class="wrap">
+    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">Listado Gobernación</h1>
+    <p class="muted" style="margin:0 0 1.25rem">Créditos aprobados que entregó la gobernación. Estado de carpeta, técnico y monto del sistema salen en vivo de cada expediente; en <b>Detalle del estado</b> podés ir sumando novedades — se guarda solo al salir del casillero.</p>
+
+    <div class="lg-resumen">
+      <div class="tabla-wrap card lg-kpi"><div class="n" id="lg-total"></div><div class="l" id="lg-total-l">Expedientes en el listado</div></div>
+      <div class="tabla-wrap card lg-kpi"><div class="n" id="lg-monto"></div><div class="l">Monto según la gobernación</div></div>
+      <div class="tabla-wrap card lg-kpi"><div class="n" id="lg-sin-detalle"></div><div class="l">Sin detalle cargado todavía</div></div>
+    </div>
+
+    <div class="lg-filtros">
+      <input type="search" id="lg-buscar" placeholder="Buscar solicitante o proyecto…">
+      <select id="lg-estado"><option value="">Todos los estados</option></select>
+      <select id="lg-detalle-filtro">
+        <option value="">Con o sin detalle</option>
+        <option value="sin">Solo sin detalle</option>
+        <option value="con">Solo con detalle</option>
+      </select>
+    </div>
+
+    <div class="tabla-wrap card">
+      <table>
+        <thead><tr>
+          <th>N°</th><th>Solicitante / proyecto</th><th style="text-align:right">Monto</th>
+          <th>Línea</th><th>Firma</th><th>Estado carpeta</th><th>Técnico</th><th>Detalle del estado</th>
+        </tr></thead>
+        <tbody id="lg-tbody"></tbody>
+      </table>
+    </div>
+    <div class="muted" id="lg-vacio" style="display:none;padding:1.25rem;text-align:center">Ningún expediente coincide con el filtro.</div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = s => document.querySelector(s);
+let TODOS = [];
+let COLORES = {};
+
+function etiqueta(s){
+  return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+}
+
+function badgeEstado(e){
+  if(!e) return '<span class="lg-badge" style="background:#f0f1f5;color:#6b7590">Sin clasificar</span>';
+  const c = COLORES[e] || {bg:'#f0f1f5', fg:'#6b7590'};
+  return `<span class="lg-badge" style="background:${c.bg};color:${c.fg}">${escapeHtml(etiqueta(e))}</span>`;
+}
+
+function fila(c){
+  const abre = c.consulta_id ? `class="cod-abrir" data-id="${c.consulta_id}" style="cursor:pointer"` : '';
+  const dif = c.monto_difiere ? `<div class="lg-dif" title="El monto del sistema no coincide con el de la nota de la gobernación">Sistema: ${escapeHtml(c.monto_sistema_fmt)}</div>` : '';
+  const nota = c.nota ? `<div class="lg-nota">⚠ ${escapeHtml(c.nota)}</div>` : '';
+  const fueraIS = c.consulta_id && !c.en_instancia_superior ? '<div class="lg-dif">No está en Instancia Superior</div>' : '';
+  const detalle = c.consulta_id
+    ? `<textarea class="lg-detalle" data-id="${c.consulta_id}" data-orig="${escapeHtml(c.detalle_estado)}"
+         placeholder="Ej: 13-10-2026 — se envió la documentación a Sede">${escapeHtml(c.detalle_estado)}</textarea>
+       <div class="lg-estado-guardado"></div>`
+    : '<span class="muted">Sin expediente vinculado</span>';
+  return `<tr>
+      <td>${c.nro}</td>
+      <td ${abre}>${escapeHtml(c.solicitante)}${c.codigo ? `<div class="cod">${escapeHtml(c.codigo)}</div>` : ''}
+        <div class="lg-proyecto">${escapeHtml(c.proyecto)}</div>${nota}${fueraIS}</td>
+      <td style="text-align:right;white-space:nowrap">${escapeHtml(c.monto_fmt)}${dif}</td>
+      <td>${escapeHtml(c.linea)}</td>
+      <td style="white-space:nowrap">${escapeHtml(c.fecha_firma)}</td>
+      <td>${badgeEstado(c.estado_carpeta)}</td>
+      <td>${escapeHtml(c.tecnico)}</td>
+      <td>${detalle}</td>
+    </tr>`;
+}
+
+function filtrados(){
+  const q = $('#lg-buscar').value.trim().toLowerCase();
+  const est = $('#lg-estado').value;
+  const det = $('#lg-detalle-filtro').value;
+  return TODOS.filter(c =>
+    (!q || (c.solicitante + ' ' + c.proyecto).toLowerCase().includes(q)) &&
+    (!est || (est === '__sin' ? !c.estado_carpeta : c.estado_carpeta === est)) &&
+    (!det || (det === 'sin' ? !c.detalle_estado.trim() : !!c.detalle_estado.trim())));
+}
+
+function pintar(){
+  const casos = filtrados();
+  $('#lg-vacio').style.display = casos.length ? 'none' : '';
+  $('#lg-tbody').innerHTML = casos.map(fila).join('');
+  document.querySelectorAll('.cod-abrir[data-id]').forEach(el => {
+    el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
+  });
+  document.querySelectorAll('.lg-detalle').forEach(el => {
+    el.addEventListener('blur', () => guardarDetalle(el));
+  });
+  const monto = casos.reduce((a, c) => a + (c.monto || 0), 0);
+  $('#lg-total').textContent = casos.length;
+  $('#lg-total-l').textContent = casos.length === TODOS.length ? 'Expedientes en el listado' : `Expedientes (de ${TODOS.length} en el listado)`;
+  $('#lg-monto').textContent = '$ ' + monto.toLocaleString('es-AR');
+  $('#lg-sin-detalle').textContent = casos.filter(c => !c.detalle_estado.trim()).length;
+}
+
+async function guardarDetalle(el){
+  if(el.value === el.dataset.orig) return;
+  const marca = el.nextElementSibling;
+  marca.className = 'lg-estado-guardado'; marca.textContent = 'Guardando…';
+  const r = await fetch('/api/consultas/' + el.dataset.id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    // '' (no null) para poder vaciar el detalle: el PATCH ignora los null.
+    body: JSON.stringify({detalle_estado: el.value}),
+  });
+  if(!r.ok){
+    const e = await r.json().catch(() => ({}));
+    el.classList.add('error'); marca.className = 'lg-estado-guardado error';
+    marca.textContent = e.detail || 'No se pudo guardar';
+    return;
+  }
+  el.classList.remove('error'); el.classList.add('guardado');
+  el.dataset.orig = el.value;
+  const c = TODOS.find(x => String(x.consulta_id) === el.dataset.id);
+  if(c) c.detalle_estado = el.value;
+  marca.textContent = 'Guardado ✓';
+  $('#lg-sin-detalle').textContent = filtrados().filter(x => !x.detalle_estado.trim()).length;
+  setTimeout(() => { el.classList.remove('guardado'); marca.textContent = ''; }, 2500);
+}
+
+async function cargar(){
+  const d = await (await fetch('/api/listado-gobernacion')).json();
+  TODOS = d.casos; COLORES = d.estado_carpeta_color;
+  $('#lg-estado').innerHTML = '<option value="">Todos los estados</option>'
+    + d.estados.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(etiqueta(e))}</option>`).join('')
+    + '<option value="__sin">Sin clasificar</option>';
+  pintar();
+}
+
+['#lg-buscar', '#lg-estado', '#lg-detalle-filtro'].forEach(s => $(s).addEventListener('input', pintar));
+cargar();
+</script>
+{% endblock %}

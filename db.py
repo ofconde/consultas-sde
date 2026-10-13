@@ -82,6 +82,7 @@ def init_db():
                 -- monto real que se mandó a firmar — puede diferir del monto
                 -- solicitado/confirmado de la consulta original (ver abajo).
                 monto_instancia_superior BIGINT,
+                detalle_estado       TEXT,
                 created_at           TIMESTAMP DEFAULT NOW(),
                 updated_at           TIMESTAMP DEFAULT NOW()
             )
@@ -92,6 +93,9 @@ def init_db():
         conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS estado_carpeta TEXT"))
         conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS firmado BOOLEAN DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS monto_instancia_superior BIGINT"))
+        # Detalle libre del estado de cada expediente, para ir sumando novedades
+        # a mano (hoy se carga desde la pantalla del listado de la gobernación).
+        conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS detalle_estado TEXT"))
 
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS sde_acciones (
@@ -242,6 +246,25 @@ def init_db():
             )
         """))
         conn.execute(text("ALTER TABLE sde_casfog_ok ADD COLUMN IF NOT EXISTS estado_tramite TEXT"))
+
+        # Listado de créditos aprobados que entregó la gobernación, tal como vino
+        # (montos, línea y fecha de firma son los de la nota, no los del sistema):
+        # sirve para cruzar contra la consulta real y ver diferencias. Un mismo
+        # expediente puede figurar más de una vez (notas que se reemplazan).
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sde_listado_gobernacion (
+                id           SERIAL PRIMARY KEY,
+                nro          INT NOT NULL UNIQUE,
+                consulta_id  INT REFERENCES sde_consultas(id) ON DELETE SET NULL,
+                solicitante  TEXT NOT NULL,
+                proyecto     TEXT,
+                monto        BIGINT,
+                linea        TEXT,
+                fecha_firma  DATE,
+                nota         TEXT,
+                creado_en    TIMESTAMP DEFAULT NOW()
+            )
+        """))
 
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS sde_consultas_codigo_seq"))
         conn.execute(text("""

@@ -47,6 +47,7 @@ class GestionIn(ConsultaIngesta):
     estado_carpeta:       Optional[str] = _TXT
     firmado:              Optional[bool] = None
     monto_instancia_superior: Optional[str] = _TXT
+    detalle_estado:       Optional[str] = Field(default=None, max_length=10000)
 
 
 class ConsultaManualIn(GestionIn):

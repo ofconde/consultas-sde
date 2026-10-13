@@ -21,7 +21,7 @@ _GESTION_COLS = [
     "tecnico", "departamento", "localidad_confirmada", "garantia", "linea",
     "programa", "arca_confirmado", "actividad_inscripta", "situacion_bcra",
     "estado", "observaciones", "informacion_extra", "genero",
-    "instancia_superior", "estado_carpeta", "firmado",
+    "instancia_superior", "estado_carpeta", "firmado", "detalle_estado",
 ]
 
 # datos que carga el propio solicitante en el formulario público — a diferencia

@@ -15,7 +15,7 @@ from sqlalchemy import text
 from db import init_db, engine
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
                   SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
-from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria, casfog
+from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria, casfog, listado_gobernacion
 from routers.auditoria import registrar_actividad, registrar_accion
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -73,6 +73,7 @@ app.include_router(bcra.router)
 app.include_router(seguimiento.router)
 app.include_router(auditoria.router)
 app.include_router(casfog.router)
+app.include_router(listado_gobernacion.router)
 
 
 # ── Páginas ──────────────────────────────────────────────────────────
@@ -234,6 +235,16 @@ def informe_avanzados_page(request: Request):
     if u["rol"] != "coordinador":
         return RedirectResponse("/panel")
     return templates.TemplateResponse("informe_avanzados.html", {"request": request, "usuario": u})
+
+
+@app.get("/panel/listado-gobernacion", response_class=HTMLResponse)
+def panel_listado_gobernacion(request: Request):
+    """Listado de créditos aprobados que entregó la gobernación, con el detalle
+    del estado de cada expediente — mismo acceso que Instancia Superior."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("listado_gobernacion.html", {"request": request, "usuario": u, "activo": "listado-gobernacion"})
 
 
 @app.get("/panel/ok-casfog", response_class=HTMLResponse)
