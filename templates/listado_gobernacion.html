@@ -14,7 +14,10 @@
   .lg-proyecto{font-size:0.8125rem;color:var(--muted);margin-top:0.125rem;max-width:26rem}
   .lg-nota{font-size:0.75rem;color:var(--amber);font-weight:600;margin-top:0.25rem}
   .lg-dif{font-size:0.75rem;color:var(--amber);font-weight:600}
-  .lg-badge{display:inline-block;font-size:0.75rem;font-weight:700;padding:0.1875rem 0.625rem;border-radius:1.25rem;white-space:nowrap}
+  .lg-estado-sel{border:none;font-weight:700;padding:0.25rem 0.625rem;border-radius:1.25rem;font-size:0.75rem;
+    cursor:pointer;appearance:none;-webkit-appearance:none;max-width:15rem;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%236b7590'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 0.5rem center;padding-right:1.5rem}
   .lg-detalle{width:100%;min-width:18rem;min-height:3.25rem;padding:0.4375rem 0.625rem;border:1px solid var(--border);
     border-radius:0.5rem;font:inherit;font-size:0.8125rem;resize:vertical;background:#fff;color:var(--text)}
   .lg-detalle:focus{outline:none;border-color:var(--celeste)}
@@ -64,15 +67,35 @@
 const $ = s => document.querySelector(s);
 let TODOS = [];
 let COLORES = {};
+let ESTADOS = [];
 
 function etiqueta(s){
   return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 }
 
-function badgeEstado(e){
-  if(!e) return '<span class="lg-badge" style="background:#f0f1f5;color:#6b7590">Sin clasificar</span>';
-  const c = COLORES[e] || {bg:'#f0f1f5', fg:'#6b7590'};
-  return `<span class="lg-badge" style="background:${c.bg};color:${c.fg}">${escapeHtml(etiqueta(e))}</span>`;
+function selEstado(c){
+  if(!c.consulta_id) return '<span class="muted">—</span>';
+  const col = COLORES[c.estado_carpeta] || {bg:'#f0f1f5', fg:'#6b7590'};
+  const ops = ESTADOS.map(e => `<option value="${escapeHtml(e)}" ${c.estado_carpeta===e?'selected':''}>${escapeHtml(etiqueta(e))}</option>`).join('');
+  return `<select class="lg-estado-sel" style="background-color:${col.bg};color:${col.fg}"
+      onchange="cambiarEstado(${c.consulta_id}, this.value)">
+      <option value="" ${!c.estado_carpeta?'selected':''}>— Sin clasificar —</option>${ops}</select>`;
+}
+
+async function cambiarEstado(id, valor){
+  // '' (no null) para poder volver a "sin clasificar": el PATCH ignora los null.
+  const r = await fetch('/api/consultas/' + id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({estado_carpeta: valor}),
+  });
+  if(!r.ok){
+    const e = await r.json().catch(() => ({}));
+    alert(e.detail || 'No se pudo cambiar el estado.');
+  } else {
+    const c = TODOS.find(x => x.consulta_id === id);
+    if(c) c.estado_carpeta = valor;
+  }
+  pintar();
 }
 
 function fila(c){
@@ -92,7 +115,7 @@ function fila(c){
       <td style="text-align:right;white-space:nowrap">${escapeHtml(c.monto_fmt)}${dif}</td>
       <td>${escapeHtml(c.linea)}</td>
       <td style="white-space:nowrap">${escapeHtml(c.fecha_firma)}</td>
-      <td>${badgeEstado(c.estado_carpeta)}</td>
+      <td>${selEstado(c)}</td>
       <td>${escapeHtml(c.tecnico)}</td>
       <td>${detalle}</td>
     </tr>`;
@@ -151,7 +174,7 @@ async function guardarDetalle(el){
 
 async function cargar(){
   const d = await (await fetch('/api/listado-gobernacion')).json();
-  TODOS = d.casos; COLORES = d.estado_carpeta_color;
+  TODOS = d.casos; COLORES = d.estado_carpeta_color; ESTADOS = d.estados;
   $('#lg-estado').innerHTML = '<option value="">Todos los estados</option>'
     + d.estados.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(etiqueta(e))}</option>`).join('')
     + '<option value="__sin">Sin clasificar</option>';
