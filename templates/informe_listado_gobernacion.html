@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+{# Documento imprimible standalone (no extiende base.html, reusa
+   static/css/informe-pdf.css) para entregar a la gobernación: estado de cada
+   crédito de SU listado. A propósito NO repite lo que ellos ya tienen
+   (proyecto, línea, fecha de firma) ni muestra datos internos (técnicos):
+   solo número de su listado, solicitante, monto, y el estado con su detalle,
+   agrupado por estado para que el estado no se repita fila por fila. #}
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/img/favicon.png">
+<title>Estado de créditos aprobados · Consultas SDE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Raleway:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/informe-pdf.css">
+<script src="/static/js/util.js"></script>
+<style>
+  .filtros-estado{max-width:var(--hoja);margin:12px auto 0;padding:10px 14px;background:#fff;border-radius:8px;
+    box-shadow:0 2px 12px rgba(28,36,67,.10);display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px}
+  .fe-tit{font-weight:700;color:var(--navy)}
+  .fe-chip{display:inline-flex;align-items:center;gap:5px;margin:2px 8px 2px 0;cursor:pointer;user-select:none}
+  .fe-chip input{margin:0;cursor:pointer}
+  .filtros-estado .tbtn{background:#fff;color:var(--navy);border:1px solid #d6dbe6}
+  .detalle-txt{white-space:pre-line}
+  .nota-pie{font-size:9.5px;color:var(--muted);margin-top:6px;font-style:italic}
+  @media print{.filtros-estado{display:none !important}}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <img class="tl-logo" src="/static/img/logo-cfi.png" alt="CFI">
+  <span class="tl-tit">Estado de créditos aprobados</span>
+  <span class="spacer"></span>
+  <button class="tbtn" id="btn-actualizar">Actualizar</button>
+  <button class="tbtn primary" id="btn-imprimir">Imprimir / Guardar PDF</button>
+</div>
+
+<div class="filtros-estado" aria-label="Filtrar por estado">
+  <span class="fe-tit">Estados a incluir:</span>
+  <span id="fe-chips"></span>
+  <button class="tbtn" id="fe-todos">Todos</button>
+</div>
+
+<div id="doc">
+  <div class="doc-head">
+    <img class="doc-escudo" src="/static/img/escudo-sde.svg" alt="Escudo de la Provincia de Santiago del Estero">
+    <div class="doc-head-txt">
+      <div class="doc-gob">Gobierno de la Provincia<br>de Santiago del Estero</div>
+      <div class="doc-casa">Casa de Santiago del Estero</div>
+      <div class="doc-casa-sub">Representación Oficial del Gobierno de la Provincia
+        en la Ciudad de Buenos Aires y Relaciones Internacionales</div>
+    </div>
+    <div class="doc-cfi">
+      <img src="/static/img/logo-cfi.png" alt="Consejo Federal de Inversiones">
+      <div class="emitido" id="emitido"></div>
+    </div>
+  </div>
+
+  <div class="doc-titulo-wrap">
+    <h1 class="doc-titulo brand-font">Estado de los créditos aprobados</h1>
+    <div class="doc-sub">Seguimiento de los créditos del listado remitido por la Gobernación — Unidad de Enlace Provincial Santiago del Estero</div>
+    <div class="doc-sub" id="doc-filtro" style="font-weight:700;color:var(--navy);margin-top:3px"></div>
+  </div>
+
+  <div class="sec" style="margin-top:16px">
+    <div class="sec-title">Resumen por estado</div>
+    <div id="tabla-resumen"></div>
+  </div>
+
+  <div id="secciones"></div>
+
+  <div class="nota-pie" id="nota-pie"></div>
+
+  <div class="doc-foot">
+    <span>Consejo Federal de Inversiones · UEP Santiago del Estero</span>
+    <span id="foot-emitido"></span>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+
+// De lo más avanzado a lo menos: lo que ya se cobró primero, lo que recién
+// empieza al final. Los estados de salida (desistido/rechazado) van últimos.
+const ORDEN = [
+  'DESEMBOLSADO', 'EN TRAMITE DE DESEMBOLSO', 'EN TRAMITE EN CFI SEDE',
+  'FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)',
+  'ENVIADO A FIRMA DE REPRESENTANTE', 'DESISTIDO POR SOLICITANTE',
+  'RECHAZADO POR ANALISIS DE RIESGO', '',
+];
+// Títulos más legibles que el nombre interno del estado.
+const TITULO = {
+  'DESEMBOLSADO': 'Desembolsados',
+  'EN TRAMITE DE DESEMBOLSO': 'En trámite de desembolso',
+  'EN TRAMITE EN CFI SEDE': 'En trámite en CFI Sede',
+  'FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)': 'Firmados — en trámite para ingresar a CFI',
+  'ENVIADO A FIRMA DE REPRESENTANTE': 'Enviados a firma del representante',
+  'DESISTIDO POR SOLICITANTE': 'Desistidos por el solicitante',
+  'RECHAZADO POR ANALISIS DE RIESGO': 'Rechazados por análisis de riesgo',
+  '': 'Sin clasificar',
+};
+
+let COLORES = {};
+let TODOS = [];
+let seleccion = new Set(new URLSearchParams(location.search).getAll('estados'));  // vacío = todos
+
+const fmt = n => '$ ' + (n || 0).toLocaleString('es-AR');
+const color = e => (COLORES[e] || {fg:'var(--navy)'}).fg;
+const colorTxt = e => { const c = COLORES[e]; return c ? (c.fg === '#ffffff' ? c.bg : c.fg) : 'var(--navy)'; };
+function hoy(){
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}-${p(d.getMonth()+1)}-${d.getFullYear()}`;
+}
+
+function tablaResumen(grupos, total, monto){
+  return `<table><thead><tr><th>Estado</th><th style="text-align:right">Cantidad</th><th style="text-align:right">%</th><th style="text-align:right">Monto</th></tr></thead><tbody>${
+    grupos.map(g => `<tr>
+      <td><span class="estado-linea" style="color:${colorTxt(g.estado)}">${escapeHtml(TITULO[g.estado])}</span></td>
+      <td class="num">${g.casos.length}</td>
+      <td class="num">${(g.casos.length / total * 100).toFixed(1).replace('.', ',')}%</td>
+      <td class="money">${fmt(g.monto)}</td></tr>`).join('')
+  }</tbody><tfoot><tr style="font-weight:700"><td>TOTAL</td><td class="num">${total}</td><td class="num">100%</td><td class="money">${fmt(monto)}</td></tr></tfoot></table>`;
+}
+
+function tablaGrupo(g){
+  const conDetalle = g.casos.some(c => c.detalle_estado.trim());
+  const cols = conDetalle ? ['7%', '31%', '16%', '46%'] : ['8%', '62%', '30%'];
+  return `<div class="sec">
+    <div class="sec-title" style="color:${colorTxt(g.estado)}">${escapeHtml(TITULO[g.estado])} (${g.casos.length})</div>
+    <table class="tabla-avanzados"><colgroup>${cols.map(w => `<col style="width:${w}">`).join('')}</colgroup>
+      <thead><tr><th>N°</th><th>Solicitante</th><th style="text-align:right">Monto</th>${conDetalle ? '<th>Detalle</th>' : ''}</tr></thead>
+      <tbody>${g.casos.map(c => `<tr>
+        <td>${c.nro}</td><td>${escapeHtml(c.solicitante)}</td><td class="money">${escapeHtml(c.monto_fmt)}</td>
+        ${conDetalle ? `<td class="detalle-txt">${escapeHtml(c.detalle_estado.trim()) || '—'}</td>` : ''}</tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+function pintarFiltros(estados){
+  $('#fe-chips').innerHTML = estados.map(e => `
+    <label class="fe-chip"><input type="checkbox" value="${escapeHtml(e)}" ${(!seleccion.size || seleccion.has(e)) ? 'checked' : ''}>
+      <span style="color:${colorTxt(e)};font-weight:700">${escapeHtml(TITULO[e])}</span></label>`).join('');
+  document.querySelectorAll('#fe-chips input').forEach(cb => cb.addEventListener('change', () => {
+    const marcados = [...document.querySelectorAll('#fe-chips input:checked')].map(i => i.value);
+    seleccion = new Set(marcados.length === estados.length ? [] : marcados);
+    pintar();
+  }));
+}
+
+function pintar(){
+  const vigentes = TODOS.filter(c => !c.anulado);
+  const presentes = ORDEN.filter(e => vigentes.some(c => (c.estado_carpeta || '') === e));
+  pintarFiltros(presentes);
+
+  const usados = presentes.filter(e => !seleccion.size || seleccion.has(e));
+  const grupos = usados.map(e => {
+    const casos = vigentes.filter(c => (c.estado_carpeta || '') === e);
+    return { estado: e, casos, monto: casos.reduce((a, c) => a + (c.monto || 0), 0) };
+  });
+  const total = grupos.reduce((a, g) => a + g.casos.length, 0);
+  const monto = grupos.reduce((a, g) => a + g.monto, 0);
+
+  const qs = new URLSearchParams(); seleccion.forEach(e => qs.append('estados', e));
+  history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : ''));
+  $('#doc-filtro').textContent = seleccion.size ? 'Solo: ' + usados.map(e => TITULO[e]).join(' · ') : '';
+  $('#tabla-resumen').innerHTML = total ? tablaResumen(grupos, total, monto) : '<div class="vacio">Sin datos.</div>';
+  $('#secciones').innerHTML = grupos.map(tablaGrupo).join('');
+
+  const anulados = TODOS.filter(c => c.anulado);
+  $('#nota-pie').textContent = anulados.length
+    ? 'Se cuenta una sola vez cada expediente: ' + anulados.map(c => `el N° ${c.nro} (${c.solicitante}) ya no se incluye porque fue reemplazado por una nota posterior`).join('; ') + '.'
+    : '';
+}
+
+async function cargar(){
+  const d = await (await fetch('/api/listado-gobernacion')).json();
+  COLORES = d.estado_carpeta_color; TODOS = d.casos;
+  const ahora = hoy();
+  $('#emitido').textContent = 'Emitido: ' + ahora;
+  $('#foot-emitido').textContent = 'Emitido: ' + ahora;
+  pintar();
+}
+
+$('#btn-actualizar').addEventListener('click', cargar);
+$('#btn-imprimir').addEventListener('click', () => window.print());
+$('#fe-todos').addEventListener('click', () => { seleccion = new Set(); pintar(); });
+cargar();
+</script>
+</body>
+</html>

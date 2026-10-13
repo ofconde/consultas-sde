@@ -264,9 +264,13 @@ def init_db():
                 linea        TEXT,
                 fecha_firma  DATE,
                 nota         TEXT,
+                anulado      BOOLEAN DEFAULT FALSE,
                 creado_en    TIMESTAMP DEFAULT NOW()
             )
         """))
+        # Renglón reemplazado por otro de una nota posterior: se muestra en la
+        # pantalla pero el informe lo deja afuera para no contar dos veces.
+        conn.execute(text("ALTER TABLE sde_listado_gobernacion ADD COLUMN IF NOT EXISTS anulado BOOLEAN DEFAULT FALSE"))
 
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS sde_consultas_codigo_seq"))
         conn.execute(text("""

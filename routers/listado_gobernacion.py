@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/listado-gobernacion", tags=["gobernacion"])
 def listar(usuario=Depends(require_login)):
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT g.nro, g.solicitante, g.proyecto, g.monto, g.linea, g.fecha_firma, g.nota,
+            SELECT g.nro, g.solicitante, g.proyecto, g.monto, g.linea, g.fecha_firma, g.nota, g.anulado,
                    c.id AS consulta_id, c.codigo, c.tecnico, c.instancia_superior,
                    c.estado_carpeta, c.detalle_estado, c.situacion_tramite, c.firmado,
                    COALESCE(NULLIF(c.monto_instancia_superior, 0), NULLIF(c.monto_confirmado, 0), c.monto) AS monto_sistema
@@ -39,6 +39,7 @@ def listar(usuario=Depends(require_login)):
             "linea": r["linea"] or "—",
             "fecha_firma": _dmy(r["fecha_firma"]) if r["fecha_firma"] else "—",
             "nota": r["nota"] or "",
+            "anulado": bool(r["anulado"]),
             "consulta_id": r["consulta_id"], "codigo": r["codigo"],
             "tecnico": r["tecnico"] or "Sin asignar" if r["consulta_id"] else "—",
             "en_instancia_superior": bool(r["instancia_superior"]),

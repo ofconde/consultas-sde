@@ -247,6 +247,16 @@ def panel_listado_gobernacion(request: Request):
     return templates.TemplateResponse("listado_gobernacion.html", {"request": request, "usuario": u, "activo": "listado-gobernacion"})
 
 
+@app.get("/informe/listado-gobernacion", response_class=HTMLResponse)
+def informe_listado_gobernacion_page(request: Request):
+    """Informe imprimible para la gobernación: estado de cada crédito del
+    listado, agrupado por estado y sin datos internos (técnicos)."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("informe_listado_gobernacion.html", {"request": request, "usuario": u})
+
+
 @app.get("/panel/ok-casfog", response_class=HTMLResponse)
 def panel_ok_casfog(request: Request):
     """Casos aprobados por CASFOG, consolidados a mano desde las planillas del
