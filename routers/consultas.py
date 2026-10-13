@@ -1,7 +1,7 @@
 """API de consultas — listar/filtrar, detalle, editar gestión, alta manual, baja."""
 import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, Body, Query
 from sqlalchemy import text
 
 from db import engine, proximo_codigo, cuits_duplicados
@@ -289,8 +289,13 @@ def resumen(_=Depends(require_login)):
 
 
 @router.get("/instancia-superior")
-def instancia_superior(_=Depends(require_login)):
-    """Casos marcados 'pasa a instancia superior': reemplaza la planilla Excel
+def instancia_superior(estados: list[str] = Query(default=[]), _=Depends(require_login)):
+    """`estados` (repetible) acota todo el resultado — casos, totales y desgloses —
+    a esos estados de carpeta; sin él se devuelve todo (lo que usa la pantalla de
+    gestión). Lo usa el informe imprimible para sacar, por ejemplo, solo lo
+    desembolsado o en trámite de desembolso.
+
+    Casos marcados 'pasa a instancia superior': reemplaza la planilla Excel
     que se llevaba a mano para el seguimiento fino desde que se remiten a firma
     de representante hasta el desembolso. Visible a cualquier usuario logueado
     (técnico y coordinador trabajan estos casos día a día, a diferencia de
@@ -318,12 +323,15 @@ def instancia_superior(_=Depends(require_login)):
         "garantia": r["garantia"] or "—", "firmado": bool(r["firmado"]),
         "estado_carpeta": r["estado_carpeta"],
     } for r in rows]
+    if estados:
+        casos = [c for c in casos if c["estado_carpeta"] in estados]
     # Sin estado_carpeta todavía (recién pasó a instancia superior) va primero,
     # es lo más urgente de clasificar; después el orden real del circuito.
     casos.sort(key=lambda c: rank.get(c["estado_carpeta"], -1))
 
     monto_total = sum(c["monto"] for c in casos)
-    resumen_por_estado = {e: {"n": 0, "monto": 0} for e in ESTADOS_CARPETA}
+    estados_resumen = [e for e in ESTADOS_CARPETA if e in estados] if estados else ESTADOS_CARPETA
+    resumen_por_estado = {e: {"n": 0, "monto": 0} for e in estados_resumen}
     for c in casos:
         if c["estado_carpeta"] in resumen_por_estado:
             resumen_por_estado[c["estado_carpeta"]]["n"] += 1
@@ -350,7 +358,7 @@ def instancia_superior(_=Depends(require_login)):
         "monto_total": monto_total, "monto_total_fmt": _monto(monto_total),
         "resumen": [{"estado": e, "n": resumen_por_estado[e]["n"],
                      "monto": resumen_por_estado[e]["monto"], "monto_fmt": _monto(resumen_por_estado[e]["monto"])}
-                    for e in ESTADOS_CARPETA],
+                    for e in estados_resumen],
         "resumen_linea": _agrupar("linea"),
         "resumen_programa": _agrupar("programa"),
         "resumen_garantia": _agrupar("garantia"),
