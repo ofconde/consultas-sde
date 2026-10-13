@@ -105,6 +105,29 @@ ESTADO_CARPETA_COLOR = {
     "RECHAZADO POR ANALISIS DE RIESGO":                                {"bg": "#fdecea", "fg": "#d0402c"},
 }
 
+# Situación del trámite de un expediente ya firmado: sub-etapa dentro de "Firmado -
+# en trámite para ingresar a CFI" y de "En trámite de desembolso" (qué está
+# esperando o con quién está). Surge de estandarizar el detalle libre que se
+# cargó en el Listado Gobernación; el detalle libre sigue existiendo al lado.
+SITUACIONES_TRAMITE = [
+    "ESPERANDO DOCUMENTACION",
+    "EN TRAMITE CON SGR",
+    "EN TRAMITE CON CASFOG",
+    "CAMBIO DE GARANTIA A FIANZA",
+    "ENVIADO A CARGA",
+    "EN COMITE",
+    "DESEMBOLSO PROXIMO",
+]
+SITUACION_TRAMITE_COLOR = {
+    "ESPERANDO DOCUMENTACION":     {"bg": "#f6e2b8", "fg": "#8a5a00"},
+    "EN TRAMITE CON SGR":          {"bg": "#efe9fb", "fg": "#6c4bd0"},
+    "EN TRAMITE CON CASFOG":       {"bg": "#e1ebfa", "fg": "#2f6fd0"},
+    "CAMBIO DE GARANTIA A FIANZA": {"bg": "#fbe7ef", "fg": "#c2255c"},
+    "ENVIADO A CARGA":             {"bg": "#dff3fb", "fg": "#0a7fa8"},
+    "EN COMITE":                   {"bg": "#e4e7f0", "fg": "#1C2443"},
+    "DESEMBOLSO PROXIMO":          {"bg": "#cceee0", "fg": "#0f7a3f"},
+}
+
 # Estado de trámite en OK CASFOG: una vez aprobado por CASFOG, si ya se inició
 # o se terminó de tramitar en el circuito normal de CFI. Catálogo chico y fijo
 # (no vive en sde_catalogos como el resto): es un detalle interno de esa única

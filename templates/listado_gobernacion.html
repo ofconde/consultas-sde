@@ -43,6 +43,7 @@
     <div class="lg-filtros">
       <input type="search" id="lg-buscar" placeholder="Buscar solicitante o proyecto…">
       <select id="lg-estado"><option value="">Todos los estados</option></select>
+      <select id="lg-situacion"><option value="">Todas las situaciones</option></select>
       <select id="lg-detalle-filtro">
         <option value="">Con o sin detalle</option>
         <option value="sin">Solo sin detalle</option>
@@ -54,7 +55,7 @@
       <table>
         <thead><tr>
           <th>N°</th><th>Solicitante / proyecto</th><th style="text-align:right">Monto</th>
-          <th>Línea</th><th>Firma</th><th>Estado carpeta</th><th>Técnico</th><th>Detalle del estado</th>
+          <th>Línea</th><th>Firma</th><th>Estado carpeta</th><th>Situación</th><th>Técnico</th><th>Detalle del estado</th>
         </tr></thead>
         <tbody id="lg-tbody"></tbody>
       </table>
@@ -68,6 +69,8 @@ const $ = s => document.querySelector(s);
 let TODOS = [];
 let COLORES = {};
 let ESTADOS = [];
+let SITUACIONES = [];
+let COLORES_SIT = {};
 
 function etiqueta(s){
   return (s||'').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
@@ -98,6 +101,31 @@ async function cambiarEstado(id, valor){
   pintar();
 }
 
+function selSituacion(c){
+  if(!c.consulta_id) return '<span class="muted">—</span>';
+  const col = COLORES_SIT[c.situacion_tramite] || {bg:'#f0f1f5', fg:'#6b7590'};
+  const ops = SITUACIONES.map(e => `<option value="${escapeHtml(e)}" ${c.situacion_tramite===e?'selected':''}>${escapeHtml(etiqueta(e))}</option>`).join('');
+  return `<select class="lg-estado-sel" style="background-color:${col.bg};color:${col.fg}"
+      onchange="cambiarSituacion(${c.consulta_id}, this.value)">
+      <option value="" ${!c.situacion_tramite?'selected':''}>— Sin situación —</option>${ops}</select>`;
+}
+
+async function cambiarSituacion(id, valor){
+  const r = await fetch('/api/consultas/' + id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({situacion_tramite: valor}),
+  });
+  if(!r.ok){
+    const e = await r.json().catch(() => ({}));
+    alert(e.detail || 'No se pudo cambiar la situación.');
+  } else {
+    // el mismo expediente puede figurar en más de un renglón (ej. nota reemplazada)
+    TODOS.filter(x => x.consulta_id === id).forEach(x => x.situacion_tramite = valor);
+  }
+  pintarFiltroSituacion();
+  pintar();
+}
+
 function fila(c){
   const abre = c.consulta_id ? `class="cod-abrir" data-id="${c.consulta_id}" style="cursor:pointer"` : '';
   const dif = c.monto_difiere ? `<div class="lg-dif" title="El monto del sistema no coincide con el de la nota de la gobernación">Sistema: ${escapeHtml(c.monto_sistema_fmt)}</div>` : '';
@@ -116,6 +144,7 @@ function fila(c){
       <td>${escapeHtml(c.linea)}</td>
       <td style="white-space:nowrap">${escapeHtml(c.fecha_firma)}</td>
       <td>${selEstado(c)}</td>
+      <td>${selSituacion(c)}</td>
       <td>${escapeHtml(c.tecnico)}</td>
       <td>${detalle}</td>
     </tr>`;
@@ -125,9 +154,11 @@ function filtrados(){
   const q = $('#lg-buscar').value.trim().toLowerCase();
   const est = $('#lg-estado').value;
   const det = $('#lg-detalle-filtro').value;
+  const sit = $('#lg-situacion').value;
   return TODOS.filter(c =>
     (!q || (c.solicitante + ' ' + c.proyecto).toLowerCase().includes(q)) &&
     (!est || (est === '__sin' ? !c.estado_carpeta : c.estado_carpeta === est)) &&
+    (!sit || (sit === '__sin' ? !c.situacion_tramite : c.situacion_tramite === sit)) &&
     (!det || (det === 'sin' ? !c.detalle_estado.trim() : !!c.detalle_estado.trim())));
 }
 
@@ -174,14 +205,24 @@ async function guardarDetalle(el){
 
 async function cargar(){
   const d = await (await fetch('/api/listado-gobernacion')).json();
-  TODOS = d.casos; COLORES = d.estado_carpeta_color; ESTADOS = d.estados;
+  TODOS = d.casos; COLORES = d.estado_carpeta_color; ESTADOS = d.estados; SITUACIONES = d.situaciones; COLORES_SIT = d.situacion_color;
   $('#lg-estado').innerHTML = '<option value="">Todos los estados</option>'
     + d.estados.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(etiqueta(e))}</option>`).join('')
     + '<option value="__sin">Sin clasificar</option>';
+  pintarFiltroSituacion();
   pintar();
 }
 
-['#lg-buscar', '#lg-estado', '#lg-detalle-filtro'].forEach(s => $(s).addEventListener('input', pintar));
+function pintarFiltroSituacion(){
+  const sel = $('#lg-situacion'), actual = sel.value;
+  const n = v => TODOS.filter(c => c.situacion_tramite === v).length;
+  sel.innerHTML = '<option value="">Todas las situaciones</option>'
+    + SITUACIONES.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(etiqueta(e))} (${n(e)})</option>`).join('')
+    + `<option value="__sin">Sin situación (${TODOS.filter(c => !c.situacion_tramite).length})</option>`;
+  sel.value = actual;
+}
+
+['#lg-buscar', '#lg-estado', '#lg-situacion', '#lg-detalle-filtro'].forEach(s => $(s).addEventListener('input', pintar));
 cargar();
 </script>
 {% endblock %}

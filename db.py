@@ -83,6 +83,7 @@ def init_db():
                 -- solicitado/confirmado de la consulta original (ver abajo).
                 monto_instancia_superior BIGINT,
                 detalle_estado       TEXT,
+                situacion_tramite    TEXT,
                 created_at           TIMESTAMP DEFAULT NOW(),
                 updated_at           TIMESTAMP DEFAULT NOW()
             )
@@ -96,6 +97,7 @@ def init_db():
         # Detalle libre del estado de cada expediente, para ir sumando novedades
         # a mano (hoy se carga desde la pantalla del listado de la gobernación).
         conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS detalle_estado TEXT"))
+        conn.execute(text("ALTER TABLE sde_consultas ADD COLUMN IF NOT EXISTS situacion_tramite TEXT"))
 
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS sde_acciones (

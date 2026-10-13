@@ -12,7 +12,7 @@ from sqlalchemy import text
 from db import engine
 from auth import require_login
 from formatos import _monto, _dmy
-from constantes import ESTADOS_CARPETA, ESTADO_CARPETA_COLOR
+from constantes import ESTADOS_CARPETA, ESTADO_CARPETA_COLOR, SITUACIONES_TRAMITE, SITUACION_TRAMITE_COLOR
 
 router = APIRouter(prefix="/api/listado-gobernacion", tags=["gobernacion"])
 
@@ -23,7 +23,7 @@ def listar(usuario=Depends(require_login)):
         rows = conn.execute(text("""
             SELECT g.nro, g.solicitante, g.proyecto, g.monto, g.linea, g.fecha_firma, g.nota,
                    c.id AS consulta_id, c.codigo, c.tecnico, c.instancia_superior,
-                   c.estado_carpeta, c.detalle_estado, c.firmado,
+                   c.estado_carpeta, c.detalle_estado, c.situacion_tramite, c.firmado,
                    COALESCE(NULLIF(c.monto_instancia_superior, 0), NULLIF(c.monto_confirmado, 0), c.monto) AS monto_sistema
             FROM sde_listado_gobernacion g
             LEFT JOIN sde_consultas c ON c.id = g.consulta_id
@@ -44,6 +44,7 @@ def listar(usuario=Depends(require_login)):
             "en_instancia_superior": bool(r["instancia_superior"]),
             "estado_carpeta": r["estado_carpeta"] or "",
             "detalle_estado": r["detalle_estado"] or "",
+            "situacion_tramite": r["situacion_tramite"] or "",
             "monto_sistema": sistema,
             "monto_sistema_fmt": _monto(sistema) if sistema is not None else "—",
             "monto_difiere": sistema is not None and r["monto"] is not None and sistema != r["monto"],
@@ -53,5 +54,7 @@ def listar(usuario=Depends(require_login)):
         "monto_total_fmt": _monto(sum(c["monto"] or 0 for c in casos)),
         "estados": ESTADOS_CARPETA,
         "estado_carpeta_color": ESTADO_CARPETA_COLOR,
+        "situaciones": SITUACIONES_TRAMITE,
+        "situacion_color": SITUACION_TRAMITE_COLOR,
         "casos": casos,
     }
