@@ -83,23 +83,21 @@
 <script>
 const $ = s => document.querySelector(s);
 
-// De lo más avanzado a lo menos: lo que ya se cobró primero, lo que recién
-// empieza al final. Los estados de salida (desistido/rechazado) van últimos.
-const ORDEN = [
-  'DESEMBOLSADO', 'EN TRAMITE DE DESEMBOLSO', 'EN TRAMITE EN CFI SEDE',
-  'FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)',
-  'ENVIADO A FIRMA DE REPRESENTANTE', 'DESISTIDO POR SOLICITANTE',
-  'RECHAZADO POR ANALISIS DE RIESGO', '',
-];
-// Títulos más legibles que el nombre interno del estado.
+// Estados que usa la gobernación (los que definió el área superior): todo lo
+// firmado y en trámite —incluido CFI Sede y lo recién enviado a firma— es un solo
+// estado. Se agrupa acá, así la pantalla de gestión conserva el detalle fino.
+const FIRMADO = 'FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)';
+const AGRUPA_EN_FIRMADO = ['EN TRAMITE EN CFI SEDE', 'ENVIADO A FIRMA DE REPRESENTANTE'];
+const grupoDe = c => { const e = c.estado_carpeta || ''; return AGRUPA_EN_FIRMADO.includes(e) ? FIRMADO : e; };
+// De lo más avanzado a lo menos; los estados de salida (desistido/rechazado) al final.
+const ORDEN = ['DESEMBOLSADO', 'EN TRAMITE DE DESEMBOLSO', FIRMADO,
+  'DESISTIDO POR SOLICITANTE', 'RECHAZADO POR ANALISIS DE RIESGO', ''];
 const TITULO = {
-  'DESEMBOLSADO': 'Desembolsados',
+  'DESEMBOLSADO': 'Desembolsado',
   'EN TRAMITE DE DESEMBOLSO': 'En trámite de desembolso',
-  'EN TRAMITE EN CFI SEDE': 'En trámite en CFI Sede',
-  'FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)': 'Firmados — en trámite para ingresar a CFI',
-  'ENVIADO A FIRMA DE REPRESENTANTE': 'Enviados a firma del representante',
-  'DESISTIDO POR SOLICITANTE': 'Desistidos por el solicitante',
-  'RECHAZADO POR ANALISIS DE RIESGO': 'Rechazados por análisis de riesgo',
+  [FIRMADO]: 'Firmado - En trámite de CFI',
+  'DESISTIDO POR SOLICITANTE': 'Desistido por el solicitante',
+  'RECHAZADO POR ANALISIS DE RIESGO': 'Rechazado por análisis de riesgo',
   '': 'Sin clasificar',
 };
 
@@ -158,12 +156,12 @@ function pintarFiltros(estados){
 
 function pintar(){
   const vigentes = TODOS.filter(c => !c.anulado && !c.omitir_informe);
-  const presentes = ORDEN.filter(e => vigentes.some(c => (c.estado_carpeta || '') === e));
+  const presentes = ORDEN.filter(e => vigentes.some(c => grupoDe(c) === e));
   pintarFiltros(presentes);
 
   const usados = presentes.filter(e => !seleccion.size || seleccion.has(e));
   const grupos = usados.map(e => {
-    const casos = vigentes.filter(c => (c.estado_carpeta || '') === e);
+    const casos = vigentes.filter(c => grupoDe(c) === e);
     return { estado: e, casos, monto: casos.reduce((a, c) => a + (c.monto || 0), 0) };
   });
   const total = grupos.reduce((a, g) => a + g.casos.length, 0);

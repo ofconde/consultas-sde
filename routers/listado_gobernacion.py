@@ -72,21 +72,22 @@ def listar(usuario=Depends(require_login)):
     }
 
 
-# Orden y rótulos del Excel — los mismos criterios que el informe imprimible
-# (de lo más avanzado a lo que recién empieza; estados de salida al final).
-_ORDEN = ["DESEMBOLSADO", "EN TRAMITE DE DESEMBOLSO", "EN TRAMITE EN CFI SEDE",
-          "FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)",
-          "ENVIADO A FIRMA DE REPRESENTANTE", "DESISTIDO POR SOLICITANTE",
-          "RECHAZADO POR ANALISIS DE RIESGO", ""]
+# Estados que usa la gobernación (los que definió el área superior): todo lo que
+# está firmado y en trámite —incluido CFI Sede y lo recién enviado a firma— se
+# muestra como un solo estado. Los estados de salida conservan su nombre.
+_FIRMADO = "FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)"
+_AGRUPA_EN_FIRMADO = {"EN TRAMITE EN CFI SEDE", "ENVIADO A FIRMA DE REPRESENTANTE"}
+_ORDEN = ["DESEMBOLSADO", "EN TRAMITE DE DESEMBOLSO", _FIRMADO,
+          "DESISTIDO POR SOLICITANTE", "RECHAZADO POR ANALISIS DE RIESGO", ""]
 _ROTULO = {"DESEMBOLSADO": "Desembolsado", "EN TRAMITE DE DESEMBOLSO": "En trámite de desembolso",
-           "EN TRAMITE EN CFI SEDE": "En trámite en CFI Sede",
-           "FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)": "Firmado - en trámite para ingresar a CFI",
-           "ENVIADO A FIRMA DE REPRESENTANTE": "Enviado a firma del representante",
+           _FIRMADO: "Firmado - En trámite de CFI",
            "DESISTIDO POR SOLICITANTE": "Desistido por el solicitante",
            "RECHAZADO POR ANALISIS DE RIESGO": "Rechazado por análisis de riesgo", "": "Sin clasificar"}
-_FONDO = {"DESEMBOLSADO": "E3F5EA", "EN TRAMITE DE DESEMBOLSO": "EAF7F0", "EN TRAMITE EN CFI SEDE": "EFE9FB",
-          "FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)": "FBF3DC",
-          "ENVIADO A FIRMA DE REPRESENTANTE": "FBE7EF"}
+_FONDO = {"DESEMBOLSADO": "E3F5EA", "EN TRAMITE DE DESEMBOLSO": "EAF7F0", _FIRMADO: "FBF3DC"}
+
+
+def _grupo(estado):
+    return _FIRMADO if estado in _AGRUPA_EN_FIRMADO else (estado or "")
 
 
 @router.get("/excel")
@@ -102,7 +103,7 @@ def exportar_excel(usuario=Depends(require_login)):
             LEFT JOIN sde_consultas c ON c.id = g.consulta_id
             WHERE NOT COALESCE(g.anulado, FALSE) AND NOT COALESCE(g.omitir_informe, FALSE)
         """)).mappings().all()
-    rows = sorted(rows, key=lambda r: (_ORDEN.index(r["estado_carpeta"] or "") if (r["estado_carpeta"] or "") in _ORDEN else len(_ORDEN), r["nro"]))
+    rows = sorted(rows, key=lambda r: (_ORDEN.index(_grupo(r["estado_carpeta"])) if _grupo(r["estado_carpeta"]) in _ORDEN else len(_ORDEN), r["nro"]))
 
     wb = Workbook()
     ws = wb.active
@@ -117,7 +118,7 @@ def exportar_excel(usuario=Depends(require_login)):
         c.alignment = Alignment(vertical="center", wrap_text=True)
     borde = Border(*(Side(style="thin", color="D9DCE3"),) * 4)
     for n, r in enumerate(rows, start=2):
-        est = r["estado_carpeta"] or ""
+        est = _grupo(r["estado_carpeta"])
         detalle = (r["detalle_estado"] or "").strip()
         if re.match(r"^desembolsad[oa]s?\.?$", detalle, re.I):
             detalle = ""  # repite el estado: no aporta
@@ -147,6 +148,32 @@ def exportar_excel(usuario=Depends(require_login)):
         ws.column_dimensions[col].width = ancho
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = f"A1:I{ultima}"
+
+    # Hoja "Resumen" (como la armó el área superior): cantidad y monto por estado,
+    # con fórmulas sobre la hoja de datos para que se mantenga al corregir algo.
+    rs = wb.create_sheet("Resumen", 0)
+    rs.append(["Estado", "Cantidad", "Suma de Monto"])
+    estados = [e for e in _ORDEN if any(_grupo(r["estado_carpeta"]) == e for r in rows)]
+    for k, e in enumerate(estados, start=2):
+        rotulo = _ROTULO[e]
+        rs.cell(k, 1, rotulo)
+        rs.cell(k, 2, f"=COUNTIF('Créditos aprobados'!$H$2:$H${ultima},A{k})")
+        rs.cell(k, 3, f"=SUMIF('Créditos aprobados'!$H$2:$H${ultima},A{k},'Créditos aprobados'!$F$2:$F${ultima})")
+    fin = len(estados) + 2
+    rs.cell(fin, 1, "Total general")
+    rs.cell(fin, 2, f"=SUM(B2:B{fin - 1})")
+    rs.cell(fin, 3, f"=SUM(C2:C{fin - 1})")
+    for fila in rs.iter_rows(min_row=1, max_row=fin, max_col=3):
+        for x in fila:
+            x.font = Font(name=fuente, size=10, bold=(x.row in (1, fin)))
+            x.border = borde
+            if x.row == 1:
+                x.font = Font(name=fuente, size=10, bold=True, color="FFFFFF")
+                x.fill = PatternFill("solid", fgColor="1C2443")
+            if x.column == 3 and x.row > 1:
+                x.number_format = "$#,##0"
+    for col, ancho in zip("ABC", [38, 12, 20]):
+        rs.column_dimensions[col].width = ancho
 
     buf = BytesIO()
     wb.save(buf)
