@@ -266,6 +266,7 @@ def init_db():
                 nota         TEXT,
                 anulado      BOOLEAN DEFAULT FALSE,
                 omitir_informe BOOLEAN DEFAULT FALSE,
+                motivo_inversion TEXT,
                 creado_en    TIMESTAMP DEFAULT NOW()
             )
         """))
@@ -275,6 +276,9 @@ def init_db():
         # Renglón que se decide no mostrar en el informe para la gobernación (sin
         # que haya sido reemplazado): a diferencia de `anulado`, no deja nota al pie.
         conn.execute(text("ALTER TABLE sde_listado_gobernacion ADD COLUMN IF NOT EXISTS omitir_informe BOOLEAN DEFAULT FALSE"))
+        # Motivo de la inversión resumido de la columna "proyecto" de la nota de la
+        # gobernación (que puede ser un párrafo largo); proyecto queda como vino.
+        conn.execute(text("ALTER TABLE sde_listado_gobernacion ADD COLUMN IF NOT EXISTS motivo_inversion TEXT"))
 
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS sde_consultas_codigo_seq"))
         conn.execute(text("""

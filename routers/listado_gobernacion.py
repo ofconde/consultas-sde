@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/listado-gobernacion", tags=["gobernacion"])
 def listar(usuario=Depends(require_login)):
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT g.nro, g.solicitante, g.proyecto, g.monto, g.linea, g.fecha_firma, g.nota, g.anulado, g.omitir_informe,
+            SELECT g.nro, g.solicitante, g.proyecto, g.monto, g.linea, g.fecha_firma, g.nota, g.anulado, g.omitir_informe, g.motivo_inversion,
                    c.id AS consulta_id, c.codigo, c.tecnico, c.instancia_superior,
                    c.estado_carpeta, c.detalle_estado, c.situacion_tramite, c.firmado,
                    COALESCE(NULLIF(c.monto_instancia_superior, 0), NULLIF(c.monto_confirmado, 0), c.monto) AS monto_sistema
@@ -49,6 +49,7 @@ def listar(usuario=Depends(require_login)):
             "nota": r["nota"] or "",
             "anulado": bool(r["anulado"]),
             "omitir_informe": bool(r["omitir_informe"]),
+            "motivo_inversion": r["motivo_inversion"] or "",
             "consulta_id": r["consulta_id"], "codigo": r["codigo"],
             "tecnico": r["tecnico"] or "Sin asignar" if r["consulta_id"] else "—",
             "en_instancia_superior": bool(r["instancia_superior"]),
@@ -94,7 +95,7 @@ def exportar_excel(usuario=Depends(require_login)):
     y los datos de contacto para llamar al solicitante. Sin técnicos."""
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT g.nro, g.solicitante, g.monto, c.estado_carpeta, c.detalle_estado,
+            SELECT g.nro, g.solicitante, g.monto, g.motivo_inversion, c.estado_carpeta, c.detalle_estado,
                    COALESCE(c.telefono, '') AS telefono, COALESCE(c.mail, '') AS mail
             FROM sde_listado_gobernacion g
             LEFT JOIN sde_consultas c ON c.id = g.consulta_id
@@ -106,7 +107,7 @@ def exportar_excel(usuario=Depends(require_login)):
     ws = wb.active
     ws.title = "Créditos aprobados"
     fuente = "Arial"
-    encabezado = ["N°", "Solicitante", "Teléfono", "Mail", "Monto", "Estado", "Detalle del estado"]
+    encabezado = ["N°", "Solicitante", "Teléfono", "Mail", "Monto", "Motivo de la inversión", "Estado", "Detalle del estado"]
     ws.append(encabezado)
     for i in range(1, len(encabezado) + 1):
         c = ws.cell(1, i)
@@ -120,14 +121,14 @@ def exportar_excel(usuario=Depends(require_login)):
         if re.match(r"^desembolsad[oa]s?\.?$", detalle, re.I):
             detalle = ""  # repite el estado: no aporta
         ws.append([r["nro"], r["solicitante"], (r["telefono"] or "").strip(), (r["mail"] or "").strip(),
-                   r["monto"], _ROTULO.get(est, est), detalle])
-        for i in range(1, 8):
+                   r["monto"], r["motivo_inversion"] or "", _ROTULO.get(est, est), detalle])
+        for i in range(1, 9):
             x = ws.cell(n, i)
             x.font = Font(name=fuente, size=10)
             x.border = borde
-            x.alignment = Alignment(vertical="top", wrap_text=i in (2, 4, 6, 7))
+            x.alignment = Alignment(vertical="top", wrap_text=i in (2, 4, 6, 7, 8))
         if est in _FONDO:
-            ws.cell(n, 6).fill = PatternFill("solid", fgColor=_FONDO[est])
+            ws.cell(n, 7).fill = PatternFill("solid", fgColor=_FONDO[est])
         ws.cell(n, 3).number_format = "@"
         ws.cell(n, 5).number_format = "$#,##0"
     ultima = len(rows) + 1
@@ -136,15 +137,15 @@ def exportar_excel(usuario=Depends(require_login)):
     ws.cell(total, 2, "TOTAL")
     ws.cell(total, 5, f"=SUM(E2:E{ultima})")
     ws.cell(total, 5).number_format = "$#,##0"
-    for i in range(1, 8):
+    for i in range(1, 9):
         x = ws.cell(total, i)
         x.font = Font(name=fuente, bold=True, size=10)
         x.fill = PatternFill("solid", fgColor="EEF1F7")
         x.border = borde
-    for col, ancho in zip("ABCDEFG", [6, 34, 20, 36, 16, 34, 60]):
+    for col, ancho in zip("ABCDEFGH", [6, 34, 20, 36, 16, 48, 34, 60]):
         ws.column_dimensions[col].width = ancho
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:G{ultima}"
+    ws.auto_filter.ref = f"A1:H{ultima}"
 
     buf = BytesIO()
     wb.save(buf)

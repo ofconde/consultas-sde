@@ -134,13 +134,13 @@ function detalleUtil(c){
 
 function tablaGrupo(g){
   const conDetalle = g.casos.some(c => detalleUtil(c));
-  const cols = conDetalle ? ['7%', '31%', '16%', '46%'] : ['8%', '62%', '30%'];
+  const cols = conDetalle ? ['5%', '18%', '18%', '26%', '33%'] : ['6%', '28%', '18%', '48%'];
   return `<div class="sec">
     <div class="sec-title" style="color:${colorTxt(g.estado)}">${escapeHtml(TITULO[g.estado])} (${g.casos.length})</div>
     <table class="tabla-avanzados"><colgroup>${cols.map(w => `<col style="width:${w}">`).join('')}</colgroup>
-      <thead><tr><th>N°</th><th>Solicitante</th><th style="text-align:right">Monto</th>${conDetalle ? '<th>Detalle</th>' : ''}</tr></thead>
+      <thead><tr><th>N°</th><th>Solicitante</th><th style="text-align:right">Monto</th><th>Inversión</th>${conDetalle ? '<th>Detalle</th>' : ''}</tr></thead>
       <tbody>${g.casos.map(c => `<tr>
-        <td>${c.nro}</td><td>${escapeHtml(c.solicitante)}</td><td class="money">${escapeHtml(c.monto_fmt)}</td>
+        <td>${c.nro}</td><td>${escapeHtml(c.solicitante)}</td><td class="money">${escapeHtml(c.monto_fmt)}</td><td>${escapeHtml(c.motivo_inversion) || '—'}</td>
         ${conDetalle ? `<td class="detalle-txt">${escapeHtml(detalleUtil(c)) || '—'}</td>` : ''}</tr>`).join('')}</tbody>
     </table></div>`;
 }

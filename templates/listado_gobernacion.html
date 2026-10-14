@@ -145,7 +145,7 @@ function fila(c){
   return `<tr>
       <td>${c.nro}</td>
       <td ${abre}>${escapeHtml(c.solicitante)}${c.codigo ? `<div class="cod">${escapeHtml(c.codigo)}</div>` : ''}
-        <div class="lg-proyecto">${escapeHtml(c.proyecto)}</div>${nota}${fueraIS}${fueraInf}</td>
+        <div class="lg-proyecto" title="${escapeHtml(c.proyecto)}">${escapeHtml(c.motivo_inversion || c.proyecto)}</div>${nota}${fueraIS}${fueraInf}</td>
       <td style="text-align:right;white-space:nowrap">${escapeHtml(c.monto_fmt)}${dif}</td>
       <td>${escapeHtml(c.linea)}</td>
       <td style="white-space:nowrap">${escapeHtml(c.fecha_firma)}</td>
