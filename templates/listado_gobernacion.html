@@ -18,6 +18,11 @@
     cursor:pointer;appearance:none;-webkit-appearance:none;max-width:15rem;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%236b7590'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 0.5rem center;padding-right:1.5rem}
+  .lg-contacto{width:100%;min-width:9rem;padding:0.375rem 0.5rem;border:1px solid var(--border);border-radius:0.5rem;
+    font:inherit;font-size:0.8125rem;background:#fff;color:var(--text)}
+  .lg-contacto:focus{outline:none;border-color:var(--celeste)}
+  .lg-contacto.guardado{border-color:var(--green)}
+  .lg-contacto.error{border-color:var(--red)}
   .lg-detalle{width:100%;min-width:18rem;min-height:3.25rem;padding:0.4375rem 0.625rem;border:1px solid var(--border);
     border-radius:0.5rem;font:inherit;font-size:0.8125rem;resize:vertical;background:#fff;color:var(--text)}
   .lg-detalle:focus{outline:none;border-color:var(--celeste)}
@@ -60,7 +65,7 @@
       <table>
         <thead><tr>
           <th>N°</th><th>Solicitante / proyecto</th><th style="text-align:right">Monto</th>
-          <th>Línea</th><th>Firma</th><th>Estado carpeta</th><th>Situación</th><th>Técnico</th><th>Detalle del estado</th>
+          <th>Línea</th><th>Firma</th><th>Estado carpeta</th><th>Situación</th><th>Persona de contacto</th><th>Técnico</th><th>Detalle del estado</th>
         </tr></thead>
         <tbody id="lg-tbody"></tbody>
       </table>
@@ -151,6 +156,7 @@ function fila(c){
       <td style="white-space:nowrap">${escapeHtml(c.fecha_firma)}</td>
       <td>${selEstado(c)}</td>
       <td>${selSituacion(c)}</td>
+      <td><input class="lg-contacto" data-nro="${c.nro}" data-orig="${escapeHtml(c.contacto_nombre)}" value="${escapeHtml(c.contacto_nombre)}" placeholder="Si es empresa" maxlength="200"></td>
       <td>${escapeHtml(c.tecnico)}</td>
       <td>${detalle}</td>
     </tr>`;
@@ -175,6 +181,10 @@ function pintar(){
   document.querySelectorAll('.cod-abrir[data-id]').forEach(el => {
     el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
   });
+  document.querySelectorAll('.lg-contacto').forEach(el => {
+    el.addEventListener('blur', () => guardarContacto(el));
+    el.addEventListener('keydown', e => { if(e.key === 'Enter') el.blur(); });
+  });
   document.querySelectorAll('.lg-detalle').forEach(el => {
     el.addEventListener('blur', () => guardarDetalle(el));
   });
@@ -183,6 +193,20 @@ function pintar(){
   $('#lg-total-l').textContent = casos.length === TODOS.length ? 'Expedientes en el listado' : `Expedientes (de ${TODOS.length} en el listado)`;
   $('#lg-monto').textContent = '$ ' + monto.toLocaleString('es-AR');
   $('#lg-sin-detalle').textContent = casos.filter(c => !c.detalle_estado.trim()).length;
+}
+
+async function guardarContacto(el){
+  if(el.value === el.dataset.orig) return;
+  const r = await fetch('/api/listado-gobernacion/' + el.dataset.nro, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({contacto_nombre: el.value}),
+  });
+  if(!r.ok){ el.classList.add('error'); return; }
+  el.classList.remove('error'); el.classList.add('guardado');
+  el.dataset.orig = el.value;
+  const c = TODOS.find(x => String(x.nro) === el.dataset.nro);
+  if(c) c.contacto_nombre = el.value.trim();
+  setTimeout(() => el.classList.remove('guardado'), 2000);
 }
 
 async function guardarDetalle(el){

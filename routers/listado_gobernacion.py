@@ -11,7 +11,7 @@ from datetime import datetime
 from io import BytesIO
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import Response
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/listado-gobernacion", tags=["gobernacion"])
 def listar(usuario=Depends(require_login)):
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT g.nro, g.solicitante, g.proyecto, g.monto, g.linea, g.fecha_firma, g.nota, g.anulado, g.omitir_informe, g.motivo_inversion,
+            SELECT g.nro, g.solicitante, g.proyecto, g.monto, g.linea, g.fecha_firma, g.nota, g.anulado, g.omitir_informe, g.motivo_inversion, g.contacto_nombre,
                    c.id AS consulta_id, c.codigo, c.tecnico, c.instancia_superior,
                    c.estado_carpeta, c.detalle_estado, c.situacion_tramite, c.firmado,
                    COALESCE(NULLIF(c.monto_instancia_superior, 0), NULLIF(c.monto_confirmado, 0), c.monto) AS monto_sistema
@@ -50,6 +50,7 @@ def listar(usuario=Depends(require_login)):
             "anulado": bool(r["anulado"]),
             "omitir_informe": bool(r["omitir_informe"]),
             "motivo_inversion": r["motivo_inversion"] or "",
+            "contacto_nombre": r["contacto_nombre"] or "",
             "consulta_id": r["consulta_id"], "codigo": r["codigo"],
             "tecnico": r["tecnico"] or "Sin asignar" if r["consulta_id"] else "—",
             "en_instancia_superior": bool(r["instancia_superior"]),
@@ -95,7 +96,7 @@ def exportar_excel(usuario=Depends(require_login)):
     y los datos de contacto para llamar al solicitante. Sin técnicos."""
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT g.nro, g.solicitante, g.monto, g.motivo_inversion, c.estado_carpeta, c.detalle_estado,
+            SELECT g.nro, g.solicitante, g.contacto_nombre, g.monto, g.motivo_inversion, c.estado_carpeta, c.detalle_estado,
                    COALESCE(c.telefono, '') AS telefono, COALESCE(c.mail, '') AS mail
             FROM sde_listado_gobernacion g
             LEFT JOIN sde_consultas c ON c.id = g.consulta_id
@@ -107,7 +108,7 @@ def exportar_excel(usuario=Depends(require_login)):
     ws = wb.active
     ws.title = "Créditos aprobados"
     fuente = "Arial"
-    encabezado = ["N°", "Solicitante", "Teléfono", "Mail", "Monto", "Motivo de la inversión", "Estado", "Detalle del estado"]
+    encabezado = ["N°", "Solicitante", "Persona de contacto", "Teléfono", "Mail", "Monto", "Motivo de la inversión", "Estado", "Detalle del estado"]
     ws.append(encabezado)
     for i in range(1, len(encabezado) + 1):
         c = ws.cell(1, i)
@@ -120,32 +121,32 @@ def exportar_excel(usuario=Depends(require_login)):
         detalle = (r["detalle_estado"] or "").strip()
         if re.match(r"^desembolsad[oa]s?\.?$", detalle, re.I):
             detalle = ""  # repite el estado: no aporta
-        ws.append([r["nro"], r["solicitante"], (r["telefono"] or "").strip(), (r["mail"] or "").strip(),
-                   r["monto"], r["motivo_inversion"] or "", _ROTULO.get(est, est), detalle])
-        for i in range(1, 9):
+        ws.append([r["nro"], r["solicitante"], r["contacto_nombre"] or "", (r["telefono"] or "").strip(),
+                   (r["mail"] or "").strip(), r["monto"], r["motivo_inversion"] or "", _ROTULO.get(est, est), detalle])
+        for i in range(1, 10):
             x = ws.cell(n, i)
             x.font = Font(name=fuente, size=10)
             x.border = borde
-            x.alignment = Alignment(vertical="top", wrap_text=i in (2, 4, 6, 7, 8))
+            x.alignment = Alignment(vertical="top", wrap_text=i in (2, 3, 5, 7, 8, 9))
         if est in _FONDO:
-            ws.cell(n, 7).fill = PatternFill("solid", fgColor=_FONDO[est])
-        ws.cell(n, 3).number_format = "@"
-        ws.cell(n, 5).number_format = "$#,##0"
+            ws.cell(n, 8).fill = PatternFill("solid", fgColor=_FONDO[est])
+        ws.cell(n, 4).number_format = "@"
+        ws.cell(n, 6).number_format = "$#,##0"
     ultima = len(rows) + 1
     total = ultima + 1
     ws.cell(total, 1, f"=COUNTA(B2:B{ultima})")
     ws.cell(total, 2, "TOTAL")
-    ws.cell(total, 5, f"=SUM(E2:E{ultima})")
-    ws.cell(total, 5).number_format = "$#,##0"
-    for i in range(1, 9):
+    ws.cell(total, 6, f"=SUM(F2:F{ultima})")
+    ws.cell(total, 6).number_format = "$#,##0"
+    for i in range(1, 10):
         x = ws.cell(total, i)
         x.font = Font(name=fuente, bold=True, size=10)
         x.fill = PatternFill("solid", fgColor="EEF1F7")
         x.border = borde
-    for col, ancho in zip("ABCDEFGH", [6, 34, 20, 36, 16, 48, 34, 60]):
+    for col, ancho in zip("ABCDEFGHI", [6, 34, 24, 20, 36, 16, 48, 34, 60]):
         ws.column_dimensions[col].width = ancho
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:H{ultima}"
+    ws.auto_filter.ref = f"A1:I{ultima}"
 
     buf = BytesIO()
     wb.save(buf)
@@ -156,3 +157,17 @@ def exportar_excel(usuario=Depends(require_login)):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
+
+
+@router.patch("/{nro}")
+def editar_contacto(nro: int, body: dict = Body(...), usuario=Depends(require_login)):
+    """Persona de contacto del renglón (el nombre de quien atiende cuando el
+    solicitante es una empresa). Vacío la borra."""
+    contacto = (body.get("contacto_nombre") or "").strip()[:200]
+    with engine.begin() as conn:
+        r = conn.execute(text("""
+            UPDATE sde_listado_gobernacion SET contacto_nombre = :c WHERE nro = :n RETURNING id
+        """), {"c": contacto or None, "n": nro}).first()
+    if not r:
+        raise HTTPException(404, "Renglón no encontrado")
+    return {"ok": True}

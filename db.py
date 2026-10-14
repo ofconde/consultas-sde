@@ -267,6 +267,7 @@ def init_db():
                 anulado      BOOLEAN DEFAULT FALSE,
                 omitir_informe BOOLEAN DEFAULT FALSE,
                 motivo_inversion TEXT,
+                contacto_nombre TEXT,
                 creado_en    TIMESTAMP DEFAULT NOW()
             )
         """))
@@ -279,6 +280,9 @@ def init_db():
         # Motivo de la inversión resumido de la columna "proyecto" de la nota de la
         # gobernación (que puede ser un párrafo largo); proyecto queda como vino.
         conn.execute(text("ALTER TABLE sde_listado_gobernacion ADD COLUMN IF NOT EXISTS motivo_inversion TEXT"))
+        # Persona de contacto cuando el solicitante es una empresa (el teléfono y
+        # el mail de la consulta son los de esa persona, no de la razón social).
+        conn.execute(text("ALTER TABLE sde_listado_gobernacion ADD COLUMN IF NOT EXISTS contacto_nombre TEXT"))
 
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS sde_consultas_codigo_seq"))
         conn.execute(text("""
