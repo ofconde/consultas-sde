@@ -124,8 +124,15 @@ function tablaResumen(grupos, total, monto){
   }</tbody><tfoot><tr style="font-weight:700"><td>TOTAL</td><td class="num">${total}</td><td class="num">100%</td><td class="money">${fmt(monto)}</td></tr></tfoot></table>`;
 }
 
+// Un detalle que solo repite el estado ("Desembolsado") no aporta nada: la
+// sección ya se llama así. Se ignora para no mostrar información redundante.
+function detalleUtil(c){
+  const t = c.detalle_estado.trim();
+  return /^desembolsad[oa]s?\.?$/i.test(t) ? '' : t;
+}
+
 function tablaGrupo(g){
-  const conDetalle = g.casos.some(c => c.detalle_estado.trim());
+  const conDetalle = g.casos.some(c => detalleUtil(c));
   const cols = conDetalle ? ['7%', '31%', '16%', '46%'] : ['8%', '62%', '30%'];
   return `<div class="sec">
     <div class="sec-title" style="color:${colorTxt(g.estado)}">${escapeHtml(TITULO[g.estado])} (${g.casos.length})</div>
@@ -133,7 +140,7 @@ function tablaGrupo(g){
       <thead><tr><th>N°</th><th>Solicitante</th><th style="text-align:right">Monto</th>${conDetalle ? '<th>Detalle</th>' : ''}</tr></thead>
       <tbody>${g.casos.map(c => `<tr>
         <td>${c.nro}</td><td>${escapeHtml(c.solicitante)}</td><td class="money">${escapeHtml(c.monto_fmt)}</td>
-        ${conDetalle ? `<td class="detalle-txt">${escapeHtml(c.detalle_estado.trim()) || '—'}</td>` : ''}</tr>`).join('')}</tbody>
+        ${conDetalle ? `<td class="detalle-txt">${escapeHtml(detalleUtil(c)) || '—'}</td>` : ''}</tr>`).join('')}</tbody>
     </table></div>`;
 }
 
