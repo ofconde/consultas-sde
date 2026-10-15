@@ -15,7 +15,7 @@ from sqlalchemy import text
 from db import init_db, engine
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
                   SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
-from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria, casfog, listado_gobernacion
+from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria, casfog, listado_gobernacion, revisar
 from routers.auditoria import registrar_actividad, registrar_accion
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -74,6 +74,7 @@ app.include_router(seguimiento.router)
 app.include_router(auditoria.router)
 app.include_router(casfog.router)
 app.include_router(listado_gobernacion.router)
+app.include_router(revisar.router)
 
 
 # ── Páginas ──────────────────────────────────────────────────────────
@@ -255,6 +256,18 @@ def informe_listado_gobernacion_page(request: Request):
     if not u:
         return RedirectResponse("/login")
     return templates.TemplateResponse("informe_listado_gobernacion.html", {"request": request, "usuario": u})
+
+
+@app.get("/panel/revisar", response_class=HTMLResponse)
+def panel_revisar(request: Request):
+    """Casos para revisar: chequeos de solo lectura. Solo para el usuario
+    configurado en routers/revisar.py (no para todo el rol coordinador)."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    if u["username"] != revisar.USUARIO_REVISION:
+        return RedirectResponse("/panel")
+    return templates.TemplateResponse("revisar.html", {"request": request, "usuario": u, "activo": "revisar"})
 
 
 @app.get("/panel/ok-casfog", response_class=HTMLResponse)

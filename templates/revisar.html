@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Casos para revisar · Consultas SDE{% endblock %}
+{% block extra_head %}
+<style>
+  .rv-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:1rem;margin-bottom:1.25rem}
+  .rv-kpi{padding:0.875rem 1.125rem;cursor:pointer;border-left:0.25rem solid var(--gray);text-align:left;font:inherit;background:#fff;border-top:0;border-right:0;border-bottom:0}
+  .rv-kpi.alta{border-left-color:var(--red)} .rv-kpi.media{border-left-color:var(--amber)} .rv-kpi.baja{border-left-color:var(--blue)}
+  .rv-kpi .n{font-size:1.5rem;font-weight:800;color:var(--navy)}
+  .rv-kpi .l{font-size:0.8125rem;color:var(--muted)}
+  .rv-filtros{display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;margin-bottom:1rem}
+  .rv-filtros select{padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.625rem;font:inherit;background:#fff;color:var(--navy)}
+  details.rv-sec{margin-bottom:1rem}
+  details.rv-sec>summary{cursor:pointer;padding:0.875rem 1.125rem;font-weight:700;color:var(--navy);list-style:none;display:flex;gap:0.75rem;align-items:center}
+  details.rv-sec>summary::-webkit-details-marker{display:none}
+  details.rv-sec>summary .cnt{background:#eef1f7;color:var(--muted);border-radius:1.25rem;padding:0.0625rem 0.625rem;font-size:0.8125rem}
+  details.rv-sec>summary .dot{width:0.625rem;height:0.625rem;border-radius:50%;background:var(--gray);flex:0 0 auto}
+  details.rv-sec.alta>summary .dot{background:var(--red)} details.rv-sec.media>summary .dot{background:var(--amber)} details.rv-sec.baja>summary .dot{background:var(--blue)}
+  .rv-desc{padding:0 1.125rem 0.75rem;font-size:0.8125rem;color:var(--muted)}
+  .rv-nota{font-size:0.75rem;color:var(--muted)}
+  .rv-dias{white-space:nowrap;font-weight:700}
+</style>
+{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+
+  <div class="wrap">
+    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">Casos para revisar</h1>
+    <p class="muted" style="margin:0 0 1.25rem">Chequeos para detectar casos que se pueden haber quedado sin atender, de todos los técnicos. Es solo lectura: no cambia nada. «Sin movimiento» usa la última modificación o acción registrada, así que es una aproximación.</p>
+
+    <div class="rv-filtros">
+      <select id="rv-tecnico"><option value="">Todos los técnicos</option></select>
+      <span class="muted" id="rv-resumen"></span>
+    </div>
+
+    <div class="rv-kpis" id="rv-kpis"></div>
+    <div id="rv-secciones"></div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = s => document.querySelector(s);
+let DATA = null;
+const abiertas = new Set();   // secciones que el usuario dejó abiertas, para no cerrarlas al filtrar
+
+function filtrar(casos){
+  const t = $('#rv-tecnico').value;
+  return t ? casos.filter(c => c.tecnico === t) : casos;
+}
+
+function tabla(casos){
+  if(!casos.length) return '<div class="muted" style="padding:0.75rem 1.125rem">Nada para revisar con este filtro.</div>';
+  return `<div class="tabla-wrap"><table><thead><tr>
+      <th>Solicitante</th><th>Técnico</th><th>Estado</th><th style="text-align:right">Monto</th>
+      <th style="text-align:right">Días sin mov.</th><th>Observación</th></tr></thead><tbody>${
+    casos.map(c => `<tr>
+      <td class="cod-abrir" data-id="${c.id}" style="cursor:pointer">${escapeHtml(c.nombre)}<div class="cod">${escapeHtml(c.codigo)}</div></td>
+      <td>${escapeHtml(c.tecnico)}</td>
+      <td>${escapeHtml(c.estado_carpeta || c.estado)}</td>
+      <td style="text-align:right;white-space:nowrap">${escapeHtml(c.monto_fmt)}</td>
+      <td style="text-align:right" class="rv-dias">${c.dias ?? '—'}</td>
+      <td class="rv-nota">${escapeHtml(c.nota)}</td></tr>`).join('')
+  }</tbody></table></div>`;
+}
+
+function pintar(){
+  const unicos = new Set();
+  const secciones = DATA.chequeos.map(ch => ({...ch, vis: filtrar(ch.casos)}));
+  secciones.forEach(ch => ch.vis.forEach(c => unicos.add(c.id)));
+  $('#rv-resumen').textContent = `${unicos.size} casos distintos para revisar${$('#rv-tecnico').value ? ' (' + $('#rv-tecnico').value + ')' : ''}`;
+
+  $('#rv-kpis').innerHTML = secciones.map(ch => `
+    <button class="tabla-wrap card rv-kpi ${ch.gravedad}" data-ir="${ch.id}">
+      <div class="n">${ch.vis.length}</div><div class="l">${escapeHtml(ch.titulo)}</div></button>`).join('');
+  document.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => {
+    const d = document.getElementById('sec-' + b.dataset.ir);
+    d.open = true; abiertas.add(b.dataset.ir); d.scrollIntoView({behavior:'smooth', block:'start'});
+  }));
+
+  $('#rv-secciones').innerHTML = secciones.map(ch => `
+    <details class="tabla-wrap card rv-sec ${ch.gravedad}" id="sec-${ch.id}" ${abiertas.has(ch.id) ? 'open' : ''}>
+      <summary><span class="dot"></span><span>${escapeHtml(ch.titulo)}</span><span class="cnt">${ch.vis.length}</span></summary>
+      <div class="rv-desc">${escapeHtml(ch.descripcion)}</div>
+      ${tabla(ch.vis)}
+    </details>`).join('');
+  document.querySelectorAll('details.rv-sec').forEach(d => d.addEventListener('toggle', () => {
+    const id = d.id.replace('sec-', ''); d.open ? abiertas.add(id) : abiertas.delete(id);
+  }));
+  document.querySelectorAll('.cod-abrir').forEach(el => el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id));
+}
+
+async function cargar(){
+  const r = await fetch('/api/revisar');
+  if(!r.ok){ $('#rv-secciones').innerHTML = '<div class="muted" style="padding:1.25rem">No tenés acceso a esta pantalla.</div>'; return; }
+  DATA = await r.json();
+  $('#rv-tecnico').innerHTML = '<option value="">Todos los técnicos</option>'
+    + DATA.tecnicos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  pintar();
+}
+
+$('#rv-tecnico').addEventListener('change', pintar);
+cargar();
+</script>
+{% endblock %}

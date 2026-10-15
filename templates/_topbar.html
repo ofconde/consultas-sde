@@ -12,6 +12,9 @@
       <a href="/admin" class="{% if activo=='admin' %}active{% endif %}">Admin</a>
       <a href="/admin/auditoria" class="{% if activo=='auditoria' %}active{% endif %}" title="Registro de acciones y actividad diaria por usuario">Auditoría</a>
       <a href="/panel/ok-casfog" class="{% if activo=='ok-casfog' %}active{% endif %}" title="Casos aprobados por el fondo de garantía CASFOG">OK CASFOG</a>
+      {% if usuario.username == 'omar' %}
+      <a href="/panel/revisar" class="{% if activo=='revisar' %}active{% endif %}" title="Casos que se pueden haber quedado sin atender">Casos para revisar</a>
+      {% endif %}
       {% endif %}
     </nav>
     <div class="spacer"></div>
