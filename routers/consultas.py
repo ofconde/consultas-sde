@@ -110,7 +110,7 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
            departamento: str = "", linea: str = "", programa: str = "", sector: str = "",
            situacion_arca: str = "", tipo_accion: str = "", sin_acciones: bool = False,
            fecha: str = "", genero: str = "", monto_excedido: bool = False,
-           apartadas: bool = False, fianza_tercero: bool = False, numero: str = "",
+           apartadas: bool = False, fianza_tercero: bool = False, numero: str = "", casfog: str = "",
            usuario=Depends(require_login)):
     """Lista consultas con filtros. `q` busca en todos los campos de texto (nombre,
     CUIT, código, mail, teléfono, localidad, destino, observaciones, etc. — ver
@@ -134,6 +134,9 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     búsqueda puntual, no el barrido diario — esconder un resultado que sí matchea solo
     porque el caso quedó marcado como no financiable es más confuso que mostrarlo (con
     su badge de estado bien visible, así se nota igual que está apartada).
+    `casfog=A` muestra solo los casos que la planilla oficial de CASFOG da por aprobados;
+    incluye los marcados NO ES FINANCIABLE (justamente los que conviene ver: CASFOG los
+    aprobó y acá figuran como descartados).
     `fianza_tercero=1` filtra candidatos a gestión por fianza de tercero (monotributo
     A/B/C con el monto dentro de lo que esa categoría puede cubrir — ver
     `_condicion_fianza_tercero`)."""
@@ -145,12 +148,14 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
     else:
         if estado:
             where.append("c.estado = :estado"); params["estado"] = estado
-        if estado != "NO ES FINANCIABLE" and not q and not numero:
+        if estado != "NO ES FINANCIABLE" and not q and not numero and not casfog:
             where.append("c.estado IS DISTINCT FROM :estado_oculto")
             params["estado_oculto"] = "NO ES FINANCIABLE"
     if fianza_tercero:
         cond, p2 = _condicion_fianza_tercero()
         where.append(cond); params.update(p2)
+    if casfog == "A":
+        where.append("EXISTS (SELECT 1 FROM sde_casfog_oficial o WHERE o.consulta_id = c.id AND o.resultado = 'A')")
     if fecha:
         where.append("c.fecha_recepcion::date = :fecha"); params["fecha"] = fecha
     if tecnico:
@@ -277,6 +282,10 @@ def resumen(_=Depends(require_login)):
         # candidatas a la línea Mujeres — mismo cálculo que el filtro del panel
         # (ver genero.py), acá solo para el contador del botón.
         personas = conn.execute(text("SELECT nombre, cuit, genero FROM sde_consultas")).all()
+        casfog_aprobados = conn.execute(text("""
+            SELECT COUNT(DISTINCT consulta_id) FROM sde_casfog_oficial
+            WHERE resultado = 'A' AND consulta_id IS NOT NULL
+        """)).scalar() or 0
 
     estados_out = [{"estado": r["estado"], "n": r["n"], "grupo": grupo_de(r["estado"])} for r in por_estado]
     activas = sum(r["n"] for r in estados_out if r["grupo"] in GRUPOS_ACTIVOS)
@@ -290,6 +299,7 @@ def resumen(_=Depends(require_login)):
         "total": total, "activas": activas, "sin_asignar": sin_asignar,
         "sin_acciones": sin_acciones, "nuevas_semana": nuevas_semana, "duplicados": duplicados,
         "posibles_mujeres": posibles_mujeres,
+        "casfog_aprobados": casfog_aprobados,
         "montos_excedidos": montos_excedidos,
         "tope_linea_fmt": _monto(TOPE_LINEA),
         "fianza_tercero": fianza_tercero,

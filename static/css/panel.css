@@ -367,3 +367,6 @@ a:focus-visible,.btn:focus-visible,.ebtn:focus-visible,
 .casfog-box.P{border-left-color:var(--amber)} .casfog-box.S,.casfog-box.R{border-left-color:var(--gray)}
 .casfog-box .t{font-weight:800;color:var(--navy);margin-bottom:0.25rem}
 .casfog-box .k{color:var(--muted)}
+.ebtn.casfog{border-color:#bfe3cc;color:var(--green)}
+.ebtn.casfog.active{background:var(--green);border-color:var(--green);color:#fff}
+.ebtn.casfog.active .cnt{background:rgba(255,255,255,.25);color:#fff}
