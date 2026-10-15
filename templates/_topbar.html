@@ -14,6 +14,7 @@
       <a href="/panel/ok-casfog" class="{% if activo=='ok-casfog' %}active{% endif %}" title="Casos aprobados por el fondo de garantía CASFOG">OK CASFOG</a>
       {% if usuario.username == 'omar' %}
       <a href="/panel/revisar" class="{% if activo=='revisar' %}active{% endif %}" title="Casos que se pueden haber quedado sin atender">Casos para revisar</a>
+      <a href="/panel/no-financiables" class="{% if activo=='no-financiables' %}active{% endif %}" title="Auditoría de los casos marcados como no financiables">No financiables</a>
       {% endif %}
       {% endif %}
     </nav>

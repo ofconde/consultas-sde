@@ -18,6 +18,7 @@ from formatos import _monto
 USUARIO_REVISION = "omar"
 DIAS_AVANZADOS = 30   # casos avanzados (gestión/sede) sin movimiento
 DIAS_INICIAL = 45     # "Consulta inicial" con acciones pero sin novedades
+DIAS_FORMULARIOS = 30  # se mandaron Condiciones y Formularios y no hubo respuesta ni seguimiento
 
 router = APIRouter(prefix="/api/revisar", tags=["revisar"])
 
@@ -249,6 +250,22 @@ def revisar(usuario=Depends(require_revisor)):
             "descripcion": "Tienen acciones registradas, pero la última es vieja: ¿esperan respuesta del solicitante o quedaron colgadas?",
             "casos": [_caso(r, f"{r['n_acc']} acciones registradas") for r in filas]})
 
+        # 7b) Se enviaron Condiciones y Formularios y nadie volvió a tocar el caso.
+        filas = q(f"""SELECT b.*, u.created_at AS enviado,
+                             EXTRACT(day FROM NOW() - u.created_at)::int AS dias_envio
+                      FROM ({_BASE}) b
+                      JOIN LATERAL (SELECT accion, detalle, created_at FROM sde_acciones a
+                                    WHERE a.consulta_id = b.id ORDER BY a.created_at DESC, a.id DESC LIMIT 1) u ON TRUE
+                      WHERE b.estado = ANY(:est) AND u.accion ILIKE 'SE ENVIA INFORMACION%'
+                        AND (u.detalle ILIKE '%condiciones%' OR u.detalle ILIKE '%formulario%')
+                        AND NOW() - u.created_at >= make_interval(days => :d)
+                      ORDER BY u.created_at""", est=list(_ESTADOS_ABIERTOS), d=DIAS_FORMULARIOS)
+        chequeos.append({
+            "id": "formularios_sin_respuesta", "gravedad": "alta",
+            "titulo": f"Condiciones y Formularios enviados hace {DIAS_FORMULARIOS} días o más, sin seguimiento",
+            "descripcion": "Lo último que se hizo fue mandarle la información al solicitante. No hay nada después: ni respuesta, ni recordatorio, ni cierre.",
+            "casos": [{**_caso(r), "dias": r["dias_envio"], "nota": "Última gestión: envío de Condiciones y Formularios"} for r in filas]})
+
         # 8) Instancia Superior incompleta.
         filas = q(f"""SELECT * FROM ({_BASE}) b WHERE b.en_is AND (b.estado_carpeta IS NULL OR
                       (b.estado_carpeta <> 'DESEMBOLSADO' AND COALESCE(trim(b.detalle_estado), '') = ''))
@@ -261,7 +278,7 @@ def revisar(usuario=Depends(require_revisor)):
 
     distintos = {c["id"] if c["id"] is not None else "cuit:" + c["codigo"] for ch in chequeos for c in ch["casos"]}
     return {
-        "dias_avanzados": DIAS_AVANZADOS, "dias_inicial": DIAS_INICIAL,
+        "dias_avanzados": DIAS_AVANZADOS, "dias_inicial": DIAS_INICIAL, "dias_formularios": DIAS_FORMULARIOS,
         "casos_distintos": len(distintos),
         "tecnicos": sorted({c["tecnico"] for ch in chequeos for c in ch["casos"]}),
         "chequeos": chequeos,

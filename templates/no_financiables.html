@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}No financiables · Consultas SDE{% endblock %}
+{% block extra_head %}
+<style>
+  .nf-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:1rem;margin-bottom:1.25rem}
+  .nf-kpi{padding:0.875rem 1.125rem;cursor:pointer;border-left:0.25rem solid var(--gray);text-align:left;font:inherit;background:#fff;border-top:0;border-right:0;border-bottom:0}
+  .nf-kpi.alta{border-left-color:var(--red)} .nf-kpi.media{border-left-color:var(--amber)} .nf-kpi.baja{border-left-color:var(--blue)}
+  .nf-kpi .n{font-size:1.5rem;font-weight:800;color:var(--navy)}
+  .nf-kpi .l{font-size:0.8125rem;color:var(--muted)}
+  .nf-filtros{display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;margin-bottom:1rem}
+  .nf-filtros select{padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.625rem;font:inherit;background:#fff;color:var(--navy)}
+  details.nf-sec{margin-bottom:1rem}
+  details.nf-sec>summary{cursor:pointer;padding:0.875rem 1.125rem;font-weight:700;color:var(--navy);list-style:none;display:flex;gap:0.75rem;align-items:center}
+  details.nf-sec>summary::-webkit-details-marker{display:none}
+  details.nf-sec>summary .cnt{background:#eef1f7;color:var(--muted);border-radius:1.25rem;padding:0.0625rem 0.625rem;font-size:0.8125rem}
+  details.nf-sec>summary .dot{width:0.625rem;height:0.625rem;border-radius:50%;background:var(--gray);flex:0 0 auto}
+  details.nf-sec.alta>summary .dot{background:var(--red)} details.nf-sec.media>summary .dot{background:var(--amber)} details.nf-sec.baja>summary .dot{background:var(--blue)}
+  .nf-desc{padding:0 1.125rem 0.75rem;font-size:0.8125rem;color:var(--muted)}
+  .nf-nota{font-size:0.75rem;color:var(--muted)}
+  .nf-motivo{font-weight:600;color:var(--navy);font-size:0.8125rem}
+  .nf-act{max-width:22rem;font-size:0.8125rem}
+  .nf-act .dest{color:var(--muted)}
+</style>
+{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+
+  <div class="wrap">
+    <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">No financiables</h1>
+    <p class="muted" style="margin:0 0 1.25rem">Todas las consultas marcadas «No es financiable», ordenadas por qué tan probable es que el rechazo no se sostenga. Es solo lectura. La clasificación es orientativa: se arma con el texto de actividad y destino y con el género estimado, así que hay que abrir el caso antes de cambiar nada.</p>
+
+    <div class="nf-filtros">
+      <select id="nf-tecnico"><option value="">Todos los técnicos</option></select>
+      <select id="nf-genero">
+        <option value="">Cualquier género</option><option value="F">Mujeres</option>
+        <option value="M">Varones</option><option value="—">Empresas / sin dato</option>
+      </select>
+      <span class="muted" id="nf-resumen"></span>
+    </div>
+
+    <div class="nf-kpis" id="nf-kpis"></div>
+    <div id="nf-secciones"></div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = s => document.querySelector(s);
+let DATA = null;
+const abiertas = new Set(['casfog', 'mujer_comercio', 'productivo']);   // las que más importan, abiertas de entrada
+const GENERO = {F: 'Mujer', M: 'Varón', '—': 'Empresa / s. d.'};
+
+function filtrar(casos){
+  const t = $('#nf-tecnico').value, g = $('#nf-genero').value;
+  return casos.filter(c => (!t || c.tecnico === t) && (!g || c.genero === g));
+}
+
+function tabla(casos){
+  if(!casos.length) return '<div class="muted" style="padding:0.75rem 1.125rem">Nada con este filtro.</div>';
+  return `<div class="tabla-wrap"><table><thead><tr>
+      <th>Solicitante</th><th>Técnico</th><th>Género</th><th>ARCA · BCRA</th><th>Actividad y destino</th>
+      <th style="text-align:right">Monto</th><th>Motivo y última gestión</th></tr></thead><tbody>${
+    casos.map(c => `<tr>
+      <td class="cod-abrir" data-id="${c.id}" style="cursor:pointer">${escapeHtml(c.nombre)}<div class="cod">${escapeHtml(c.codigo)}</div></td>
+      <td>${escapeHtml(c.tecnico)}</td>
+      <td>${GENERO[c.genero]}</td>
+      <td class="nf-nota">${escapeHtml(c.categoria)}<br>BCRA: ${escapeHtml(c.bcra)}</td>
+      <td class="nf-act">${escapeHtml(c.actividad)}${c.destino !== '—' ? `<div class="dest">${escapeHtml(c.destino)}</div>` : ''}</td>
+      <td style="text-align:right;white-space:nowrap">${escapeHtml(c.monto_fmt)}</td>
+      <td><div class="nf-motivo">${escapeHtml(c.motivo)}</div><div class="nf-nota">${escapeHtml(c.ultima_accion || 'Sin acciones registradas')}</div></td></tr>`).join('')
+  }</tbody></table></div>`;
+}
+
+function pintar(){
+  const secciones = DATA.grupos.map(g => ({...g, vis: filtrar(DATA.casos.filter(c => c.grupo === g.id))}));
+  const total = secciones.reduce((n, g) => n + g.vis.length, 0);
+  $('#nf-resumen').textContent = `${total} de ${DATA.total} casos`;
+
+  $('#nf-kpis').innerHTML = secciones.map(g => `
+    <button class="tabla-wrap card nf-kpi ${g.gravedad}" data-ir="${g.id}">
+      <div class="n">${g.vis.length}</div><div class="l">${escapeHtml(g.titulo)}</div></button>`).join('');
+  document.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => {
+    const d = document.getElementById('sec-' + b.dataset.ir);
+    d.open = true; abiertas.add(b.dataset.ir); d.scrollIntoView({behavior:'smooth', block:'start'});
+  }));
+
+  $('#nf-secciones').innerHTML = secciones.map(g => `
+    <details class="tabla-wrap card nf-sec ${g.gravedad}" id="sec-${g.id}" ${abiertas.has(g.id) ? 'open' : ''}>
+      <summary><span class="dot"></span><span>${escapeHtml(g.titulo)}</span><span class="cnt">${g.vis.length}</span></summary>
+      <div class="nf-desc">${escapeHtml(g.descripcion)}</div>
+      ${tabla(g.vis)}
+    </details>`).join('');
+  document.querySelectorAll('details.nf-sec').forEach(d => d.addEventListener('toggle', () => {
+    const id = d.id.replace('sec-', ''); d.open ? abiertas.add(id) : abiertas.delete(id);
+  }));
+  enlazarCasos($('#nf-secciones'));
+}
+
+async function cargar(){
+  const r = await fetch('/api/no-financiables');
+  if(!r.ok){ $('#nf-secciones').innerHTML = '<div class="muted" style="padding:1.25rem">No tenés acceso a esta pantalla.</div>'; return; }
+  DATA = await r.json();
+  $('#nf-tecnico').innerHTML = '<option value="">Todos los técnicos</option>'
+    + DATA.tecnicos.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  pintar();
+}
+
+$('#nf-tecnico').addEventListener('change', pintar);
+$('#nf-genero').addEventListener('change', pintar);
+cargar();
+</script>
+{% endblock %}

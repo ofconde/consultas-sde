@@ -15,7 +15,7 @@ from sqlalchemy import text
 from db import init_db, engine
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
                   SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
-from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria, casfog, listado_gobernacion, revisar
+from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria, casfog, listado_gobernacion, revisar, no_financiables
 from routers.auditoria import registrar_actividad, registrar_accion
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -95,6 +95,7 @@ app.include_router(auditoria.router)
 app.include_router(casfog.router)
 app.include_router(listado_gobernacion.router)
 app.include_router(revisar.router)
+app.include_router(no_financiables.router)
 
 
 # ── Páginas ──────────────────────────────────────────────────────────
@@ -288,6 +289,18 @@ def panel_revisar(request: Request):
     if u["username"] != revisar.USUARIO_REVISION:
         return RedirectResponse("/panel")
     return templates.TemplateResponse("revisar.html", {"request": request, "usuario": u, "activo": "revisar"})
+
+
+@app.get("/panel/no-financiables", response_class=HTMLResponse)
+def panel_no_financiables(request: Request):
+    """Auditoría de los casos marcados NO ES FINANCIABLE. Mismo acceso que
+    «Casos para revisar»: solo el usuario configurado en routers/revisar.py."""
+    u = usuario_actual(request)
+    if not u:
+        return RedirectResponse("/login")
+    if u["username"] != revisar.USUARIO_REVISION:
+        return RedirectResponse("/panel")
+    return templates.TemplateResponse("no_financiables.html", {"request": request, "usuario": u, "activo": "no-financiables"})
 
 
 @app.get("/panel/ok-casfog", response_class=HTMLResponse)
