@@ -17,6 +17,10 @@
   details.rv-sec.alta>summary .dot{background:var(--red)} details.rv-sec.media>summary .dot{background:var(--amber)} details.rv-sec.baja>summary .dot{background:var(--blue)}
   .rv-desc{padding:0 1.125rem 0.75rem;font-size:0.8125rem;color:var(--muted)}
   .rv-nota{font-size:0.75rem;color:var(--muted)}
+  .rv-cat{font-weight:700;color:var(--navy);white-space:nowrap}
+  .rv-cat-fuente{font-size:0.6875rem;font-weight:600;color:var(--muted)}
+  .rv-cat-fuente.confirmada{color:var(--green)}
+  .rv-cat-dif{font-size:0.6875rem;font-weight:700;color:var(--amber)}
   .rv-dias{white-space:nowrap;font-weight:700}
 </style>
 {% endblock %}
@@ -29,6 +33,7 @@
 
     <div class="rv-filtros">
       <select id="rv-tecnico"><option value="">Todos los técnicos</option></select>
+      <select id="rv-categoria" title="Categoría fiscal: la confirmada por el técnico si existe, si no la declarada en el formulario"><option value="">Todas las categorías</option></select>
       <span class="muted" id="rv-resumen"></span>
     </div>
 
@@ -42,19 +47,48 @@ const $ = s => document.querySelector(s);
 let DATA = null;
 const abiertas = new Set();   // secciones que el usuario dejó abiertas, para no cerrarlas al filtrar
 
+function coincideCategoria(c, cat){
+  if(!cat) return true;
+  return cat === 'MONO' ? c.cat_clave.startsWith('MONO_') : c.cat_clave === cat;
+}
+
 function filtrar(casos){
-  const t = $('#rv-tecnico').value;
-  return t ? casos.filter(c => c.tecnico === t) : casos;
+  const t = $('#rv-tecnico').value, cat = $('#rv-categoria').value;
+  return casos.filter(c => (!t || c.tecnico === t) && coincideCategoria(c, cat));
+}
+
+// Opciones del filtro de categoría, con la cantidad de casos distintos que hay en
+// cada una (respetando el filtro de técnico).
+function pintarOpcionesCategoria(){
+  const t = $('#rv-tecnico').value, actual = $('#rv-categoria').value;
+  const porId = new Map();
+  DATA.chequeos.forEach(ch => ch.casos.forEach(c => { if(!t || c.tecnico === t) porId.set(c.id, c); }));
+  const casos = [...porId.values()];
+  const n = f => casos.filter(f).length;
+  const claves = [...new Set(casos.map(c => c.cat_clave))].filter(k => k.startsWith('MONO_')).sort();
+  const rotulo = k => 'Monotributo ' + k.split('_')[1];
+  const ops = [['', 'Todas las categorías (' + casos.length + ')'],
+               ['MONO', 'Monotributo, cualquier categoría (' + n(c => c.cat_clave.startsWith('MONO_')) + ')'],
+               ...claves.map(k => [k, rotulo(k) + ' (' + n(c => c.cat_clave === k) + ')']),
+               ['RI', 'Responsable inscripto (' + n(c => c.cat_clave === 'RI') + ')'],
+               ['EXENTO', 'Exento (' + n(c => c.cat_clave === 'EXENTO') + ')'],
+               ['OTRO', 'Otra situación (' + n(c => c.cat_clave === 'OTRO') + ')'],
+               ['SIN', 'Sin dato (' + n(c => c.cat_clave === 'SIN') + ')']];
+  $('#rv-categoria').innerHTML = ops.map(([v, l]) => `<option value="${v}">${escapeHtml(l)}</option>`).join('');
+  $('#rv-categoria').value = ops.some(o => o[0] === actual) ? actual : '';
 }
 
 function tabla(casos){
   if(!casos.length) return '<div class="muted" style="padding:0.75rem 1.125rem">Nada para revisar con este filtro.</div>';
   return `<div class="tabla-wrap"><table><thead><tr>
-      <th>Solicitante</th><th>Técnico</th><th>Estado</th><th style="text-align:right">Monto</th>
+      <th>Solicitante</th><th>Técnico</th><th>Categoría ARCA</th><th>Estado</th><th style="text-align:right">Monto</th>
       <th style="text-align:right">Días sin mov.</th><th>Observación</th></tr></thead><tbody>${
     casos.map(c => `<tr>
       <td class="cod-abrir" data-id="${c.id}" style="cursor:pointer">${escapeHtml(c.nombre)}<div class="cod">${escapeHtml(c.codigo)}</div></td>
       <td>${escapeHtml(c.tecnico)}</td>
+      <td><span class="rv-cat">${escapeHtml(c.categoria)}</span>
+        ${c.categoria === 'Sin dato' ? '' : `<div class="rv-cat-fuente ${c.cat_fuente}">${c.cat_fuente === 'confirmada' ? 'confirmada por el técnico' : 'declarada en el formulario'}</div>`}
+        ${c.cat_declarada ? `<div class="rv-cat-dif" title="El solicitante declaró otra categoría que la que confirmó el técnico">declaró: ${escapeHtml(c.cat_declarada)}</div>` : ''}</td>
       <td>${escapeHtml(c.estado_carpeta || c.estado)}</td>
       <td style="text-align:right;white-space:nowrap">${escapeHtml(c.monto_fmt)}</td>
       <td style="text-align:right" class="rv-dias">${c.dias ?? '—'}</td>
@@ -63,10 +97,11 @@ function tabla(casos){
 }
 
 function pintar(){
+  pintarOpcionesCategoria();
   const unicos = new Set();
   const secciones = DATA.chequeos.map(ch => ({...ch, vis: filtrar(ch.casos)}));
   secciones.forEach(ch => ch.vis.forEach(c => unicos.add(c.id)));
-  $('#rv-resumen').textContent = `${unicos.size} casos distintos para revisar${$('#rv-tecnico').value ? ' (' + $('#rv-tecnico').value + ')' : ''}`;
+  $('#rv-resumen').textContent = `${unicos.size} casos distintos para revisar${$('#rv-tecnico').value ? ' · ' + $('#rv-tecnico').value : ''}${$('#rv-categoria').value ? ' · ' + $('#rv-categoria').selectedOptions[0].textContent.replace(/ \(\d+\)$/, '') : ''}`;
 
   $('#rv-kpis').innerHTML = secciones.map(ch => `
     <button class="tabla-wrap card rv-kpi ${ch.gravedad}" data-ir="${ch.id}">
@@ -98,6 +133,7 @@ async function cargar(){
 }
 
 $('#rv-tecnico').addEventListener('change', pintar);
+$('#rv-categoria').addEventListener('change', pintar);
 cargar();
 </script>
 {% endblock %}

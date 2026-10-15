@@ -43,7 +43,7 @@ _ESTADOS_ABIERTOS = ("CONSULTA INICIAL",) + _ESTADOS_AVANZADOS + (
 _BASE = """
     SELECT c.id, c.codigo, c.nombre, COALESCE(NULLIF(c.tecnico,''),'Sin asignar') AS tecnico,
            c.estado, c.estado_carpeta, COALESCE(c.instancia_superior, FALSE) AS en_is,
-           c.detalle_estado,
+           c.detalle_estado, c.situacion_arca, c.arca_confirmado,
            COALESCE(NULLIF(c.monto_instancia_superior,0), NULLIF(c.monto_confirmado,0), c.monto) AS monto,
            COALESCE(a.n, 0) AS n_acc,
            EXTRACT(day FROM NOW() - GREATEST(c.updated_at, COALESCE(a.ult, c.updated_at)))::int AS dias
@@ -59,8 +59,36 @@ def require_revisor(usuario=Depends(require_coordinador)):
     return usuario
 
 
+def _categoria(r):
+    """Categoría fiscal efectiva: la que confirmó el técnico si la hay (salvo
+    «no se puede verificar», que no informa nada), si no la que declaró el
+    solicitante en el formulario. Devuelve (rótulo, clave de filtro, fuente,
+    declarada si difiere de la confirmada)."""
+    declarada = (r["situacion_arca"] or "").strip().upper()
+    confirmada = (r["arca_confirmado"] or "").strip().upper()
+    if confirmada and confirmada != "NO SE PUEDE VERIFICAR":
+        efectiva, fuente = confirmada, "confirmada"
+    else:
+        efectiva, fuente = declarada, "declarada"
+    if efectiva.startswith("MONOTRIBUTO "):
+        clave = "MONO_" + efectiva.split()[-1]
+    elif efectiva == "RESPONSABLE INSCRIPTO":
+        clave = "RI"
+    elif efectiva == "EXENTO":
+        clave = "EXENTO"
+    elif efectiva:
+        clave = "OTRO"
+    else:
+        clave = "SIN"
+    difiere = fuente == "confirmada" and bool(declarada) and declarada != efectiva
+    return (efectiva.title() if efectiva else "Sin dato"), clave, fuente, (declarada.title() if difiere else "")
+
+
 def _caso(r, nota=""):
+    categoria, cat_clave, cat_fuente, cat_declarada = _categoria(r)
     return {
+        "categoria": categoria, "cat_clave": cat_clave,
+        "cat_fuente": cat_fuente, "cat_declarada": cat_declarada,
         "id": r["id"], "codigo": r["codigo"], "nombre": r["nombre"] or "—", "tecnico": r["tecnico"],
         "estado": r["estado"], "estado_carpeta": r["estado_carpeta"] or "",
         "monto": int(r["monto"] or 0), "monto_fmt": _monto(r["monto"]),
