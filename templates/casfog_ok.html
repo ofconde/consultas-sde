@@ -91,9 +91,7 @@ function pintar(){
 
   $('#ck-vacio').style.display = casos.length ? 'none' : '';
   $('#ck-tbody').innerHTML = casos.map(fila).join('');
-  document.querySelectorAll('.cod-abrir[data-id]:not([data-id=""])').forEach(el => {
-    el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
-  });
+  enlazarCasos($('#ck-tbody'));
 
   const conMatch = casos.filter(c => c.consulta_id);
   $('#ck-total').textContent = casos.length;

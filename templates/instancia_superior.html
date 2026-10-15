@@ -155,9 +155,7 @@ async function cargar(){
 
   $('#is-vacio').style.display = d.casos.length ? 'none' : '';
   $('#is-tbody').innerHTML = d.casos.map(filaHTML).join('');
-  document.querySelectorAll('.cod-abrir').forEach(el => {
-    el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
-  });
+  enlazarCasos($('#is-tbody'));
   document.querySelectorAll('.is-firmado').forEach(el => {
     el.addEventListener('change', () => cambiarFirmado(el.dataset.id, el.checked));
   });

@@ -120,7 +120,7 @@ function pintar(){
   document.querySelectorAll('details.rv-sec').forEach(d => d.addEventListener('toggle', () => {
     const id = d.id.replace('sec-', ''); d.open ? abiertas.add(id) : abiertas.delete(id);
   }));
-  document.querySelectorAll('.cod-abrir').forEach(el => el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id));
+  enlazarCasos($('#rv-secciones'));
 }
 
 async function cargar(){

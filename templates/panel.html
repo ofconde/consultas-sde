@@ -430,11 +430,11 @@ function filaHTML(c, numeroFila){
          onclick="event.stopPropagation();borrarConsulta(${c.id},this)">Eliminar</button></td>`
     : '';
   return `
-    <tr onclick="location.href='/consulta/${c.id}'">
+    <tr onclick="abrirCaso(event,${c.id})">
       <td onclick="event.stopPropagation()"><input type="checkbox" class="chk-fila" data-id="${c.id}"
         ${state.seleccion.has(c.id)?'checked':''} onchange="toggleSeleccion(${c.id}, this.checked)"></td>
       <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">${escapeHtml(c.codigo)||'#'+numeroFila}</div></td>
-      <td><span class="nom">${escapeHtml(c.nombre)||'—'}</span>${
+      <td><a class="lnk-caso" href="/consulta/${c.id}" style="display:inline"><span class="nom">${escapeHtml(c.nombre)||'—'}</span></a>${
           c.genero_estimado==='F' ? '<span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : ''}${
           c.instancia_superior
             ? ` <span class="badge-instancia-superior" title="Seguimiento fino en Instancia Superior" onclick="event.stopPropagation();location.href='/panel/instancia-superior'">↑ Instancia superior</span>`

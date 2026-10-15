@@ -110,3 +110,30 @@ function bcraBadgeMini(d) {
   if (!d || d.sin_datos) return '<span class="muted">sin registro</span>';
   return `<span class="badge g-${bcraGrupo(d.situacion_max)}">${d.situacion_max} · ${escapeHtml(d.situacion_label)}</span>`;
 }
+
+
+// Celdas de caso (.cod-abrir[data-id]) → enlaces reales a /consulta/ID. Así el
+// botón derecho ofrece "Abrir en pestaña nueva" y funcionan Ctrl/Cmd+clic y el
+// clic con la rueda, sin perder la pantalla (filtros, scroll) que se está viendo.
+// El clic común en la celda abre en la misma pestaña, y con Ctrl/Cmd en otra.
+function enlazarCasos(raiz){
+  (raiz || document).querySelectorAll('.cod-abrir[data-id]').forEach(td => {
+    if(!td.dataset.id || td.querySelector(':scope > a.lnk-caso')) return;
+    const url = '/consulta/' + td.dataset.id;
+    const a = document.createElement('a');
+    a.className = 'lnk-caso'; a.href = url;
+    while(td.firstChild) a.appendChild(td.firstChild);
+    td.appendChild(a);
+    td.addEventListener('click', e => {
+      if(e.target.closest('a')) return;           // el enlace se encarga solo
+      if(e.ctrlKey || e.metaKey) window.open(url, '_blank'); else location.href = url;
+    });
+  });
+}
+
+// Fila de una tabla que abre el caso: ignora los clics en enlaces y controles.
+function abrirCaso(ev, id){
+  if(ev.target.closest('a,button,input,select,textarea,label')) return;
+  const url = '/consulta/' + id;
+  if(ev.ctrlKey || ev.metaKey) window.open(url, '_blank'); else location.href = url;
+}

@@ -178,9 +178,7 @@ function pintar(){
   const casos = filtrados();
   $('#lg-vacio').style.display = casos.length ? 'none' : '';
   $('#lg-tbody').innerHTML = casos.map(fila).join('');
-  document.querySelectorAll('.cod-abrir[data-id]').forEach(el => {
-    el.addEventListener('click', () => location.href = '/consulta/' + el.dataset.id);
-  });
+  enlazarCasos($('#lg-tbody'));
   document.querySelectorAll('.lg-contacto').forEach(el => {
     el.addEventListener('blur', () => guardarContacto(el));
     el.addEventListener('keydown', e => { if(e.key === 'Enter') el.blur(); });
