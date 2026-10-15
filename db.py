@@ -284,6 +284,28 @@ def init_db():
         # el mail de la consulta son los de esa persona, no de la razón social).
         conn.execute(text("ALTER TABLE sde_listado_gobernacion ADD COLUMN IF NOT EXISTS contacto_nombre TEXT"))
 
+        # Copia de la planilla oficial de CASFOG (Región NEA, Serie 2, pestaña de
+        # Santiago del Estero): resultado del análisis y monto aprobado de cada
+        # solicitud, tal como los informó el fondo. Es la fuente de verdad sobre
+        # qué aprobó CASFOG; sde_casfog_ok (listas armadas a mano) se contrasta
+        # contra ésta. consulta_id enlaza con la consulta cuando se la encontró.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sde_casfog_oficial (
+                id              SERIAL PRIMARY KEY,
+                fila            INT NOT NULL,
+                cuit            TEXT NOT NULL,
+                nombre          TEXT NOT NULL,
+                resultado       TEXT NOT NULL,          -- A aprobado, D desaprobado, P pide información, S sin resultado, R en revisión
+                monto_aprobado  BIGINT,
+                estado_planilla TEXT,                   -- columna A de la planilla (Efectivizado, En trámite…)
+                tecnico_letra   TEXT,                   -- O / V / S: inicial del técnico que figura en la planilla
+                nota            TEXT,
+                consulta_id     INT REFERENCES sde_consultas(id) ON DELETE SET NULL,
+                cargado_en      TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_casfog_oficial_cuit ON sde_casfog_oficial (cuit)"))
+
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS sde_consultas_codigo_seq"))
         conn.execute(text("""
             SELECT setval('sde_consultas_codigo_seq',

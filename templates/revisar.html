@@ -62,7 +62,7 @@ function filtrar(casos){
 function pintarOpcionesCategoria(){
   const t = $('#rv-tecnico').value, actual = $('#rv-categoria').value;
   const porId = new Map();
-  DATA.chequeos.forEach(ch => ch.casos.forEach(c => { if(!t || c.tecnico === t) porId.set(c.id, c); }));
+  DATA.chequeos.forEach(ch => ch.casos.forEach(c => { if(!t || c.tecnico === t) porId.set(c.id ?? 'cuit:' + c.codigo, c); }));
   const casos = [...porId.values()];
   const n = f => casos.filter(f).length;
   const claves = [...new Set(casos.map(c => c.cat_clave))].filter(k => k.startsWith('MONO_')).sort();
@@ -84,7 +84,7 @@ function tabla(casos){
       <th>Solicitante</th><th>Técnico</th><th>Categoría ARCA</th><th>Estado</th><th style="text-align:right">Monto</th>
       <th style="text-align:right">Días sin mov.</th><th>Observación</th></tr></thead><tbody>${
     casos.map(c => `<tr>
-      <td class="cod-abrir" data-id="${c.id}" style="cursor:pointer">${escapeHtml(c.nombre)}<div class="cod">${escapeHtml(c.codigo)}</div></td>
+      <td ${c.id !== null ? `class="cod-abrir" data-id="${c.id}" style="cursor:pointer"` : ''}>${escapeHtml(c.nombre)}<div class="cod">${c.id !== null ? '' : 'CUIT '}${escapeHtml(c.codigo)}</div></td>
       <td>${escapeHtml(c.tecnico)}</td>
       <td><span class="rv-cat">${escapeHtml(c.categoria)}</span>
         ${c.categoria === 'Sin dato' ? '' : `<div class="rv-cat-fuente ${c.cat_fuente}">${c.cat_fuente === 'confirmada' ? 'confirmada por el técnico' : 'declarada en el formulario'}</div>`}
@@ -100,7 +100,7 @@ function pintar(){
   pintarOpcionesCategoria();
   const unicos = new Set();
   const secciones = DATA.chequeos.map(ch => ({...ch, vis: filtrar(ch.casos)}));
-  secciones.forEach(ch => ch.vis.forEach(c => unicos.add(c.id)));
+  secciones.forEach(ch => ch.vis.forEach(c => unicos.add(c.id ?? 'cuit:' + c.codigo)));
   $('#rv-resumen').textContent = `${unicos.size} casos distintos para revisar${$('#rv-tecnico').value ? ' · ' + $('#rv-tecnico').value : ''}${$('#rv-categoria').value ? ' · ' + $('#rv-categoria').selectedOptions[0].textContent.replace(/ \(\d+\)$/, '') : ''}`;
 
   $('#rv-kpis').innerHTML = secciones.map(ch => `

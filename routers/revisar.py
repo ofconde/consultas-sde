@@ -96,6 +96,22 @@ def _caso(r, nota=""):
     }
 
 
+_TECNICO_POR_LETRA = {"O": "OMAR CONDE", "V": "VICTOR SUAREZ", "S": "SOLEDAD GUTIERREZ"}
+
+
+def _caso_sin_consulta(r, nota=""):
+    """Aprobado por CASFOG que no tiene consulta en el sistema: no hay id, así que
+    la pantalla no lo puede abrir; se identifica por el CUIT."""
+    return {
+        "categoria": "Sin dato", "cat_clave": "SIN", "cat_fuente": "declarada", "cat_declarada": "",
+        "id": None, "codigo": r["cuit"], "nombre": r["nombre"],
+        "tecnico": _TECNICO_POR_LETRA.get((r["tecnico_letra"] or "").upper(), "Sin asignar"),
+        "estado": "No existe en Consultas SDE", "estado_carpeta": "",
+        "monto": int(r["monto_aprobado"] or 0), "monto_fmt": _monto(r["monto_aprobado"]),
+        "dias": None, "nota": nota,
+    }
+
+
 @router.get("")
 def revisar(usuario=Depends(require_revisor)):
     chequeos = []
@@ -129,6 +145,57 @@ def revisar(usuario=Depends(require_revisor)):
             "titulo": "Aprobados por CASFOG marcados como no financiable o desistido",
             "descripcion": "Figuran con ese estado en la consulta y sin marca en OK CASFOG: confirmar que sea correcto.",
             "casos": [_caso(r, f"CASFOG aprobó {_monto(r['monto_aprobado'])} · estado: {r['estado']}") for r in filas]})
+
+        # 2b) Planilla oficial de CASFOG: aprobados que acá siguen sin avanzar.
+        filas = q(f"""
+            SELECT DISTINCT ON (b.id) b.*, o.monto_aprobado, o.estado_planilla
+            FROM sde_casfog_oficial o JOIN ({_BASE}) b ON b.id = o.consulta_id
+            WHERE o.resultado = 'A' AND COALESCE(o.estado_planilla,'') NOT IN ('NO FINANCIABLE','DESISTE TOMAR CREDITO')
+              AND b.estado = 'CONSULTA INICIAL' AND NOT b.en_is
+            ORDER BY b.id, o.monto_aprobado DESC NULLS LAST""")
+        filas = sorted(filas, key=lambda r: r["monto_aprobado"] or 0, reverse=True)
+        chequeos.append({
+            "id": "oficial_sin_avanzar", "gravedad": "alta",
+            "titulo": "Aprobados en la planilla oficial de CASFOG que acá siguen sin avanzar",
+            "descripcion": "La planilla de CASFOG los da por aprobados, pero la consulta sigue en «Consulta inicial» y fuera de Instancia Superior.",
+            "casos": [_caso(r, f"CASFOG oficial aprobó {_monto(r['monto_aprobado'])}" + (f" · planilla: {r['estado_planilla']}" if r["estado_planilla"] else "")) for r in filas]})
+
+        # 2c) CASFOG pidió información.
+        filas = q(f"""
+            SELECT DISTINCT ON (b.id) b.*, o.nota AS pedido
+            FROM sde_casfog_oficial o JOIN ({_BASE}) b ON b.id = o.consulta_id
+            WHERE o.resultado = 'P' ORDER BY b.id""")
+        filas = sorted(filas, key=lambda r: (r["tecnico"], r["nombre"] or ""))
+        chequeos.append({
+            "id": "casfog_pide_info", "gravedad": "alta",
+            "titulo": "CASFOG pidió información",
+            "descripcion": "La planilla oficial de CASFOG pide documentación (ventas, F1272, comprobantes) antes de analizar el caso.",
+            "casos": [_caso(r, f"CASFOG pidió: {r['pedido']}" if r["pedido"] else "CASFOG pidió información") for r in filas]})
+
+        # 2d) CASFOG lo dio por no financiable / desistido y acá sigue abierto.
+        filas = q(f"""
+            SELECT DISTINCT ON (b.id) b.*, o.estado_planilla
+            FROM sde_casfog_oficial o JOIN ({_BASE}) b ON b.id = o.consulta_id
+            WHERE o.estado_planilla IN ('NO FINANCIABLE','DESISTE TOMAR CREDITO')
+              AND b.estado NOT IN ('NO ES FINANCIABLE','DESISTE DE TOMAR EL CRÉDITO','DESEMBOLSADO','REPETIDO')
+            ORDER BY b.id""")
+        chequeos.append({
+            "id": "oficial_cerrado_abierto", "gravedad": "media",
+            "titulo": "CASFOG lo marcó no financiable o desistido y acá sigue abierto",
+            "descripcion": "Según la planilla oficial el caso se cerró, pero en el sistema no tiene ese estado.",
+            "casos": [_caso(r, f"Planilla CASFOG: {r['estado_planilla']} · estado acá: {r['estado']}") for r in filas]})
+
+        # 2e) Aprobados por CASFOG que no existen en el sistema.
+        filas = q("""
+            SELECT DISTINCT ON (o.cuit) o.cuit, o.nombre, o.monto_aprobado, o.estado_planilla, o.tecnico_letra
+            FROM sde_casfog_oficial o WHERE o.resultado = 'A' AND o.consulta_id IS NULL
+            ORDER BY o.cuit, o.fila""")
+        filas = sorted(filas, key=lambda r: r["monto_aprobado"] or 0, reverse=True)
+        chequeos.append({
+            "id": "oficial_no_cargados", "gravedad": "alta",
+            "titulo": "Aprobados por CASFOG que no existen en Consultas SDE",
+            "descripcion": "Figuran aprobados en la planilla oficial pero no hay ninguna consulta con ese CUIT ni con ese nombre (verificar que el CUIT no esté mal cargado).",
+            "casos": [_caso_sin_consulta(r, "CASFOG oficial aprobó " + _monto(r["monto_aprobado"]) + (f" · planilla: {r['estado_planilla']}" if r["estado_planilla"] else "")) for r in filas]})
 
         # 3) Estado general atrasado respecto al estado de carpeta (Instancia Superior).
         filas = q(f"SELECT * FROM ({_BASE}) b WHERE b.en_is AND b.estado_carpeta IS NOT NULL ORDER BY b.dias DESC")
@@ -192,7 +259,7 @@ def revisar(usuario=Depends(require_revisor)):
             "descripcion": "Sin estado de carpeta, o sin detalle de estado (salvo los ya desembolsados).",
             "casos": [_caso(r, "Sin estado de carpeta" if r["estado_carpeta"] is None else "Sin detalle de estado") for r in filas]})
 
-    distintos = {c["id"] for ch in chequeos for c in ch["casos"]}
+    distintos = {c["id"] if c["id"] is not None else "cuit:" + c["codigo"] for ch in chequeos for c in ch["casos"]}
     return {
         "dias_avanzados": DIAS_AVANZADOS, "dias_inicial": DIAS_INICIAL,
         "casos_distintos": len(distintos),
