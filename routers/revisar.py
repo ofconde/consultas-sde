@@ -77,6 +77,8 @@ def _categoria(r):
         clave = "RI"
     elif efectiva == "EXENTO":
         clave = "EXENTO"
+    elif efectiva == "NO INSCRIPTO":
+        clave = "NOINSC"
     elif efectiva:
         clave = "OTRO"
     else:

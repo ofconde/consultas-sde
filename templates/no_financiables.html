@@ -18,6 +18,7 @@
   .nf-desc{padding:0 1.125rem 0.75rem;font-size:0.8125rem;color:var(--muted)}
   .nf-nota{font-size:0.75rem;color:var(--muted)}
   .nf-motivo{font-weight:600;color:var(--navy);font-size:0.8125rem}
+  .nf-chk{display:flex;gap:0.5rem;align-items:center;font-size:0.875rem;color:var(--navy);cursor:pointer}
   .nf-act{max-width:22rem;font-size:0.8125rem}
   .nf-act .dest{color:var(--muted)}
 </style>
@@ -35,6 +36,7 @@
         <option value="">Cualquier género</option><option value="F">Mujeres</option>
         <option value="M">Varones</option><option value="—">Empresas / sin dato</option>
       </select>
+      <label class="nf-chk" title="Los exentos y no inscriptos no se pueden financiar hasta que se inscriban en ARCA: se ocultan, no se borran."><input type="checkbox" id="nf-sin-exentos"> Ocultar exentos y no inscriptos</label>
       <span class="muted" id="nf-resumen"></span>
     </div>
 
@@ -49,9 +51,11 @@ let DATA = null;
 const abiertas = new Set(['casfog', 'mujer_comercio', 'productivo']);   // las que más importan, abiertas de entrada
 const GENERO = {F: 'Mujer', M: 'Varón', '—': 'Empresa / s. d.'};
 
+const SIN_MONOTRIBUTO = ['EXENTO', 'NOINSC'];
 function filtrar(casos){
-  const t = $('#nf-tecnico').value, g = $('#nf-genero').value;
-  return casos.filter(c => (!t || c.tecnico === t) && (!g || c.genero === g));
+  const t = $('#nf-tecnico').value, g = $('#nf-genero').value, ocultar = $('#nf-sin-exentos').checked;
+  return casos.filter(c => (!t || c.tecnico === t) && (!g || c.genero === g)
+    && !(ocultar && SIN_MONOTRIBUTO.includes(c.cat_clave)));
 }
 
 function tabla(casos){
@@ -73,7 +77,8 @@ function tabla(casos){
 function pintar(){
   const secciones = DATA.grupos.map(g => ({...g, vis: filtrar(DATA.casos.filter(c => c.grupo === g.id))}));
   const total = secciones.reduce((n, g) => n + g.vis.length, 0);
-  $('#nf-resumen').textContent = `${total} de ${DATA.total} casos`;
+  const ocultos = $('#nf-sin-exentos').checked ? DATA.casos.filter(c => SIN_MONOTRIBUTO.includes(c.cat_clave)).length : 0;
+  $('#nf-resumen').textContent = `${total} de ${DATA.total} casos` + (ocultos ? ` · ${ocultos} exentos/no inscriptos ocultos` : '');
 
   $('#nf-kpis').innerHTML = secciones.map(g => `
     <button class="tabla-wrap card nf-kpi ${g.gravedad}" data-ir="${g.id}">
@@ -104,6 +109,11 @@ async function cargar(){
   pintar();
 }
 
+try{ $('#nf-sin-exentos').checked = localStorage.getItem('sde-ocultar-exentos') !== '0'; }catch(e){ $('#nf-sin-exentos').checked = true; }
+$('#nf-sin-exentos').addEventListener('change', () => {
+  try{ localStorage.setItem('sde-ocultar-exentos', $('#nf-sin-exentos').checked ? '1' : '0'); }catch(e){}
+  pintar();
+});
 $('#nf-tecnico').addEventListener('change', pintar);
 $('#nf-genero').addEventListener('change', pintar);
 cargar();

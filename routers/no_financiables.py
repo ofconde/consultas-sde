@@ -101,8 +101,7 @@ def clasificar(c):
         return "firme", "BCRA situación 5"
     if 0 < monto < MONTO_MINIMO:
         return "firme", f"Monto {_monto(monto)}, menor al mínimo ({_monto(MONTO_MINIMO)})"
-    if (c["cat_clave"] in ("OTRO", "SIN") and "no inscripto" in _sin_tildes(c["categoria"]).replace("-", " ")) \
-            or _ARCA_PENDIENTE.search(c["observaciones"] or ""):
+    if c["cat_clave"] in ("EXENTO", "NOINSC") or _ARCA_PENDIENTE.search(c["observaciones"] or ""):
         return "regularizable", "ARCA / CUIT: " + ((c["observaciones"] or c["categoria"]).strip()[:90] or "sin alta")
     if productiva:
         if monto > MONTO_MAXIMO:
@@ -159,7 +158,7 @@ def listar(usuario=Depends(require_revisor)):
         })
         casos.append({
             "id": r["id"], "codigo": r["codigo"], "nombre": r["nombre"] or "—", "tecnico": r["tecnico"],
-            "genero": genero if genero in ("F", "M") else "—", "categoria": categoria,
+            "genero": genero if genero in ("F", "M") else "—", "categoria": categoria, "cat_clave": cat_clave,
             "bcra": (r["situacion_bcra"] or "—").strip() or "—",
             "actividad": r["actividad"] or "—", "destino": r["destino"] or "—",
             "monto": int(r["monto"] or 0), "monto_fmt": _monto(r["monto"]),

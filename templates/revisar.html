@@ -22,6 +22,7 @@
   .rv-cat-fuente.confirmada{color:var(--green)}
   .rv-cat-dif{font-size:0.6875rem;font-weight:700;color:var(--amber)}
   .rv-dias{white-space:nowrap;font-weight:700}
+  .rv-chk{display:flex;gap:0.5rem;align-items:center;font-size:0.875rem;color:var(--navy);cursor:pointer}
 </style>
 {% endblock %}
 {% block body %}
@@ -34,6 +35,7 @@
     <div class="rv-filtros">
       <select id="rv-tecnico"><option value="">Todos los técnicos</option></select>
       <select id="rv-categoria" title="Categoría fiscal: la confirmada por el técnico si existe, si no la declarada en el formulario"><option value="">Todas las categorías</option></select>
+      <label class="rv-chk" title="Los exentos y no inscriptos no se pueden financiar hasta que se inscriban en ARCA: se ocultan, no se borran."><input type="checkbox" id="rv-sin-exentos"> Ocultar exentos y no inscriptos</label>
       <span class="muted" id="rv-resumen"></span>
     </div>
 
@@ -52,9 +54,11 @@ function coincideCategoria(c, cat){
   return cat === 'MONO' ? c.cat_clave.startsWith('MONO_') : c.cat_clave === cat;
 }
 
+const SIN_MONOTRIBUTO = ['EXENTO', 'NOINSC'];
 function filtrar(casos){
-  const t = $('#rv-tecnico').value, cat = $('#rv-categoria').value;
-  return casos.filter(c => (!t || c.tecnico === t) && coincideCategoria(c, cat));
+  const t = $('#rv-tecnico').value, cat = $('#rv-categoria').value, ocultar = $('#rv-sin-exentos').checked;
+  return casos.filter(c => (!t || c.tecnico === t) && coincideCategoria(c, cat)
+    && !(ocultar && SIN_MONOTRIBUTO.includes(c.cat_clave)));
 }
 
 // Opciones del filtro de categoría, con la cantidad de casos distintos que hay en
@@ -72,6 +76,7 @@ function pintarOpcionesCategoria(){
                ...claves.map(k => [k, rotulo(k) + ' (' + n(c => c.cat_clave === k) + ')']),
                ['RI', 'Responsable inscripto (' + n(c => c.cat_clave === 'RI') + ')'],
                ['EXENTO', 'Exento (' + n(c => c.cat_clave === 'EXENTO') + ')'],
+               ['NOINSC', 'No inscripto (' + n(c => c.cat_clave === 'NOINSC') + ')'],
                ['OTRO', 'Otra situación (' + n(c => c.cat_clave === 'OTRO') + ')'],
                ['SIN', 'Sin dato (' + n(c => c.cat_clave === 'SIN') + ')']];
   $('#rv-categoria').innerHTML = ops.map(([v, l]) => `<option value="${v}">${escapeHtml(l)}</option>`).join('');
@@ -101,7 +106,10 @@ function pintar(){
   const unicos = new Set();
   const secciones = DATA.chequeos.map(ch => ({...ch, vis: filtrar(ch.casos)}));
   secciones.forEach(ch => ch.vis.forEach(c => unicos.add(c.id ?? 'cuit:' + c.codigo)));
-  $('#rv-resumen').textContent = `${unicos.size} casos distintos para revisar${$('#rv-tecnico').value ? ' · ' + $('#rv-tecnico').value : ''}${$('#rv-categoria').value ? ' · ' + $('#rv-categoria').selectedOptions[0].textContent.replace(/ \(\d+\)$/, '') : ''}`;
+  const ocultos = new Set();
+  if($('#rv-sin-exentos').checked) DATA.chequeos.forEach(ch => ch.casos.forEach(c => {
+    if(SIN_MONOTRIBUTO.includes(c.cat_clave)) ocultos.add(c.id ?? 'cuit:' + c.codigo); }));
+  $('#rv-resumen').textContent = `${unicos.size} casos distintos para revisar${ocultos.size ? ' (' + ocultos.size + ' exentos/no inscriptos ocultos)' : ''}${$('#rv-tecnico').value ? ' · ' + $('#rv-tecnico').value : ''}${$('#rv-categoria').value ? ' · ' + $('#rv-categoria').selectedOptions[0].textContent.replace(/ \(\d+\)$/, '') : ''}`;
 
   $('#rv-kpis').innerHTML = secciones.map(ch => `
     <button class="tabla-wrap card rv-kpi ${ch.gravedad}" data-ir="${ch.id}">
@@ -132,6 +140,11 @@ async function cargar(){
   pintar();
 }
 
+try{ $('#rv-sin-exentos').checked = localStorage.getItem('sde-ocultar-exentos') !== '0'; }catch(e){ $('#rv-sin-exentos').checked = true; }
+$('#rv-sin-exentos').addEventListener('change', () => {
+  try{ localStorage.setItem('sde-ocultar-exentos', $('#rv-sin-exentos').checked ? '1' : '0'); }catch(e){}
+  pintar();
+});
 $('#rv-tecnico').addEventListener('change', pintar);
 $('#rv-categoria').addEventListener('change', pintar);
 cargar();
