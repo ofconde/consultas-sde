@@ -12,9 +12,10 @@ from sqlalchemy import text
 
 from db import engine
 from auth import require_coordinador
-from formatos import _monto
+from formatos import _monto, _hora_local
 from constantes import ESTADOS_TRAMITE_CASFOG, ESTADO_TRAMITE_CASFOG_COLOR
 import genero as genero_mod
+import casfog_planilla
 
 router = APIRouter(prefix="/api/casfog-ok", tags=["casfog"])
 
@@ -74,6 +75,7 @@ def listar(usuario=Depends(require_coordinador)):
         "con_alerta": sum(1 for c in casos if c["alerta"]),
         "monto_solicitado_total_fmt": _monto(sum(c["monto_solicitado"] for c in con_match)),
         "monto_aprobado_total_fmt": _monto(sum(c["monto_aprobado"] or 0 for c in casos)),
+        "sincronizacion": _estado_sincronizacion(),
         "estados_tramite": ESTADOS_TRAMITE_CASFOG,
         "estado_tramite_color": ESTADO_TRAMITE_CASFOG_COLOR,
         "casos": casos,
@@ -94,3 +96,23 @@ def marcar_tramite(cuit: str, body: dict = Body(...), usuario=Depends(require_co
     if not r:
         raise HTTPException(404, "CUIT no encontrado en OK CASFOG")
     return {"ok": True}
+
+
+def _estado_sincronizacion():
+    r = casfog_planilla.ultima_sincronizacion()
+    ok, ult = r["ultima_ok"], r["ultima"]
+    return {
+        "ultima_ok": _hora_local(ok["ejecutado_en"]) if ok else None,
+        "filas": ok["filas"] if ok else None,
+        "ultimo_error": ult["error"] if ult and not ult["ok"] else None,
+        "url": casfog_planilla.URL_VER,
+    }
+
+
+@router.post("/sincronizar")
+def sincronizar(usuario=Depends(require_coordinador)):
+    """Baja ahora la planilla oficial de CASFOG y actualiza el espejo."""
+    res = casfog_planilla.sincronizar("manual")
+    if not res["ok"]:
+        raise HTTPException(502, "No se pudo leer la planilla de CASFOG: " + res["error"])
+    return {**res, **_estado_sincronizacion()}

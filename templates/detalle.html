@@ -17,6 +17,7 @@
       <button class="copy-btn destacado" id="cp-elevar"
               title="Copia Solicitante / CUIT / Actividad / Solicitud, listo para pegar en el mail de elevación">copiar datos para el mail</button>
     </div>
+    <div id="casfog-box" style="display:none"></div>
 
     <div class="grid2">
       <!-- Gestión editable -->
@@ -276,6 +277,7 @@ async function cargar(){
   $('#cuit').textContent = 'CUIT ' + (c.cuit||'—');
   $('#recepcion').textContent = 'Recepción ' + (c.fecha_recepcion_fmt||'—');
   badgeGrupo(c.grupo, c.estado);
+  pintarCasfog(c.casfog);
 
   // Campos del solicitante: <span> de solo lectura para técnico, <input>/<textarea>
   // editable para coordinador (mismos ids en los dos casos, ver pintarCampo()).
@@ -429,6 +431,24 @@ async function borrarAccion(aid){
   if(!confirm('¿Eliminar esta acción?')) return;
   await fetch('/api/consultas/'+CID+'/acciones/'+aid,{method:'DELETE'});
   refrescarAcciones();
+}
+
+// Recuadro con lo que dice la planilla oficial de CASFOG sobre este caso.
+function pintarCasfog(cf){
+  const box = $('#casfog-box');
+  if(!cf){ box.style.display = 'none'; return; }
+  const titulo = {A: 'CASFOG: APROBADO', D: 'CASFOG: DESAPROBADO', P: 'CASFOG pidió información',
+                  S: 'CASFOG: todavía sin resultado', R: 'CASFOG: en revisión'}[cf.resultado] || 'CASFOG';
+  const fila = (k, v) => v ? `<div><span class="k">${k}:</span> ${escapeHtml(v)}</div>` : '';
+  box.className = 'casfog-box ' + cf.resultado;
+  box.innerHTML = `<div class="t">${escapeHtml(titulo)}${cf.monto_fmt ? ' · ' + escapeHtml(cf.monto_fmt) : ''}</div>`
+    + fila('Resultado del análisis', cf.resultado_texto)
+    + fila('Estado según la planilla', cf.estado_planilla)
+    + fila('Línea / plazo', [cf.linea, cf.plazo && (cf.plazo + ' meses')].filter(Boolean).join(' · '))
+    + fila('Observaciones de CASFOG', cf.observacion)
+    + fila('Fecha de monetización', cf.fecha_monetizacion)
+    + '<div class="k" style="margin-top:0.25rem;font-size:0.75rem">Dato tomado de la planilla oficial de CASFOG, se actualiza solo.</div>';
+  box.style.display = '';
 }
 
 cargar();

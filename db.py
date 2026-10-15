@@ -305,6 +305,22 @@ def init_db():
             )
         """))
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_casfog_oficial_cuit ON sde_casfog_oficial (cuit)"))
+        # Datos que trae la planilla además de la clasificación: el texto completo del
+        # análisis (con el motivo), la línea, el plazo, las observaciones del fondo y
+        # la fecha de monetización. Se completan en cada sincronización.
+        for col in ("resultado_texto", "linea", "plazo", "fecha_monetizacion", "observacion"):
+            conn.execute(text(f"ALTER TABLE sde_casfog_oficial ADD COLUMN IF NOT EXISTS {col} TEXT"))
+        # Registro de las sincronizaciones con la planilla de CASFOG.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sde_casfog_sync (
+                id           SERIAL PRIMARY KEY,
+                ejecutado_en TIMESTAMP DEFAULT NOW(),
+                ok           BOOLEAN NOT NULL,
+                filas        INT,
+                origen       TEXT,
+                error        TEXT
+            )
+        """))
 
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS sde_consultas_codigo_seq"))
         conn.execute(text("""

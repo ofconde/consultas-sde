@@ -162,7 +162,7 @@ def revisar(usuario=Depends(require_revisor)):
 
         # 2c) CASFOG pidió información.
         filas = q(f"""
-            SELECT DISTINCT ON (b.id) b.*, o.nota AS pedido
+            SELECT DISTINCT ON (b.id) b.*, COALESCE(o.resultado_texto, o.nota) AS pedido
             FROM sde_casfog_oficial o JOIN ({_BASE}) b ON b.id = o.consulta_id
             WHERE o.resultado = 'P' ORDER BY b.id""")
         filas = sorted(filas, key=lambda r: (r["tecnico"], r["nombre"] or ""))

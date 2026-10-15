@@ -22,10 +22,30 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("consultas_sde")
 
 
+def _loop_sync_casfog():
+    """Mantiene al día el espejo de la planilla oficial de CASFOG: al arrancar y
+    cada SYNC_CASFOG_HORAS. Hilo aparte: si falla solo deja el error registrado."""
+    import casfog_planilla
+    time.sleep(45)                                       # que termine de arrancar la app
+    while True:
+        try:
+            ult = casfog_planilla.ultima_sincronizacion()["ultima_ok"]
+            if not ult or float(ult["edad_s"]) > SYNC_CASFOG_HORAS * 3600 - 300:
+                casfog_planilla.sincronizar("automatica")
+        except Exception:
+            log.exception("Error en el ciclo de sincronización con CASFOG")
+        time.sleep(3600)
+
+
+SYNC_CASFOG_HORAS = 6
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     seed_usuarios()
+    import threading
+    threading.Thread(target=_loop_sync_casfog, daemon=True, name="sync-casfog").start()
     yield
 
 

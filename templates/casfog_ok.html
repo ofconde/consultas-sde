@@ -23,8 +23,10 @@
     <div style="display:flex;align-items:baseline;gap:0.875rem;flex-wrap:wrap">
       <h1 class="brand-font" style="margin:0.5rem 0 0.25rem">OK CASFOG</h1>
       <div class="spacer" style="flex:1"></div>
+      <button class="ebtn" id="btn-sync" title="Lee ahora la planilla oficial de CASFOG y actualiza lo que se ve en el sistema">Actualizar desde CASFOG</button>
       <button class="ebtn mujeres" id="btn-mujeres" title="Estimado por CUIT/nombre — no reemplaza confirmar el encuadre">♀ Mujeres</button>
     </div>
+    <p class="muted" id="ck-sync" style="margin:0 0 0.5rem;font-size:0.8125rem"></p>
     <p class="muted" style="margin:0 0 1.25rem">Casos aprobados por el fondo de garantía CASFOG, consolidados a mano desde las planillas del fondo. El monto solicitado sale de la consulta real en el sistema, no del genérico de esas planillas.</p>
 
     <div class="ck-resumen">
@@ -111,6 +113,11 @@ async function cargar(){
   ESTADOS_TRAMITE = d.estados_tramite || [];
   ESTADO_TRAMITE_COLOR = d.estado_tramite_color || {};
   TODOS = d.casos;
+  const sy = d.sincronizacion || {};
+  $('#ck-sync').innerHTML = sy.ultima_ok
+    ? `Planilla oficial de CASFOG leída el ${escapeHtml(sy.ultima_ok)} (${sy.filas} solicitudes) — se actualiza sola cada pocas horas · <a href="${escapeHtml(sy.url)}" target="_blank" rel="noopener">abrir la planilla</a>`
+    : 'Todavía no se leyó la planilla oficial de CASFOG.';
+  if(sy.ultimo_error) $('#ck-sync').innerHTML += ` <span style="color:var(--red)">⚠ Última lectura con error: ${escapeHtml(sy.ultimo_error)}</span>`;
   pintar();
 }
 
@@ -123,6 +130,14 @@ async function cambiarTramite(cuit, valor){
   });
   cargar();
 }
+
+$('#btn-sync').addEventListener('click', async () => {
+  const b = $('#btn-sync'); b.disabled = true; const t = b.textContent; b.textContent = 'Leyendo la planilla…';
+  const r = await fetch('/api/casfog-ok/sincronizar', {method: 'POST'});
+  b.disabled = false; b.textContent = t;
+  if(!r.ok){ const e = await r.json().catch(() => ({})); alert(e.detail || 'No se pudo actualizar.'); return; }
+  cargar();
+});
 
 $('#btn-mujeres').addEventListener('click', () => {
   soloMujeres = !soloMujeres;

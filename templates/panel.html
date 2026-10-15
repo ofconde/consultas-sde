@@ -393,6 +393,15 @@ const ACCIONES_RAPIDAS = [
   ['SE INFORMA QUE NO ES FINANCIABLE', 'No es financiable'],
 ];
 
+// Lo que dice la planilla oficial de CASFOG sobre el caso (se actualiza sola).
+function badgeCasfog(cf){
+  if(!cf) return '';
+  const txt = {A: 'CASFOG ✓ ' + (cf.monto_fmt || 'aprobado'), D: 'CASFOG ✗ desaprobado', P: 'CASFOG pide info',
+               S: 'CASFOG: sin resultado', R: 'CASFOG: en revisión'}[cf.resultado] || 'CASFOG';
+  const tip = [cf.texto, cf.estado && ('Estado en la planilla: ' + cf.estado), cf.obs].filter(Boolean).join(' · ');
+  return ` <span class="badge-casfog ${cf.resultado}" title="${escapeHtml(tip)}">${escapeHtml(txt)}</span>`;
+}
+
 function filaHTML(c, numeroFila){
   const dup = c.es_duplicado ? '<span class="dup">DUP</span>' : '';
   // Última acción del historial. Si hay más de una se aclara cuántas van, para no
@@ -436,6 +445,7 @@ function filaHTML(c, numeroFila){
       <td>${escapeHtml(c.fecha_recepcion)||'—'}<div class="cod">${escapeHtml(c.codigo)||'#'+numeroFila}</div></td>
       <td><a class="lnk-caso" href="/consulta/${c.id}" style="display:inline"><span class="nom">${escapeHtml(c.nombre)||'—'}</span></a>${
           c.genero_estimado==='F' ? '<span class="tag-mujer" title="Estimado por CUIT/nombre — confirmar encuadre">♀</span>' : ''}${
+          badgeCasfog(c.casfog)}${
           c.instancia_superior
             ? ` <span class="badge-instancia-superior" title="Seguimiento fino en Instancia Superior" onclick="event.stopPropagation();location.href='/panel/instancia-superior'">↑ Instancia superior</span>`
             : ` <button class="btn sm btn-instancia-superior" onclick="event.stopPropagation();pasarAInstanciaSuperior(${c.id},this)">→ Instancia superior</button>`}

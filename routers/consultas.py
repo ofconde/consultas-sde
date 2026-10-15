@@ -61,6 +61,9 @@ def _condicion_fianza_tercero(alias="c"):
 
 def _fila_resumen(r):
     return {
+        "casfog": ({"resultado": r["cf_resultado"], "texto": r["cf_texto"], "monto": r["cf_monto"],
+                    "monto_fmt": _monto(r["cf_monto"]) if r["cf_monto"] else None,
+                    "estado": r["cf_estado"], "obs": r["cf_obs"]} if r.get("cf_resultado") else None),
         "id": r["id"],
         "codigo": r["codigo"],
         "fecha_recepcion": _dmy(r["fecha_recepcion"]),
@@ -200,8 +203,15 @@ def listar(request: Request, estado: str = "", tecnico: str = "",
         rows = conn.execute(text(f"""
             SELECT c.*,
                    (SELECT COUNT(*) FROM sde_acciones a WHERE a.consulta_id = c.id) AS n_acciones,
-                   ua.accion AS ultima_accion, ua.fecha AS ultima_accion_fecha
+                   ua.accion AS ultima_accion, ua.fecha AS ultima_accion_fecha,
+                   cf.resultado AS cf_resultado, cf.resultado_texto AS cf_texto, cf.monto_aprobado AS cf_monto,
+                   cf.estado_planilla AS cf_estado, cf.observacion AS cf_obs
             FROM sde_consultas c
+            LEFT JOIN LATERAL (
+                SELECT resultado, resultado_texto, monto_aprobado, estado_planilla, observacion
+                FROM sde_casfog_oficial o WHERE o.consulta_id = c.id
+                ORDER BY CASE o.resultado WHEN 'A' THEN 0 WHEN 'P' THEN 1 ELSE 2 END, o.fila LIMIT 1
+            ) cf ON true
             LEFT JOIN LATERAL (
                 SELECT accion, fecha FROM sde_acciones a2
                 WHERE a2.consulta_id = c.id
@@ -516,6 +526,15 @@ def detalle(cid: int, _=Depends(require_login)):
     consulta["monto_fmt"] = _monto(c["monto"])
     consulta["monto_confirmado_fmt"] = _monto(c["monto_confirmado"])
     consulta["grupo"] = grupo_de(c["estado"])
+    with engine.connect() as conn:
+        cf = conn.execute(text("""
+            SELECT resultado, resultado_texto, monto_aprobado, estado_planilla, linea, plazo,
+                   observacion, fecha_monetizacion
+            FROM sde_casfog_oficial WHERE consulta_id = :id
+            ORDER BY CASE resultado WHEN 'A' THEN 0 WHEN 'P' THEN 1 ELSE 2 END, fila LIMIT 1
+        """), {"id": cid}).mappings().first()
+    consulta["casfog"] = ({**dict(cf), "monto_fmt": _monto(cf["monto_aprobado"]) if cf["monto_aprobado"] else None}
+                          if cf else None)
     acciones = [{
         "id": a["id"], "fecha": _dmy(a["fecha"]), "accion": a["accion"],
         "detalle": a["detalle"], "creado_por": a["creado_por"],
