@@ -137,3 +137,11 @@ function abrirCaso(ev, id){
   const url = '/consulta/' + id;
   if(ev.ctrlKey || ev.metaKey) window.open(url, '_blank'); else location.href = url;
 }
+
+// Línea con la que se agrupa un caso de instancia superior. La línea
+// «PROGRAMATICA» mezcla Mujeres y Verde: lo que las distingue es el programa, así
+// que en ese caso la línea efectiva es el programa. '' = sin línea.
+function lineaEfectiva(c) {
+  const l = c.linea && c.linea !== "—" ? c.linea : "";
+  return l === "PROGRAMATICA" && c.programa && c.programa !== "—" ? c.programa : l;
+}
