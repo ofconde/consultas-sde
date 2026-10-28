@@ -20,8 +20,8 @@
   :root{--hoja:269mm}
   @media print{ @page{size:A4 landscape;margin:12mm 14mm} }
   .resumen-2col{display:grid;grid-template-columns:1.15fr 1fr;gap:18px;align-items:start}
-  .resumen-der{display:grid;gap:10px}
-  .resumen-der .sec-title{margin-bottom:4px}
+  .resumen-col{display:grid;gap:10px;align-content:start}
+  .resumen-col .sec-title{margin-bottom:4px}
   .linea-bloque{margin-top:16px}
   .linea-tit{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:2px}
   .linea-sub{font-size:10px;color:var(--muted);margin-bottom:8px}
@@ -76,12 +76,11 @@
   <div class="kpi-row" id="kpis"></div>
 
   <div class="sec resumen-2col" style="margin-top:16px">
-    <div>
-      <div class="sec-title">Resumen por estado</div>
-      <div id="tabla-resumen"></div>
-    </div>
-    <div class="resumen-der">
+    <div class="resumen-col">
+      <div><div class="sec-title">Resumen por estado</div><div id="tabla-resumen"></div></div>
       <div><div class="sec-title">Por línea</div><div id="tabla-linea"></div></div>
+    </div>
+    <div class="resumen-col">
       <div><div class="sec-title">Por garantía</div><div id="tabla-garantia"></div></div>
       <div><div class="sec-title">Por programática</div><div id="tabla-programa"></div></div>
     </div>
