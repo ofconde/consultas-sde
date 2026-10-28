@@ -14,18 +14,6 @@
 <link rel="stylesheet" href="/static/css/informe-pdf.css">
 <script src="/static/js/util.js"></script>
 <style>
-  /* Este informe se imprime APAISADO: la tabla de casos lleva una columna de
-     anotaciones y en vertical queda angosta. --hoja es el ancho útil de la hoja
-     (A4 apaisado 297mm menos los márgenes de @page). */
-  :root{--hoja:269mm}
-  @media print{ @page{size:A4 landscape;margin:12mm 14mm} }
-  .resumen-2col{display:grid;grid-template-columns:1.15fr 1fr;gap:18px;align-items:start}
-  .resumen-col{display:grid;gap:10px;align-content:start}
-  .resumen-col .sec-title{margin-bottom:4px}
-  .linea-bloque{margin-top:16px}
-  .linea-tit{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:2px}
-  .linea-sub{font-size:10px;color:var(--muted);margin-bottom:8px}
-  @media print{ .linea-bloque{break-before:page;page-break-before:always;margin-top:0} }
   .filtros-estado{max-width:var(--hoja);margin:12px auto 0;padding:10px 14px;background:#fff;border-radius:8px;
     box-shadow:0 2px 12px rgba(28,36,67,.10);display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px}
   .fe-tit{font-weight:700;color:var(--navy)}
@@ -33,6 +21,12 @@
   .fe-chip input{margin:0;cursor:pointer}
   .filtros-estado .tbtn{background:#fff;color:var(--navy);border:1px solid #d6dbe6}
   @media print{.filtros-estado{display:none !important}}
+  /* Desglose por línea: una hoja por cada línea, para pasarla al área que corresponda */
+  .desglose-intro{margin-top:18px}
+  .linea-bloque{margin-top:16px}
+  .linea-tit{font-size:15px;font-weight:800;color:var(--navy)}
+  .linea-sub{font-size:10px;color:var(--muted);margin:2px 0 8px}
+  @media print{ .linea-bloque{break-before:page;page-break-before:always;margin-top:0} }
 </style>
 </head>
 <body>
@@ -75,18 +69,35 @@
 
   <div class="kpi-row" id="kpis"></div>
 
-  <div class="sec resumen-2col" style="margin-top:16px">
-    <div class="resumen-col">
-      <div><div class="sec-title">Resumen por estado</div><div id="tabla-resumen"></div></div>
-      <div><div class="sec-title">Por línea</div><div id="tabla-linea"></div></div>
-    </div>
-    <div class="resumen-col">
-      <div><div class="sec-title">Por garantía</div><div id="tabla-garantia"></div></div>
-      <div><div class="sec-title">Por programática</div><div id="tabla-programa"></div></div>
+  <div class="sec" style="margin-top:16px">
+    <div class="sec-title">Resumen por estado</div>
+    <div id="tabla-resumen"></div>
+  </div>
+
+  <div class="sec">
+    <div class="grid2">
+      <div>
+        <div class="sec-title">Por línea</div>
+        <div id="tabla-linea"></div>
+      </div>
+      <div>
+        <div class="sec-title">Por garantía</div>
+        <div id="tabla-garantia"></div>
+      </div>
     </div>
   </div>
 
-  <div id="tabla-casos"></div>
+  <div class="sec">
+    <div class="sec-title">Por programática</div>
+    <div id="tabla-programa"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Detalle por caso</div>
+    <div id="tabla-casos"></div>
+  </div>
+
+  <div id="desglose"></div>
 
   <div class="doc-foot">
     <span>Consejo Federal de Inversiones · UEP Santiago del Estero · {{ usuario.nombre }}</span>
@@ -150,14 +161,14 @@ function tablaAgrupada(encabezado, filas){
       <tr><td>${escapeHtml(f.clave)}</td><td class="num">${f.n}</td><td class="money">${escapeHtml(f.monto_fmt)}</td></tr>`).join('')}</tbody></table>`;
 }
 
-function filasCasos(casos){
+function tablaCasos(casos){
+  if(!casos.length) return '<div class="vacio">Todavía no hay casos en instancia superior.</div>';
   return `<table class="tabla-avanzados"><colgroup>
-      <col style="width:8%"><col style="width:16%"><col style="width:10%">
-      <col style="width:9%"><col style="width:7%"><col style="width:16%"><col style="width:34%">
+      <col style="width:9%"><col style="width:17%"><col style="width:11%">
+      <col style="width:17%"><col style="width:11%"><col style="width:35%">
     </colgroup><thead><tr>
       <th style="white-space:normal">Código</th><th style="white-space:normal">Solicitante</th><th style="white-space:normal">Técnico</th>
-      <th style="text-align:right;white-space:normal">Monto</th><th style="text-align:center;white-space:normal">Firmado</th>
-      <th style="white-space:normal">Estado</th><th style="white-space:normal">Anotaciones</th>
+      <th style="text-align:right;white-space:normal">Monto</th><th style="text-align:center;white-space:normal">Firmado</th><th style="white-space:normal">Estado</th>
     </tr></thead><tbody>${casos.map(c => `
       <tr>
         <td>${escapeHtml(c.codigo)}</td>
@@ -166,36 +177,52 @@ function filasCasos(casos){
         <td class="money">${escapeHtml(c.monto_fmt)}</td>
         <td style="text-align:center">${c.firmado ? 'Sí' : 'No'}</td>
         <td><span class="estado-linea" style="color:${colorEstado(c.estado_carpeta)};white-space:normal">${escapeHtml(etiqueta(c.estado_carpeta)||'Sin clasificar')}</span></td>
-        <td style="white-space:normal">${escapeHtml(c.detalle_estado) || '<span style="color:var(--muted)">—</span>'}</td>
       </tr>`).join('')}</tbody></table>`;
 }
 
-// El detalle se separa por línea: un bloque (una hoja nueva al imprimir) por cada una.
-function tablaCasos(casos){
-  if(!casos.length) return '<div class="vacio">Todavía no hay casos en instancia superior.</div>';
-  const grupos = new Map();
-  casos.forEach(c => { const k = lineaEfectiva(c); (grupos.get(k) || grupos.set(k, []).get(k)).push(c); });
-  const orden = k => { const i = [...LINEAS_ORDEN].indexOf(k); return k === '' ? 9999 : (i === -1 ? 9998 : i); };
-  return [...grupos.entries()].sort((a, b) => orden(a[0]) - orden(b[0])).map(([k, lista]) => {
-    const monto = lista.reduce((n, c) => n + c.monto, 0);
-    return `<div class="linea-bloque">
-      <div class="linea-tit">${escapeHtml(k ? etiqueta(k) : 'Sin línea')}</div>
-      <div class="linea-sub">${lista.length} ${lista.length === 1 ? 'caso' : 'casos'} · ${escapeHtml(montoTexto(monto))}</div>
-      ${filasCasos(lista)}</div>`;
-  }).join('');
-}
+function montoTexto(n){ return '$ ' + n.toLocaleString('es-AR'); }
 
-// «Por línea» del resumen: mismo criterio que el detalle (línea efectiva).
+// «Por línea» del resumen: la línea PROGRAMATICA mezcla Mujeres y Verde, así que
+// se usa la línea efectiva (el programa en ese caso), igual que el desglose.
 function resumenPorLinea(casos){
   const acc = new Map();
   casos.forEach(c => { const k = etiqueta(lineaEfectiva(c)) || 'Sin línea'; const a = acc.get(k) || {n:0, monto:0}; a.n++; a.monto += c.monto; acc.set(k, a); });
   return [...acc.entries()].map(([clave, v]) => ({clave, n: v.n, monto_fmt: montoTexto(v.monto), monto: v.monto}))
     .sort((a, b) => b.monto - a.monto);
 }
-function montoTexto(n){ return '$ ' + n.toLocaleString('es-AR'); }
+
+// Desglose por línea, después del informe: qué le pasa a cada solicitante, para que
+// quien conduce pueda pasarle a cada área (Mujeres, Verde, Competitividad…) lo suyo.
+// Lo desembolsado queda afuera: ya no hay nada que resolver.
+let LINEAS_ORDEN = [];
+function desglosePorLinea(casos){
+  const pendientes = casos.filter(c => c.estado_carpeta !== 'DESEMBOLSADO');
+  if(!pendientes.length) return '';
+  const grupos = new Map();
+  pendientes.forEach(c => { const k = lineaEfectiva(c); (grupos.get(k) || grupos.set(k, []).get(k)).push(c); });
+  const orden = k => { const i = LINEAS_ORDEN.indexOf(k); return k === '' ? 9999 : (i === -1 ? 9998 : i); };
+  const bloques = [...grupos.entries()].sort((a, b) => orden(a[0]) - orden(b[0])).map(([k, lista]) => {
+    const monto = lista.reduce((n, c) => n + c.monto, 0);
+    return `<div class="linea-bloque">
+      <div class="linea-tit">${escapeHtml(k ? etiqueta(k) : 'Sin línea')}</div>
+      <div class="linea-sub">${lista.length} ${lista.length === 1 ? 'caso' : 'casos'} sin desembolsar · ${escapeHtml(montoTexto(monto))}</div>
+      <table class="tabla-avanzados"><colgroup>
+        <col style="width:24%"><col style="width:12%"><col style="width:22%"><col style="width:42%">
+      </colgroup><thead><tr>
+        <th style="white-space:normal">Solicitante</th><th style="text-align:right;white-space:normal">Monto</th>
+        <th style="white-space:normal">Estado</th><th style="white-space:normal">Qué le pasa</th>
+      </tr></thead><tbody>${lista.map(c => `
+        <tr>
+          <td>${escapeHtml(c.nombre)||'—'}<div style="font-size:8.5px;color:var(--muted)">${escapeHtml(c.codigo)}</div></td>
+          <td class="money">${escapeHtml(c.monto_fmt)}</td>
+          <td><span class="estado-linea" style="color:${colorEstado(c.estado_carpeta)};white-space:normal">${escapeHtml(etiqueta(c.estado_carpeta)||'Sin clasificar')}</span></td>
+          <td style="white-space:normal">${escapeHtml(c.detalle_estado) || '<span style="color:var(--muted)">Sin anotación</span>'}</td>
+        </tr>`).join('')}</tbody></table></div>`;
+  }).join('');
+  return `<div class="desglose-intro"></div>${bloques}`;
+}
 
 let TODOS_ESTADOS = [];
-let LINEAS_ORDEN = [];
 let seleccion = new Set(new URLSearchParams(location.search).getAll('estados'));  // vacío = todos
 
 function pintarFiltros(){
@@ -235,6 +262,7 @@ async function cargar(){
   $('#tabla-garantia').innerHTML = tablaAgrupada('Garantía', d.resumen_garantia);
   $('#tabla-programa').innerHTML = tablaAgrupada('Programa', d.resumen_programa);
   $('#tabla-casos').innerHTML = tablaCasos(d.casos);
+  $('#desglose').innerHTML = desglosePorLinea(d.casos);
 }
 
 $('#btn-actualizar').addEventListener('click', cargar);
