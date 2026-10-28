@@ -330,7 +330,7 @@ def instancia_superior(estados: list[str] = Query(default=[]), _=Depends(require
             SELECT id, codigo, nombre, tecnico,
                    COALESCE(monto_instancia_superior, NULLIF(monto_confirmado, 0), monto) AS monto,
                    monto_instancia_superior,
-                   linea, programa, garantia, firmado, estado_carpeta
+                   linea, programa, garantia, firmado, estado_carpeta, detalle_estado
             FROM sde_consultas WHERE instancia_superior = TRUE
         """)).mappings().all()
 
@@ -342,6 +342,7 @@ def instancia_superior(estados: list[str] = Query(default=[]), _=Depends(require
         "linea": r["linea"] or "—", "programa": r["programa"] or "—",
         "garantia": r["garantia"] or "—", "firmado": bool(r["firmado"]),
         "estado_carpeta": r["estado_carpeta"],
+        "detalle_estado": r["detalle_estado"] or "",
     } for r in rows]
     if estados:
         casos = [c for c in casos if c["estado_carpeta"] in estados]

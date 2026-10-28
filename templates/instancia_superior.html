@@ -15,6 +15,13 @@
   .is-sel-plain:hover{border-color:var(--border)}
   .is-sel-plain.is-linea{font-weight:600;margin-bottom:0.125rem}
   .is-sel-plain.is-programa{font-size:0.8125rem;color:var(--muted)}
+  .is-filtros{display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;margin-bottom:0.875rem}
+  .is-filtros select{padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.625rem;font:inherit;background:#fff;color:var(--navy)}
+  .is-chk{display:flex;gap:0.5rem;align-items:center;font-size:0.875rem;color:var(--navy);cursor:pointer}
+  .is-grupo td{background:#eef1f7;color:var(--navy);font-weight:700;padding:0.5rem 0.875rem}
+  .is-grupo .sub{font-weight:500;color:var(--muted);margin-left:0.75rem}
+  .is-nota{width:100%;min-width:16rem;min-height:2.75rem;resize:vertical;border:1px solid var(--border);border-radius:0.375rem;padding:0.3125rem 0.5rem;font:inherit;font-size:0.8125rem;background:#fff;color:inherit}
+  .is-nota.ok{border-color:var(--green)} .is-nota.err{border-color:var(--red)}
 </style>
 {% endblock %}
 {% block body %}
@@ -28,12 +35,18 @@
     </div>
     <p class="muted" style="margin:0 0 1.25rem">Casos remitidos a firma de representante en adelante — el circuito hasta el desembolso, con seguimiento más fino que el estado general.</p>
 
+    <div class="is-filtros">
+      <select id="is-filtro-estado" title="Mostrar solo los casos de un estado de carpeta"><option value="">Todos los estados</option></select>
+      <label class="is-chk"><input type="checkbox" id="is-por-linea"> Separar por línea</label>
+      <span class="muted" id="is-contador"></span>
+    </div>
+
     <div class="tabla-wrap card" style="margin-bottom:1.5rem">
       <table>
         <thead><tr>
           <th>Técnico</th><th>Solicitante</th><th style="text-align:right">Monto</th>
           <th>Línea / Programa</th><th>Garantía</th><th style="text-align:center">Firmado</th>
-          <th>Estado carpeta</th>
+          <th>Estado carpeta</th><th>Anotaciones</th>
         </tr></thead>
         <tbody id="is-tbody"></tbody>
       </table>
@@ -142,20 +155,40 @@ function filaHTML(c){
       <td>${escapeHtml(c.garantia)}</td>
       <td style="text-align:center"><input type="checkbox" class="is-firmado" data-id="${c.id}" ${c.firmado?'checked':''}></td>
       <td>${selEstadoCarpeta(c)}</td>
+      <td><textarea class="is-nota" data-id="${c.id}" placeholder="Anotaciones del caso…">${escapeHtml(c.detalle_estado)}</textarea></td>
     </tr>`;
 }
 
-async function cargar(){
-  META = await (await fetch('/api/catalogos/estado-grupo')).json();
-  const cat = await (await fetch('/api/catalogos')).json();
-  ESTADOS_CARPETA = cat.ESTADO_CARPETA || [];
-  LINEAS = cat.LINEA || [];
-  PROGRAMAS = cat.PROGRAMA || [];
-  const d = await (await fetch('/api/consultas/instancia-superior')).json();
+// ── tabla: filtro por estado y separación por línea ─────────────────────────
+let CASOS = [];
+const ORDEN_SIN_LINEA = 9999;
 
-  $('#is-vacio').style.display = d.casos.length ? 'none' : '';
-  $('#is-tbody').innerHTML = d.casos.map(filaHTML).join('');
+function pintarTabla(){
+  const estado = $('#is-filtro-estado').value;
+  const porLinea = $('#is-por-linea').checked;
+  const casos = CASOS.filter(c => !estado || (estado === '__sin__' ? !c.estado_carpeta : c.estado_carpeta === estado));
+  $('#is-contador').textContent = `${casos.length} de ${CASOS.length} casos`;
+  $('#is-vacio').style.display = CASOS.length ? 'none' : '';
+  let html;
+  if(!porLinea){
+    html = casos.map(filaHTML).join('');
+  }else{
+    const grupos = new Map();
+    casos.forEach(c => { const k = c.linea && c.linea !== '—' ? c.linea : ''; (grupos.get(k) || grupos.set(k, []).get(k)).push(c); });
+    const orden = k => { const i = LINEAS.indexOf(k); return k === '' ? ORDEN_SIN_LINEA : (i === -1 ? ORDEN_SIN_LINEA - 1 : i); };
+    html = [...grupos.entries()].sort((a, b) => orden(a[0]) - orden(b[0])).map(([k, lista]) => {
+      const monto = lista.reduce((n, c) => n + c.monto, 0);
+      return `<tr class="is-grupo"><td colspan="8">${escapeHtml(k ? etiqueta(k) : 'Sin línea')}
+          <span class="sub">${lista.length} ${lista.length === 1 ? 'caso' : 'casos'} · ${escapeHtml("$ " + montoFmt(monto))}</span></td></tr>`
+        + lista.map(filaHTML).join('');
+    }).join('');
+  }
+  $('#is-tbody').innerHTML = html;
   enlazarCasos($('#is-tbody'));
+  engancharEdicion();
+}
+
+function engancharEdicion(){
   document.querySelectorAll('.is-firmado').forEach(el => {
     el.addEventListener('change', () => cambiarFirmado(el.dataset.id, el.checked));
   });
@@ -171,6 +204,45 @@ async function cargar(){
     el.addEventListener('blur', () => cambiarMonto(el.dataset.id, el.value));
     el.addEventListener('keydown', e => { if(e.key === 'Enter') el.blur(); });
   });
+  document.querySelectorAll('.is-nota').forEach(el => {
+    el.addEventListener('blur', () => guardarNota(el));
+  });
+}
+
+// Las anotaciones se guardan al salir del cuadro y NO recargan la pantalla (si
+// no, se perdería el lugar donde se estaba escribiendo). Es el mismo campo
+// «Detalle del estado» del Listado Gobernación y del informe.
+async function guardarNota(el){
+  const c = CASOS.find(x => x.id === Number(el.dataset.id));
+  const valor = el.value.trim();
+  if(!c || valor === (c.detalle_estado || '').trim()) return;
+  const r = await fetch('/api/consultas/'+c.id, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({detalle_estado: valor}),
+  });
+  if(r.ok){
+    c.detalle_estado = valor;
+    el.classList.remove('err'); el.classList.add('ok'); setTimeout(() => el.classList.remove('ok'), 1200);
+  }else{
+    el.classList.add('err');
+    alert(r.status === 403 ? 'Este caso es de otro técnico: no podés editar sus anotaciones.' : 'No se pudo guardar la anotación. Probá de nuevo.');
+  }
+}
+
+async function cargar(){
+  META = await (await fetch('/api/catalogos/estado-grupo')).json();
+  const cat = await (await fetch('/api/catalogos')).json();
+  ESTADOS_CARPETA = cat.ESTADO_CARPETA || [];
+  LINEAS = cat.LINEA || [];
+  PROGRAMAS = cat.PROGRAMA || [];
+  const d = await (await fetch('/api/consultas/instancia-superior')).json();
+
+  CASOS = d.casos;
+  const sel = $('#is-filtro-estado'), actual = sel.value;
+  sel.innerHTML = '<option value="">Todos los estados</option><option value="__sin__">Sin clasificar</option>'
+    + ESTADOS_CARPETA.map(e => `<option value="${e}">${escapeHtml(etiqueta(e))}</option>`).join('');
+  sel.value = actual;
+  pintarTabla();
 
   const pct = n => d.total ? (n / d.total * 100).toFixed(1).replace('.', ',') + '%' : '—';
   $('#is-resumen-tbody').innerHTML = d.resumen.map(r => `
@@ -243,6 +315,12 @@ async function cambiarMonto(id, valor){
   cargar();
 }
 
+try{ $('#is-por-linea').checked = localStorage.getItem('sde-is-por-linea') === '1'; }catch(e){}
+$('#is-por-linea').addEventListener('change', () => {
+  try{ localStorage.setItem('sde-is-por-linea', $('#is-por-linea').checked ? '1' : '0'); }catch(e){}
+  pintarTabla();
+});
+$('#is-filtro-estado').addEventListener('change', pintarTabla);
 cargar();
 </script>
 {% endblock %}
