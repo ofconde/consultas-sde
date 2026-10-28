@@ -173,9 +173,15 @@ function pintarTabla(){
   if(!porLinea){
     html = casos.map(filaHTML).join('');
   }else{
+    // La línea «PROGRAMATICA» mezcla Mujeres y Verde: lo que distingue el
+    // programa. Se separa por la línea efectiva = programa cuando la línea es esa.
+    const lineaEfectiva = c => {
+      const l = c.linea && c.linea !== '—' ? c.linea : '';
+      return l === 'PROGRAMATICA' && c.programa && c.programa !== '—' ? c.programa : l;
+    };
     const grupos = new Map();
-    casos.forEach(c => { const k = c.linea && c.linea !== '—' ? c.linea : ''; (grupos.get(k) || grupos.set(k, []).get(k)).push(c); });
-    const orden = k => { const i = LINEAS.indexOf(k); return k === '' ? ORDEN_SIN_LINEA : (i === -1 ? ORDEN_SIN_LINEA - 1 : i); };
+    casos.forEach(c => { const k = lineaEfectiva(c); (grupos.get(k) || grupos.set(k, []).get(k)).push(c); });
+    const orden = k => { const i = [...LINEAS, ...PROGRAMAS].indexOf(k); return k === '' ? ORDEN_SIN_LINEA : (i === -1 ? ORDEN_SIN_LINEA - 1 : i); };
     html = [...grupos.entries()].sort((a, b) => orden(a[0]) - orden(b[0])).map(([k, lista]) => {
       const monto = lista.reduce((n, c) => n + c.monto, 0);
       return `<tr class="is-grupo"><td colspan="8">${escapeHtml(k ? etiqueta(k) : 'Sin línea')}
