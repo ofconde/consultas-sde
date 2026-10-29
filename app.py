@@ -15,7 +15,7 @@ from sqlalchemy import text
 from db import init_db, engine
 from auth import (seed_usuarios, autenticar, crear_token, usuario_actual, COOKIE_NAME,
                   SESSION_MAX_AGE, rate_limit_excedido, registrar_intento_fallido, limpiar_intentos)
-from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria, casfog, listado_gobernacion, revisar, no_financiables
+from routers import consultas, acciones, ingesta, informe, catalogos, usuarios, bcra, seguimiento, auditoria, casfog, listado_gobernacion, revisar, no_financiables, exportacion
 from routers.auditoria import registrar_actividad, registrar_accion
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -96,6 +96,7 @@ app.include_router(casfog.router)
 app.include_router(listado_gobernacion.router)
 app.include_router(revisar.router)
 app.include_router(no_financiables.router)
+app.include_router(exportacion.router)
 
 
 # ── Páginas ──────────────────────────────────────────────────────────
