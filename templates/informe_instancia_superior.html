@@ -3,7 +3,10 @@
 {# Documento imprimible standalone — mismo criterio que informe_avanzados.html
    (no extiende base.html, reusa static/css/informe-pdf.css). Snapshot de
    /panel/instancia-superior para elevar/compartir, la gestión día a día sigue
-   viviendo en esa pantalla, acá solo se lee. #}
+   viviendo en esa pantalla, acá solo se lee.
+   Es un informe ARMABLE: el botón «Personalizar» deja elegir qué secciones lleva,
+   qué columnas tiene el detalle, a qué casos acota (línea / garantía / técnico) y
+   cómo se agrupa el detalle. La elección se recuerda en este navegador. #}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,19 +23,35 @@
   :root{--hoja:269mm}
   @media print{ @page{size:A4 landscape;margin:12mm 14mm} }
   .resumen-2col{display:grid;grid-template-columns:1.15fr 1fr;gap:18px;align-items:start}
+  .resumen-2col.una-col{grid-template-columns:1fr}
   .resumen-col{display:grid;gap:10px;align-content:start}
   .resumen-col .sec-title{margin-bottom:4px}
   .linea-bloque{margin-top:16px}
   .linea-tit{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:2px}
   .linea-sub{font-size:10px;color:var(--muted);margin-bottom:8px}
+  .grupo-bloque{margin-top:14px}
+  .grupo-bloque:first-child{margin-top:0}
+  .grupo-tit{font-size:12px;font-weight:800;color:var(--navy);margin-bottom:1px;break-after:avoid;page-break-after:avoid}
+  .grupo-sub{font-size:9.5px;color:var(--muted);margin-bottom:5px;break-after:avoid;page-break-after:avoid}
   @media print{ .linea-bloque{break-before:page;page-break-before:always;margin-top:0} }
-  .filtros-estado{max-width:var(--hoja);margin:12px auto 0;padding:10px 14px;background:#fff;border-radius:8px;
-    box-shadow:0 2px 12px rgba(28,36,67,.10);display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px}
+  .filtros-estado,.cfg{max-width:var(--hoja);margin:12px auto 0;padding:10px 14px;background:#fff;border-radius:8px;
+    box-shadow:0 2px 12px rgba(28,36,67,.10);font-size:12px}
+  .filtros-estado{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
   .fe-tit{font-weight:700;color:var(--navy)}
   .fe-chip{display:inline-flex;align-items:center;gap:5px;margin:2px 8px 2px 0;cursor:pointer;user-select:none}
   .fe-chip input{margin:0;cursor:pointer}
-  .filtros-estado .tbtn{background:#fff;color:var(--navy);border:1px solid #d6dbe6}
-  @media print{.filtros-estado{display:none !important}}
+  .filtros-estado .tbtn,.cfg .tbtn{background:#fff;color:var(--navy);border:1px solid #d6dbe6}
+  /* Panel «Personalizar»: cerrado de entrada para que el informe se vea limpio. */
+  .cfg{display:none;padding:12px 14px 6px}
+  .cfg.abierto{display:block}
+  .cfg-grupo{display:flex;flex-wrap:wrap;align-items:baseline;margin-bottom:9px;padding-bottom:9px;border-bottom:1px solid #eef0f5}
+  .cfg-grupo:last-child{border-bottom:0}
+  .cfg-tit{font-weight:700;color:var(--navy);width:150px;flex:none}
+  .cfg-opciones{display:flex;flex-wrap:wrap;flex:1;min-width:0}
+  .cfg-nota{font-size:10.5px;color:var(--muted);margin-left:8px}
+  .cfg select{font:inherit;padding:3px 6px;border:1px solid #d6dbe6;border-radius:6px;color:var(--navy);background:#fff}
+  .cfg-acciones{display:flex;gap:8px;padding-bottom:6px}
+  .tbtn.activo{background:var(--navy);color:#fff}
 </style>
 </head>
 <body>
@@ -41,6 +60,7 @@
   <img class="tl-logo" src="/static/img/logo-cfi.png" alt="CFI">
   <span class="tl-tit">Instancia Superior</span>
   <span class="spacer"></span>
+  <button class="tbtn" id="btn-personalizar" aria-expanded="false" aria-controls="cfg">Personalizar informe</button>
   <button class="tbtn" id="btn-actualizar">Actualizar</button>
   <button class="tbtn primary" id="btn-imprimir">Imprimir / Guardar PDF</button>
 </div>
@@ -50,6 +70,46 @@
   <span id="fe-chips"></span>
   <button class="tbtn" id="fe-todos">Todos</button>
   <button class="tbtn" id="fe-desembolso" title="Solo lo desembolsado o en trámite de desembolso">Desembolsado + en trámite de desembolso</button>
+</div>
+
+<div class="cfg" id="cfg" aria-label="Personalizar informe">
+  <div class="cfg-grupo">
+    <span class="cfg-tit">Secciones</span>
+    <span class="cfg-opciones" id="cfg-secciones"></span>
+  </div>
+  <div class="cfg-grupo">
+    <span class="cfg-tit">Columnas del detalle</span>
+    <span class="cfg-opciones" id="cfg-columnas"></span>
+  </div>
+  <div class="cfg-grupo">
+    <span class="cfg-tit">Agrupar el detalle por</span>
+    <span class="cfg-opciones">
+      <select id="cfg-agrupar" aria-label="Agrupar el detalle por">
+        <option value="">Sin agrupar</option>
+        <option value="estado">Estado</option>
+        <option value="linea">Línea</option>
+        <option value="garantia">Garantía</option>
+        <option value="tecnico">Técnico</option>
+      </select>
+    </span>
+  </div>
+  <div class="cfg-grupo">
+    <span class="cfg-tit">Solo estas líneas</span>
+    <span class="cfg-opciones" id="cfg-f-linea"></span>
+  </div>
+  <div class="cfg-grupo">
+    <span class="cfg-tit">Solo estas garantías</span>
+    <span class="cfg-opciones" id="cfg-f-garantia"></span>
+  </div>
+  <div class="cfg-grupo">
+    <span class="cfg-tit">Solo estos técnicos</span>
+    <span class="cfg-opciones" id="cfg-f-tecnico"></span>
+  </div>
+  <div class="cfg-acciones">
+    <button class="tbtn" id="cfg-solo-resumen" title="Deja los indicadores y los resúmenes, sin el detalle caso por caso">Solo resumen</button>
+    <button class="tbtn" id="cfg-restablecer">Restablecer todo</button>
+    <span class="cfg-nota">Lo que no tildás de «Solo estas…» entra completo. Tus elecciones quedan guardadas en este navegador.</span>
+  </div>
 </div>
 
 <div id="doc">
@@ -75,18 +135,12 @@
 
   <div class="kpi-row" id="kpis"></div>
 
-  <div class="sec resumen-2col" style="margin-top:16px">
-    <div class="resumen-col">
-      <div><div class="sec-title">Resumen por estado</div><div id="tabla-resumen"></div></div>
-      <div><div class="sec-title">Por línea</div><div id="tabla-linea"></div></div>
-    </div>
-    <div class="resumen-col">
-      <div><div class="sec-title">Por garantía</div><div id="tabla-garantia"></div></div>
-      <div><div class="sec-title">Por programática</div><div id="tabla-programa"></div></div>
-    </div>
+  <div class="sec resumen-2col" id="resumenes" style="margin-top:16px">
+    <div class="resumen-col" id="col-a"></div>
+    <div class="resumen-col" id="col-b"></div>
   </div>
 
-  <div class="sec">
+  <div class="sec" id="sec-casos">
     <div class="sec-title">Detalle por caso</div>
     <div id="tabla-casos"></div>
   </div>
@@ -115,36 +169,130 @@ function colorEstado(estado){
   if(!c) return 'var(--navy)';
   return c.fg === '#ffffff' ? c.bg : c.fg;
 }
+function montoTexto(n){ return '$ ' + n.toLocaleString('es-AR'); }
+const suma = casos => casos.reduce((n, c) => n + c.monto, 0);
 
 // Estados que ya salieron del circuito, para bien (desembolsado) o para mal
 // (desistido/rechazado) — "en curso" es todo lo que no cayó en ninguno de
 // estos, no solo lo que todavía no se desembolsó.
 const ESTADOS_CERRADOS = ['DESEMBOLSADO', 'DESISTIDO POR SOLICITANTE', 'RECHAZADO POR ANALISIS DE RIESGO'];
+const ESTADO_FIRMADO = 'FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)';
 
-function pintarKpis(d){
-  const desembolsado = d.resumen.find(r => r.estado === 'DESEMBOLSADO') || {n:0, monto_fmt:'$ 0'};
-  const cerrados = d.resumen.filter(r => ESTADOS_CERRADOS.includes(r.estado)).reduce((acc, r) => acc + r.n, 0);
-  const enCurso = d.total - cerrados;
-  $('#kpis').innerHTML = `
-    <div class="kpi c-navy"><div class="n">${d.total}</div><div class="l">Casos totales</div></div>
-    <div class="kpi c-violet"><div class="n">${enCurso}</div><div class="l">En curso</div></div>
-    <div class="kpi c-green"><div class="n">${desembolsado.n}</div><div class="l">Desembolsados</div>
-      <div class="sub">${escapeHtml(desembolsado.monto_fmt)}</div></div>
-    <div class="kpi c-amber"><div class="n" style="font-size:16px">${escapeHtml(d.monto_total_fmt)}</div><div class="l">Monto total</div></div>`;
+/* ── Configuración del informe ───────────────────────────────────────────── */
+// Claves con las que se agrupa y se filtra. Cada una devuelve la etiqueta que se
+// ve en pantalla, así el filtro, el resumen y los grupos del detalle hablan igual.
+const CLAVE = {
+  linea:    c => etiqueta(lineaEfectiva(c)) || 'Sin línea',
+  garantia: c => (c.garantia && c.garantia !== '—') ? c.garantia : 'Sin garantía',
+  programa: c => (c.programa && c.programa !== '—') ? c.programa : 'Sin programa',
+  tecnico:  c => c.tecnico || 'Sin asignar',
+  estado:   c => etiqueta(c.estado_carpeta) || 'Sin clasificar',
+};
+
+const SECCIONES = [
+  ['kpis', 'Indicadores'], ['estado', 'Resumen por estado'], ['linea', 'Por línea'],
+  ['garantia', 'Por garantía'], ['programa', 'Por programática'], ['casos', 'Detalle por caso'],
+  ['firmados', 'Firmados en trámite (una hoja por línea)'],
+];
+
+// Orden de este objeto = orden de las columnas en la hoja. w = peso relativo del ancho.
+const COLUMNAS = {
+  codigo:   {t: 'Código',          w: 8,  v: c => escapeHtml(c.codigo)},
+  nombre:   {t: 'Solicitante',     w: 16, v: c => escapeHtml(c.nombre) || '—'},
+  cuit:     {t: 'CUIT',            w: 9,  v: c => escapeHtml(c.cuit) || '—', nowrap: true},
+  telefono: {t: 'Teléfono',        w: 9,  v: c => escapeHtml(c.telefono) || '—'},
+  mail:     {t: 'Mail',            w: 14, v: c => escapeHtml(c.mail) || '—'},
+  localidad:{t: 'Localidad',       w: 10, v: c => escapeHtml(c.localidad) || '—'},
+  tecnico:  {t: 'Técnico',         w: 10, v: c => escapeHtml(c.tecnico)},
+  linea:    {t: 'Línea',           w: 11, v: c => escapeHtml(CLAVE.linea(c))},
+  programa: {t: 'Programa',        w: 9,  v: c => escapeHtml(c.programa && c.programa !== '—' ? c.programa : '—')},
+  garantia: {t: 'Garantía',        w: 10, v: c => escapeHtml(c.garantia)},
+  monto:    {t: 'Monto',           w: 9,  v: c => escapeHtml(c.monto_fmt), clase: 'money', alinea: 'right'},
+  firmado:  {t: 'Firmado',         w: 7,  v: c => c.firmado ? 'Sí' : 'No', alinea: 'center'},
+  estado:   {t: 'Estado',          w: 16, v: c => `<span class="estado-linea" style="color:${colorEstado(c.estado_carpeta)};white-space:normal">${escapeHtml(CLAVE.estado(c))}</span>`},
+  situacion_tramite: {t: 'Situación del trámite', w: 14, v: c => escapeHtml(c.situacion_tramite) || '<span style="color:var(--muted)">—</span>'},
+  detalle:  {t: 'Anotaciones',     w: 34, v: c => escapeHtml(c.detalle_estado) || '<span style="color:var(--muted)">—</span>'},
+};
+const COLUMNAS_DEFECTO = ['codigo', 'nombre', 'tecnico', 'monto', 'firmado', 'estado', 'detalle'];
+const CLAVE_GUARDADO = 'sde-informe-instancia-superior-v1';
+
+function cfgDefecto(){
+  return {
+    secciones: Object.fromEntries(SECCIONES.map(([k]) => [k, true])),
+    columnas: [...COLUMNAS_DEFECTO],
+    agrupar: '',
+    filtros: {linea: [], garantia: [], tecnico: []},   // vacío = no acota
+  };
+}
+function leerCfg(){
+  const cfg = cfgDefecto();
+  try {
+    const g = JSON.parse(localStorage.getItem(CLAVE_GUARDADO) || 'null');
+    if(!g) return cfg;
+    SECCIONES.forEach(([k]) => { if(typeof g.secciones?.[k] === 'boolean') cfg.secciones[k] = g.secciones[k]; });
+    if(Array.isArray(g.columnas)) cfg.columnas = Object.keys(COLUMNAS).filter(k => g.columnas.includes(k));
+    if(cfg.columnas.length === 0) cfg.columnas = [...COLUMNAS_DEFECTO];
+    if(['', 'estado', 'linea', 'garantia', 'tecnico'].includes(g.agrupar)) cfg.agrupar = g.agrupar;
+    ['linea', 'garantia', 'tecnico'].forEach(k => { if(Array.isArray(g.filtros?.[k])) cfg.filtros[k] = g.filtros[k].map(String); });
+  } catch(e) { /* sin almacenamiento o dato viejo: se usa el informe de siempre */ }
+  return cfg;
+}
+function guardarCfg(){
+  try { localStorage.setItem(CLAVE_GUARDADO, JSON.stringify(CFG)); } catch(e) { /* no pasa nada: solo no se recuerda */ }
 }
 
-function tablaResumen(resumen, totalN, totalFmt){
+let CFG = leerCfg();
+let DATA = {casos: []};        // lo que devolvió el servidor para los estados elegidos
+let OPCIONES = {linea: [], garantia: [], tecnico: []};
+let TODOS_ESTADOS = [];
+let LINEAS_ORDEN = [];
+let seleccion = new Set(new URLSearchParams(location.search).getAll('estados'));  // vacío = todos
+
+/* ── Datos ya acotados ───────────────────────────────────────────────────── */
+function casosFiltrados(){
+  return DATA.casos.filter(c => ['linea', 'garantia', 'tecnico'].every(k =>
+    !CFG.filtros[k].length || CFG.filtros[k].includes(CLAVE[k](c))));
+}
+
+// Cantidad y monto por valor de `clave`, de mayor a menor monto.
+function agrupar(casos, clave){
+  const acc = new Map();
+  casos.forEach(c => { const k = CLAVE[clave](c); const a = acc.get(k) || {n: 0, monto: 0}; a.n++; a.monto += c.monto; acc.set(k, a); });
+  return [...acc.entries()].map(([k, v]) => ({clave: k, n: v.n, monto: v.monto, monto_fmt: montoTexto(v.monto)}))
+    .sort((a, b) => b.monto - a.monto);
+}
+
+/* ── Piezas del informe ──────────────────────────────────────────────────── */
+function pintarKpis(casos){
+  const monto = suma(casos);
+  const des = casos.filter(c => c.estado_carpeta === 'DESEMBOLSADO');
+  const cerrados = casos.filter(c => ESTADOS_CERRADOS.includes(c.estado_carpeta)).length;
+  return `
+    <div class="kpi c-navy"><div class="n">${casos.length}</div><div class="l">Casos totales</div></div>
+    <div class="kpi c-violet"><div class="n">${casos.length - cerrados}</div><div class="l">En curso</div></div>
+    <div class="kpi c-green"><div class="n">${des.length}</div><div class="l">Desembolsados</div>
+      <div class="sub">${escapeHtml(montoTexto(suma(des)))}</div></div>
+    <div class="kpi c-amber"><div class="n" style="font-size:16px">${escapeHtml(montoTexto(monto))}</div><div class="l">Monto total</div></div>`;
+}
+
+function tablaResumen(casos){
+  const estados = seleccion.size ? TODOS_ESTADOS.filter(e => seleccion.has(e)) : TODOS_ESTADOS;
+  const filas = estados.map(e => {
+    const lista = casos.filter(c => c.estado_carpeta === e);
+    return {estado: e, n: lista.length, monto_fmt: montoTexto(suma(lista))};
+  });
+  const totalN = casos.length;
   const pct = n => totalN ? (n / totalN * 100).toFixed(1).replace('.', ',') + '%' : '—';
   return `<table><thead><tr>
       <th>Estado</th><th style="text-align:right">Cantidad</th><th style="text-align:right">%</th><th style="text-align:right">Monto</th>
-    </tr></thead><tbody>${resumen.map(r => `
+    </tr></thead><tbody>${filas.map(r => `
       <tr>
         <td><span class="estado-linea" style="color:${colorEstado(r.estado)}">${escapeHtml(etiqueta(r.estado))}</span></td>
         <td class="num">${r.n}</td>
         <td class="num">${pct(r.n)}</td>
         <td class="money">${escapeHtml(r.monto_fmt)}</td>
       </tr>`).join('')}</tbody>
-    <tfoot><tr style="font-weight:700"><td>TOTAL</td><td class="num">${totalN}</td><td class="num">${totalN ? '100%' : '—'}</td><td class="money">${escapeHtml(totalFmt)}</td></tr></tfoot></table>`;
+    <tfoot><tr style="font-weight:700"><td>TOTAL</td><td class="num">${totalN}</td><td class="num">${totalN ? '100%' : '—'}</td><td class="money">${escapeHtml(montoTexto(suma(casos)))}</td></tr></tfoot></table>`;
 }
 
 function tablaAgrupada(encabezado, filas){
@@ -155,35 +303,44 @@ function tablaAgrupada(encabezado, filas){
       <tr><td>${escapeHtml(f.clave)}</td><td class="num">${f.n}</td><td class="money">${escapeHtml(f.monto_fmt)}</td></tr>`).join('')}</tbody></table>`;
 }
 
-function filasCasos(casos){
-  return `<table class="tabla-avanzados"><colgroup>
-      <col style="width:8%"><col style="width:16%"><col style="width:10%">
-      <col style="width:9%"><col style="width:7%"><col style="width:16%"><col style="width:34%">
-    </colgroup><thead><tr>
-      <th style="white-space:normal">Código</th><th style="white-space:normal">Solicitante</th><th style="white-space:normal">Técnico</th>
-      <th style="text-align:right;white-space:normal">Monto</th><th style="text-align:center;white-space:normal">Firmado</th>
-      <th style="white-space:normal">Estado</th><th style="white-space:normal">Anotaciones</th>
-    </tr></thead><tbody>${casos.map(c => `
-      <tr>
-        <td>${escapeHtml(c.codigo)}</td>
-        <td>${escapeHtml(c.nombre)||'—'}</td>
-        <td>${escapeHtml(c.tecnico)}</td>
-        <td class="money">${escapeHtml(c.monto_fmt)}</td>
-        <td style="text-align:center">${c.firmado ? 'Sí' : 'No'}</td>
-        <td><span class="estado-linea" style="color:${colorEstado(c.estado_carpeta)};white-space:normal">${escapeHtml(etiqueta(c.estado_carpeta)||'Sin clasificar')}</span></td>
-        <td style="white-space:normal">${escapeHtml(c.detalle_estado) || '<span style="color:var(--muted)">—</span>'}</td>
-      </tr>`).join('')}</tbody></table>`;
+// Tabla de casos con las columnas elegidas; los anchos se reparten según el peso
+// de cada columna para que siempre sumen el 100% de la hoja.
+function tablaDetalle(casos){
+  const cols = CFG.columnas;
+  const total = cols.reduce((n, k) => n + COLUMNAS[k].w, 0);
+  return `<table class="tabla-avanzados"><colgroup>${cols.map(k =>
+      `<col style="width:${(COLUMNAS[k].w / total * 100).toFixed(2)}%">`).join('')}</colgroup>
+    <thead><tr>${cols.map(k => `<th style="white-space:normal;${COLUMNAS[k].alinea ? 'text-align:' + COLUMNAS[k].alinea : ''}">${escapeHtml(COLUMNAS[k].t)}</th>`).join('')}</tr></thead>
+    <tbody>${casos.map(c => `<tr>${cols.map(k => {
+      const d = COLUMNAS[k];
+      const estilo = [d.alinea ? 'text-align:' + d.alinea : '', d.nowrap ? '' : 'white-space:normal'].filter(Boolean).join(';');
+      return `<td${d.clase ? ` class="${d.clase}"` : ''}${estilo ? ` style="${estilo}"` : ''}>${d.v(c)}</td>`;
+    }).join('')}</tr>`).join('')}</tbody></table>`;
 }
 
-function tablaCasos(casos){
-  if(!casos.length) return '<div class="vacio">Todavía no hay casos en instancia superior.</div>';
-  return filasCasos(casos);
+function seccionDetalle(casos){
+  if(!casos.length) return '<div class="vacio">No hay casos con esta selección.</div>';
+  if(!CFG.agrupar) return tablaDetalle(casos);
+  const orden = {
+    estado: k => { const i = TODOS_ESTADOS.findIndex(e => etiqueta(e) === k); return i === -1 ? -1 : i; },
+    linea: k => { const i = LINEAS_ORDEN.findIndex(l => etiqueta(l) === k); return k === 'Sin línea' ? 9999 : (i === -1 ? 9998 : i); },
+  }[CFG.agrupar];
+  const grupos = new Map();
+  casos.forEach(c => { const k = CLAVE[CFG.agrupar](c); (grupos.get(k) || grupos.set(k, []).get(k)).push(c); });
+  const lista = [...grupos.entries()];
+  if(orden) lista.sort((a, b) => orden(a[0]) - orden(b[0]));
+  else lista.sort((a, b) => suma(b[1]) - suma(a[1]));
+  return lista.map(([k, grupo]) => `
+    <div class="grupo-bloque">
+      <div class="grupo-tit">${escapeHtml(k)}</div>
+      <div class="grupo-sub">${grupo.length} ${grupo.length === 1 ? 'caso' : 'casos'} · ${escapeHtml(montoTexto(suma(grupo)))}</div>
+      ${tablaDetalle(grupo)}
+    </div>`).join('');
 }
 
 // Desglose de lo más importante: los expedientes «Firmado - en trámite para ingresar a
 // CFI», una hoja por línea y con el detalle del problema de cada uno, para que el área
 // que corresponde (Mujeres, Verde, Competitividad…) tome el expediente y sepa qué pasa.
-const ESTADO_FIRMADO = 'FIRMADO - EN TRAMITE PARA INGRESAR A CFI (DOCUMENTACION O SGR)';
 function desgloseFirmados(casos){
   const firmados = casos.filter(c => c.estado_carpeta === ESTADO_FIRMADO);
   if(!firmados.length) return '';
@@ -191,7 +348,7 @@ function desgloseFirmados(casos){
   firmados.forEach(c => { const k = lineaEfectiva(c); (grupos.get(k) || grupos.set(k, []).get(k)).push(c); });
   const orden = k => { const i = LINEAS_ORDEN.indexOf(k); return k === '' ? 9999 : (i === -1 ? 9998 : i); };
   return [...grupos.entries()].sort((a, b) => orden(a[0]) - orden(b[0])).map(([k, lista]) => {
-    const monto = lista.reduce((n, c) => n + c.monto, 0);
+    const monto = suma(lista);
     return `<div class="linea-bloque">
       <div class="linea-tit">${escapeHtml(k ? etiqueta(k) : 'Sin línea')}</div>
       <div class="linea-sub">Firmados, en trámite para ingresar a CFI · ${lista.length} ${lista.length === 1 ? 'expediente' : 'expedientes'} · ${escapeHtml(montoTexto(monto))}</div>
@@ -212,19 +369,92 @@ function desgloseFirmados(casos){
   }).join('');
 }
 
-// «Por línea» del resumen: mismo criterio que el detalle (línea efectiva).
-function resumenPorLinea(casos){
-  const acc = new Map();
-  casos.forEach(c => { const k = etiqueta(lineaEfectiva(c)) || 'Sin línea'; const a = acc.get(k) || {n:0, monto:0}; a.n++; a.monto += c.monto; acc.set(k, a); });
-  return [...acc.entries()].map(([clave, v]) => ({clave, n: v.n, monto_fmt: montoTexto(v.monto), monto: v.monto}))
-    .sort((a, b) => b.monto - a.monto);
+/* ── Dibujo del informe según la configuración ───────────────────────────── */
+function textoFiltros(){
+  const partes = [];
+  if(seleccion.size) partes.push('Estados: ' + [...seleccion].map(etiqueta).join(' · '));
+  [['linea', 'Líneas'], ['garantia', 'Garantías'], ['tecnico', 'Técnicos']].forEach(([k, t]) => {
+    if(CFG.filtros[k].length) partes.push(t + ': ' + CFG.filtros[k].join(' · '));
+  });
+  return partes.length ? 'Solo — ' + partes.join('  |  ') : '';
 }
-function montoTexto(n){ return '$ ' + n.toLocaleString('es-AR'); }
 
-let TODOS_ESTADOS = [];
-let LINEAS_ORDEN = [];
-let seleccion = new Set(new URLSearchParams(location.search).getAll('estados'));  // vacío = todos
+function dibujar(){
+  const casos = casosFiltrados();
+  const s = CFG.secciones;
+  $('#doc-filtro').textContent = textoFiltros();
 
+  $('#kpis').innerHTML = s.kpis ? pintarKpis(casos) : '';
+  $('#kpis').style.display = s.kpis ? '' : 'none';
+
+  const bloque = (titulo, html) => `<div><div class="sec-title">${titulo}</div>${html}</div>`;
+  const colA = [s.estado && bloque('Resumen por estado', tablaResumen(casos)),
+                s.linea && bloque('Por línea', tablaAgrupada('Línea', agrupar(casos, 'linea')))].filter(Boolean);
+  const colB = [s.garantia && bloque('Por garantía', tablaAgrupada('Garantía', agrupar(casos, 'garantia'))),
+                s.programa && bloque('Por programática', tablaAgrupada('Programa', agrupar(casos, 'programa')))].filter(Boolean);
+  $('#col-a').innerHTML = colA.join('');
+  $('#col-b').innerHTML = colB.join('');
+  $('#col-a').style.display = colA.length ? '' : 'none';
+  $('#col-b').style.display = colB.length ? '' : 'none';
+  $('#resumenes').style.display = (colA.length || colB.length) ? '' : 'none';
+  $('#resumenes').classList.toggle('una-col', !(colA.length && colB.length));
+
+  $('#sec-casos').style.display = s.casos ? '' : 'none';
+  $('#tabla-casos').innerHTML = s.casos ? seccionDetalle(casos) : '';
+  $('#desglose').innerHTML = s.firmados ? desgloseFirmados(casos) : '';
+}
+
+/* ── Panel «Personalizar» ────────────────────────────────────────────────── */
+function chip(grupo, valor, texto, marcado){
+  return `<label class="fe-chip"><input type="checkbox" data-grupo="${grupo}" value="${escapeHtml(valor)}" ${marcado ? 'checked' : ''}>
+    <span>${escapeHtml(texto)}</span></label>`;
+}
+
+function calcularOpciones(){
+  const unicos = (clave, orden) => [...new Set(DATA.casos.map(CLAVE[clave]))].sort(orden);
+  const porLineas = (a, b) => {
+    const rank = k => { const i = LINEAS_ORDEN.findIndex(l => etiqueta(l) === k); return k === 'Sin línea' ? 9999 : (i === -1 ? 9998 : i); };
+    return rank(a) - rank(b) || a.localeCompare(b, 'es');
+  };
+  OPCIONES = {
+    linea: unicos('linea', porLineas),
+    garantia: unicos('garantia', (a, b) => a.localeCompare(b, 'es')),
+    tecnico: unicos('tecnico', (a, b) => a.localeCompare(b, 'es')),
+  };
+  // Si cambian los estados y una opción tildada ya no existe, se descarta: si no
+  // quedaría un filtro invisible que deja el informe vacío sin explicación.
+  Object.keys(OPCIONES).forEach(k => { CFG.filtros[k] = CFG.filtros[k].filter(v => OPCIONES[k].includes(v)); });
+}
+
+function pintarPanel(){
+  $('#cfg-secciones').innerHTML = SECCIONES.map(([k, t]) => chip('seccion', k, t, CFG.secciones[k])).join('');
+  $('#cfg-columnas').innerHTML = Object.entries(COLUMNAS).map(([k, d]) => chip('columna', k, d.t, CFG.columnas.includes(k))).join('');
+  $('#cfg-agrupar').value = CFG.agrupar;
+  ['linea', 'garantia', 'tecnico'].forEach(k => {
+    $('#cfg-f-' + k).innerHTML = OPCIONES[k].length
+      ? OPCIONES[k].map(v => chip('f-' + k, v, v, CFG.filtros[k].includes(v))).join('')
+      : '<span class="cfg-nota">Sin datos para elegir.</span>';
+  });
+}
+
+function leerPanel(){
+  const marcados = g => [...document.querySelectorAll(`#cfg input[data-grupo="${g}"]:checked`)].map(i => i.value);
+  SECCIONES.forEach(([k]) => { CFG.secciones[k] = marcados('seccion').includes(k); });
+  const cols = marcados('columna');
+  // Un detalle sin ninguna columna no tiene sentido: se conserva la última elección.
+  if(cols.length) CFG.columnas = Object.keys(COLUMNAS).filter(k => cols.includes(k));
+  CFG.agrupar = $('#cfg-agrupar').value;
+  ['linea', 'garantia', 'tecnico'].forEach(k => { CFG.filtros[k] = marcados('f-' + k); });
+}
+
+function alCambiarPanel(){
+  leerPanel();
+  guardarCfg();
+  pintarPanel();   // repinta para devolver la columna que no se pudo destildar
+  dibujar();
+}
+
+/* ── Estados (viene del servidor, como siempre) ──────────────────────────── */
 function pintarFiltros(){
   $('#fe-chips').innerHTML = TODOS_ESTADOS.map(e => `
     <label class="fe-chip"><input type="checkbox" value="${escapeHtml(e)}" ${(!seleccion.size || seleccion.has(e)) ? 'checked' : ''}>
@@ -250,25 +480,38 @@ async function cargar(){
   const qs = new URLSearchParams();
   seleccion.forEach(e => qs.append('estados', e));
   history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : ''));
-  const d = await (await fetch('/api/consultas/instancia-superior' + (qs.toString() ? '?' + qs : ''))).json();
+  DATA = await (await fetch('/api/consultas/instancia-superior' + (qs.toString() ? '?' + qs : ''))).json();
   const ahora = new Date().toLocaleString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
   $('#emitido').textContent = 'Emitido: ' + ahora;
   $('#foot-emitido').textContent = 'Emitido: ' + ahora;
-  $('#doc-filtro').textContent = seleccion.size ? 'Solo: ' + [...seleccion].map(etiqueta).join(' · ') : '';
   pintarFiltros();
-  pintarKpis(d);
-  $('#tabla-resumen').innerHTML = tablaResumen(d.resumen, d.total, d.monto_total_fmt);
-  $('#tabla-linea').innerHTML = tablaAgrupada('Línea', resumenPorLinea(d.casos));
-  $('#tabla-garantia').innerHTML = tablaAgrupada('Garantía', d.resumen_garantia);
-  $('#tabla-programa').innerHTML = tablaAgrupada('Programa', d.resumen_programa);
-  $('#tabla-casos').innerHTML = tablaCasos(d.casos);
-  $('#desglose').innerHTML = desgloseFirmados(d.casos);
+  calcularOpciones();
+  guardarCfg();
+  pintarPanel();
+  dibujar();
 }
 
 $('#btn-actualizar').addEventListener('click', cargar);
 $('#fe-todos').addEventListener('click', () => aplicarSeleccion([]));
 $('#fe-desembolso').addEventListener('click', () => aplicarSeleccion(['EN TRAMITE DE DESEMBOLSO', 'DESEMBOLSADO']));
 $('#btn-imprimir').addEventListener('click', () => window.print());
+
+$('#btn-personalizar').addEventListener('click', () => {
+  const abierto = $('#cfg').classList.toggle('abierto');
+  $('#btn-personalizar').classList.toggle('activo', abierto);
+  $('#btn-personalizar').setAttribute('aria-expanded', abierto);
+});
+$('#cfg').addEventListener('change', alCambiarPanel);
+$('#cfg-solo-resumen').addEventListener('click', () => {
+  CFG.secciones.casos = false;
+  CFG.secciones.firmados = false;
+  ['kpis', 'estado', 'linea', 'garantia', 'programa'].forEach(k => { CFG.secciones[k] = true; });
+  guardarCfg(); pintarPanel(); dibujar();
+});
+$('#cfg-restablecer').addEventListener('click', () => {
+  CFG = cfgDefecto();
+  guardarCfg(); pintarPanel(); dibujar();
+});
 
 cargar();
 </script>
