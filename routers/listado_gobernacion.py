@@ -20,7 +20,8 @@ from sqlalchemy import text
 from db import engine
 from auth import require_login
 from formatos import _monto, _dmy
-from constantes import ESTADOS_CARPETA, ESTADO_CARPETA_COLOR, SITUACIONES_TRAMITE, SITUACION_TRAMITE_COLOR
+from constantes import (ESTADOS_CARPETA, ESTADO_CARPETA_COLOR, SITUACIONES_TRAMITE, SITUACION_TRAMITE_COLOR,
+                        ESTADOS_CARPETA_SIN_SITUACION)
 
 router = APIRouter(prefix="/api/listado-gobernacion", tags=["gobernacion"])
 
@@ -56,7 +57,8 @@ def listar(usuario=Depends(require_login)):
             "en_instancia_superior": bool(r["instancia_superior"]),
             "estado_carpeta": r["estado_carpeta"] or "",
             "detalle_estado": r["detalle_estado"] or "",
-            "situacion_tramite": r["situacion_tramite"] or "",
+            # lo cerrado (desembolsado / desistido) no espera nada: no se muestra una situación vieja
+            "situacion_tramite": "" if r["estado_carpeta"] in ESTADOS_CARPETA_SIN_SITUACION else (r["situacion_tramite"] or ""),
             "monto_sistema": sistema,
             "monto_sistema_fmt": _monto(sistema) if sistema is not None else "—",
             "monto_difiere": sistema is not None and r["monto"] is not None and sistema != r["monto"],
@@ -67,6 +69,7 @@ def listar(usuario=Depends(require_login)):
         "estados": ESTADOS_CARPETA,
         "estado_carpeta_color": ESTADO_CARPETA_COLOR,
         "situaciones": SITUACIONES_TRAMITE,
+        "estados_sin_situacion": list(ESTADOS_CARPETA_SIN_SITUACION),
         "situacion_color": SITUACION_TRAMITE_COLOR,
         "casos": casos,
     }

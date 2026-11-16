@@ -80,6 +80,7 @@ let TODOS = [];
 let COLORES = {};
 let ESTADOS = [];
 let SITUACIONES = [];
+let ESTADOS_SIN_SITUACION = [];   // desembolsado / desistido: ya no esperan nada, no llevan situación
 let COLORES_SIT = {};
 
 function etiqueta(s){
@@ -107,12 +108,16 @@ async function cambiarEstado(id, valor){
   } else {
     const c = TODOS.find(x => x.consulta_id === id);
     if(c) c.estado_carpeta = valor;
+    // el servidor borra la situación al cerrar el expediente: se refleja acá sin recargar
+    if(ESTADOS_SIN_SITUACION.includes(valor)) TODOS.filter(x => x.consulta_id === id).forEach(x => x.situacion_tramite = '');
   }
   pintar();
 }
 
 function selSituacion(c){
   if(!c.consulta_id) return '<span class="muted">—</span>';
+  if(ESTADOS_SIN_SITUACION.includes(c.estado_carpeta))
+    return '<span class="muted" title="Un expediente desembolsado o desistido no lleva situación del trámite">—</span>';
   const col = COLORES_SIT[c.situacion_tramite] || {bg:'#f0f1f5', fg:'#6b7590'};
   const ops = SITUACIONES.map(e => `<option value="${escapeHtml(e)}" ${c.situacion_tramite===e?'selected':''}>${escapeHtml(etiqueta(e))}</option>`).join('');
   return `<select class="lg-estado-sel" style="background-color:${col.bg};color:${col.fg}"
@@ -233,7 +238,7 @@ async function guardarDetalle(el){
 
 async function cargar(){
   const d = await (await fetch('/api/listado-gobernacion')).json();
-  TODOS = d.casos; COLORES = d.estado_carpeta_color; ESTADOS = d.estados; SITUACIONES = d.situaciones; COLORES_SIT = d.situacion_color;
+  TODOS = d.casos; COLORES = d.estado_carpeta_color; ESTADOS = d.estados; SITUACIONES = d.situaciones; ESTADOS_SIN_SITUACION = d.estados_sin_situacion || []; COLORES_SIT = d.situacion_color;
   $('#lg-estado').innerHTML = '<option value="">Todos los estados</option>'
     + d.estados.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(etiqueta(e))}</option>`).join('')
     + '<option value="__sin">Sin clasificar</option>';

@@ -10,7 +10,7 @@ from models import GestionIn, ConsultaManualIn, BulkGestionIn, BulkAccionIn
 from formatos import _dmy, _monto, _hora_local, _parse_monto, _parse_fecha
 from constantes import (grupo_de, _norm, ROL_COORDINADOR, GRUPOS_ACTIVOS, TOPE_LINEA, excede_tope,
                          ACCION_NO_FINANCIABLE, ESTADO_NO_FINANCIABLE, TOPES_FIANZA_TERCERO,
-                         ESTADOS_CARPETA)
+                         ESTADOS_CARPETA, ESTADOS_CARPETA_SIN_SITUACION)
 import genero as genero_mod
 
 router = APIRouter(prefix="/api/consultas", tags=["consultas"])
@@ -346,7 +346,8 @@ def instancia_superior(estados: list[str] = Query(default=[]), _=Depends(require
         "estado_carpeta": r["estado_carpeta"],
         "detalle_estado": r["detalle_estado"] or "",
         "cuit": r["cuit"] or "", "telefono": r["telefono"] or "", "mail": r["mail"] or "",
-        "localidad": r["localidad"] or "", "situacion_tramite": r["situacion_tramite"] or "",
+        "localidad": r["localidad"] or "",
+        "situacion_tramite": "" if r["estado_carpeta"] in ESTADOS_CARPETA_SIN_SITUACION else (r["situacion_tramite"] or ""),
     } for r in rows]
     if estados:
         casos = [c for c in casos if c["estado_carpeta"] in estados]
@@ -561,12 +562,19 @@ def detalle(cid: int, _=Depends(require_login)):
 @router.patch("/{cid}")
 def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
     with engine.connect() as conn:
-        actual = conn.execute(text("SELECT tecnico FROM sde_consultas WHERE id = :id"),
+        actual = conn.execute(text("SELECT tecnico, estado_carpeta FROM sde_consultas WHERE id = :id"),
                               {"id": cid}).mappings().first()
     if not actual:
         raise HTTPException(404, "Consulta no encontrada")
 
     campos = body.model_dump(exclude_none=True)
+    # Un expediente desembolsado o desistido no espera nada de nadie: al pasar a uno de
+    # esos estados la situación del trámite se borra, y mientras esté en uno no se puede
+    # volver a cargar (si no, queda "Esperando documentación" en algo ya cerrado).
+    estado_resultante = campos.get("estado_carpeta", actual["estado_carpeta"])
+    cierra_expediente = estado_resultante in ESTADOS_CARPETA_SIN_SITUACION
+    if cierra_expediente and campos.get("situacion_tramite") and "estado_carpeta" not in campos:
+        raise HTTPException(400, "Un expediente desembolsado o desistido no lleva situación del trámite")
     # Los datos que llegaron con el formulario (nombre, CUIT, teléfono, actividad,
     # destino, etc.) los puede corregir SOLO el coordinador — un técnico gestiona
     # una consulta, pero no debería poder cambiar la identidad del solicitante.
@@ -587,6 +595,8 @@ def editar_gestion(cid: int, body: GestionIn, usuario=Depends(require_login)):
         # resto del formulario pero la asignación nunca quedaba, en silencio.
         if _norm(campos["tecnico"]) != _norm(usuario["nombre"]):
             campos.pop("tecnico")
+    if cierra_expediente and "estado_carpeta" in campos:
+        campos["situacion_tramite"] = ""   # recién se cierra: la situación vieja se borra
     sets, params = [], {"id": cid}
     for col in _GESTION_COLS + _SOLICITANTE_COLS:
         if col in campos:

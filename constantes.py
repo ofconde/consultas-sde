@@ -105,6 +105,10 @@ ESTADO_CARPETA_COLOR = {
     "RECHAZADO POR ANALISIS DE RIESGO":                                {"bg": "#fdecea", "fg": "#d0402c"},
 }
 
+# Estados de carpeta que ya cerraron el circuito: el expediente no espera nada de nadie,
+# así que no lleva «situación del trámite» (qué está esperando o con quién está).
+ESTADOS_CARPETA_SIN_SITUACION = ("DESEMBOLSADO", "DESISTIDO POR SOLICITANTE")
+
 # Situación del trámite de un expediente ya firmado: sub-etapa dentro de "Firmado -
 # en trámite para ingresar a CFI" y de "En trámite de desembolso" (qué está
 # esperando o con quién está). Surge de estandarizar el detalle libre que se
